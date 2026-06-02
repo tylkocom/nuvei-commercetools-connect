@@ -129,7 +129,9 @@ describe("CardComponent", () => {
     component.mount("#container");
 
     // Wait for the rejected promise to propagate through .catch()
-    await new Promise((r) => setTimeout(r, 0));
+    const { promise: wait1, resolve: done1 } = Promise.withResolvers<void>();
+    setTimeout(done1, 0);
+    await wait1;
 
     expect(onError).toHaveBeenCalledWith(error);
   });
@@ -204,8 +206,51 @@ describe("CardComponent", () => {
     component.mount("#container");
 
     // Wait for the async init to finish and set mounted = true
-    await new Promise((r) => setTimeout(r, 0));
+    const { promise: wait2, resolve: done2 } = Promise.withResolvers<void>();
+    setTimeout(done2, 0);
+    await wait2;
 
     expect(component.isValid()).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // Session-token handoff (D-11, D-09)
+  // -------------------------------------------------------------------------
+
+  it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
+    // The Nuvei widget result has a DIFFERENT sessionToken than the one
+    // from createPayment. confirmPaymentResult must be called with the
+    // known processor session token, not the browser-returned one.
+    const mockSfcCreatePayment = vi.fn().mockImplementation(
+      (opts: { onResult: (r: { transactionStatus: string; sessionToken: string }) => void }) => {
+        opts.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
+      },
+    );
+    const mockSafeCharge = vi.fn().mockReturnValue({
+      createPayment: mockSfcCreatePayment,
+    });
+    mockLoadNuveiSdk.mockResolvedValue(mockSafeCharge);
+    mockCreatePayment.mockResolvedValue({
+      sessionToken: "known-session-token",
+      paymentReference: "payment-ref-123",
+    });
+
+    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const component = builder.build({ showPayButton: true });
+    component.mount("#container");
+
+    await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
+
+    // Third argument must be the known session token from createPayment,
+    // NOT "browser-session-token" from the Nuvei widget result.
+    expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionToken: "browser-session-token" }), // result (NuveiResult)
+      "payment-ref-123", // paymentReference
+      "known-session-token", // knownSessionToken — from paymentRes, not result
+      expect.any(Object), // api
+      undefined, // onComplete (not set in makeEnablerOptions)
+      undefined, // onError (not set in makeEnablerOptions)
+      undefined, // onPending (not set in makeEnablerOptions)
+    );
   });
 });

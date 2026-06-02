@@ -3,6 +3,7 @@ import type { EnablerOptions } from "../../src/payment-enabler/payment-enabler";
 
 const mockLoadNuveiSdk = vi.hoisted(() => vi.fn());
 const mockCreatePayment = vi.hoisted(() => vi.fn());
+const mockConfirmPaymentResult = vi.hoisted(() => vi.fn());
 
 vi.mock("../../src/services/nuvei-sdk", () => ({
   loadNuveiSdk: mockLoadNuveiSdk,
@@ -12,7 +13,7 @@ vi.mock("../../src/services/api-service", () => ({
   apiService: vi.fn(() => ({
     createPayment: mockCreatePayment,
   })),
-  confirmPaymentResult: vi.fn(),
+  confirmPaymentResult: mockConfirmPaymentResult,
 }));
 
 import { DropinEmbeddedBuilder } from "../../src/dropin/dropin-embedded";
@@ -90,6 +91,47 @@ describe("DropinEmbeddedBuilder", () => {
           merchant_unique_id: "payment-ref-123",
         }),
       ),
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Session-token handoff (D-11)
+  // -------------------------------------------------------------------------
+
+  it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
+    // The Nuvei widget result carries a DIFFERENT sessionToken than the one
+    // returned by createPayment. confirmPaymentResult must receive the
+    // known processor session token, not the browser-returned one.
+    const mockSfcCreatePayment = vi.fn().mockImplementation(
+      (opts: { onResult: (r: { transactionStatus: string; sessionToken: string }) => void }) => {
+        opts.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
+      },
+    );
+    const mockSafeCharge = vi.fn().mockReturnValue({
+      createPayment: mockSfcCreatePayment,
+    });
+    mockLoadNuveiSdk.mockResolvedValue(mockSafeCharge);
+    mockCreatePayment.mockResolvedValue({
+      sessionToken: "known-session-token",
+      paymentReference: "payment-ref-123",
+    });
+
+    const builder = new DropinEmbeddedBuilder(makeEnablerOptions());
+    const dropin = builder.build({ showPayButton: true });
+    dropin.mount("#container");
+
+    await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
+
+    // Third argument must be the known session token from createPayment,
+    // NOT "browser-session-token" from the Nuvei widget result.
+    expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionToken: "browser-session-token" }), // result
+      "payment-ref-123", // paymentReference
+      "known-session-token", // knownSessionToken — from paymentRes, not result
+      expect.any(Object), // api
+      undefined, // onComplete (not set in makeEnablerOptions)
+      undefined, // onError (not set in makeEnablerOptions)
+      undefined, // onPending (not set in makeEnablerOptions)
     );
   });
 });

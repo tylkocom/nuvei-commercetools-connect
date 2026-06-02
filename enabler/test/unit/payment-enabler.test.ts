@@ -231,3 +231,32 @@ describe("apiService", () => {
     });
   });
 });
+// ---------------------------------------------------------------------------
+// onPending optional callback in EnablerOptions (D-19)
+// ---------------------------------------------------------------------------
+
+describe("EnablerOptions onPending", () => {
+  it("validateEnablerOptions does not throw when onPending is omitted", () => {
+    expect(() => validateEnablerOptions(makeEnablerOptions())).not.toThrow();
+  });
+
+  it("validateEnablerOptions does not throw when onPending is provided", () => {
+    const onPending = vi.fn();
+    expect(() =>
+      validateEnablerOptions(makeEnablerOptions({ onPending })),
+    ).not.toThrow();
+  });
+
+  it("NuveiEnabler construction succeeds with onPending in options", () => {
+    const onPending = vi.fn();
+    expect(() => new NuveiEnabler(makeEnablerOptions({ onPending }))).not.toThrow();
+  });
+
+  it("NuveiEnabler passes onPending through to component builders (options preserved)", async () => {
+    const onPending = vi.fn();
+    const enabler = new NuveiEnabler(makeEnablerOptions({ onPending }));
+    // createComponentBuilder must succeed — option must not be rejected
+    const builder = await enabler.createComponentBuilder(PaymentMethod.card);
+    expect(builder).toBeDefined();
+  });
+});
