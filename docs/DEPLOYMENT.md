@@ -143,7 +143,7 @@ Optional configuration used by the current source:
 
 ## Post-deployment verification
 
-Use implemented processor endpoints only. The source currently registers `/config`, `/status`, `/payment-components`, `/payment-intents/:id`, `/transactions`, `/payments`, `/payments/confirmPayments/:id`, and `/webhooks/nuvei`. It does not register a `/health` route.
+Use implemented processor endpoints only. The source currently registers `/config`, `/status`, `/health`, `/payment-components`, `/payment-intents/:id`, `/transactions`, `/payments/session`, `/payments/confirm/:id`, and `/webhooks/nuvei`.
 
 Recommended checks:
 
@@ -157,7 +157,15 @@ Recommended checks:
 
    Expected response shape includes `status`, `timestamp`, `version`, `metadata`, and `checks` from `processor/src/dtos/operations/status.dto.ts`.
 
-3. Call the authenticated payment components endpoint with a valid JWT:
+3. Call the unauthenticated config-var health endpoint:
+
+   ```bash
+   curl https://<processor-service-url>/health
+   ```
+
+   Expected response shape is `{ status: "ok"|"degraded", checks: [{ name, status }] }` and contains only configuration variable names, never values.
+
+4. Call the authenticated payment components endpoint with a valid JWT:
 
    ```bash
    curl -H "Authorization: Bearer <jwt>" \
@@ -166,9 +174,9 @@ Recommended checks:
 
    The current implementation advertises the `card` component and the `embedded` drop-in.
 
-4. Run a test checkout flow that creates a payment session through `POST /payments` with `X-Session-ID`, confirms an approved Nuvei widget result through `POST /payments/confirmPayments/:id`, and verifies that the commercetools Payment receives the expected transaction update.
+5. Run a test checkout flow that creates a payment session through `POST /payments/session` with `X-Session-ID`, confirms an approved Nuvei widget result through `POST /payments/confirm/:id`, and verifies that the commercetools Payment receives the expected transaction update.
 
-5. Trigger or wait for a Nuvei DMN and verify that Nuvei reaches `POST /webhooks/nuvei`. DMN processing validates the checksum, merchant identifiers, duplicate transaction IDs, amount, currency, cart identity, and transaction identity before updating the commercetools Payment.
+6. Trigger or wait for a Nuvei DMN and verify that Nuvei reaches `POST /webhooks/nuvei`. DMN processing validates the checksum, merchant identifiers, duplicate transaction IDs, amount, currency, cart identity, and transaction identity before updating the commercetools Payment.
 
 <!-- VERIFY: Replace `<processor-service-url>` with the actual deployed processor base URL and use a JWT/session issued for the target commercetools project. -->
 

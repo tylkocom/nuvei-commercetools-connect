@@ -213,8 +213,8 @@ GET  /ledger
 POST /reset
 GET  /config
 GET  /payment-components
-POST /payments
-POST /payments/confirmPayments/:id
+POST /payments/session
+POST /payments/confirm/:id
 POST /webhooks/nuvei
 POST /payment-intents/:id
 ```

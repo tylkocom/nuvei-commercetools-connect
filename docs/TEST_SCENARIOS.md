@@ -218,8 +218,8 @@ Steps:
 Expected result:
 
 - Nuvei widget renders.
-- `POST /payments` creates a Nuvei session and a CT Payment.
-- Frontend confirmation calls `POST /payments/confirmPayments/:paymentId`.
+- `POST /payments/session` creates a Nuvei session and a CT Payment.
+- Frontend confirmation calls `POST /payments/confirm/:paymentId`.
 - CT Payment has an `Authorization` transaction with state `Success`.
 - Authorization `interactionId` is the Nuvei transaction ID after confirmation.
 - Nuvei dashboard shows an approved authorization.
@@ -580,9 +580,9 @@ Purpose: Confirm frontend routes cannot be called without a valid session.
 
 Steps:
 
-1. Send `POST {PROCESSOR_URL}/payments` without session headers.
+1. Send `POST {PROCESSOR_URL}/payments/session` without session headers.
 2. Send the same request with an invalid session ID.
-3. Send `POST {PROCESSOR_URL}/payments/confirmPayments/:paymentId` with an invalid session.
+3. Send `POST {PROCESSOR_URL}/payments/confirm/:paymentId` with an invalid session.
 4. Inspect responses.
 
 Expected result:
@@ -599,7 +599,7 @@ Steps:
 
 1. Create Checkout Session A and start a payment to create Payment A.
 2. Create Checkout Session B for a different cart.
-3. From Session B, call `POST /payments/confirmPayments/:paymentAId` with Payment A's session token.
+3. From Session B, call `POST /payments/confirm/:paymentAId` with Payment A's session token.
 4. Inspect response and CT Payment A.
 
 Expected result:
@@ -617,7 +617,7 @@ Steps:
 1. In a non-production environment, point `NUVEI_API_BASE_URL` to an unreachable HTTPS endpoint or block outbound access.
 2. Start the processor.
 3. Call `GET /status`.
-4. Attempt `POST /payments` from a valid session.
+4. Attempt `POST /payments/session` from a valid session.
 5. Inspect response and logs.
 
 Expected result:

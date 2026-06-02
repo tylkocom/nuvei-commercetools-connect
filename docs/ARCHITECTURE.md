@@ -30,11 +30,11 @@ graph TD
 1. A storefront or commercetools Checkout page instantiates `NuveiEnabler` from `enabler/src/index.ts` with the processor URL, commercetools session ID, Nuvei merchant identifiers, environment, and completion/error callbacks.
 2. The caller asks the enabler for either a component builder (`card`) or a drop-in builder (`embedded`). `NuveiEnabler` validates the requested method against the registry in `enabler/src/payment-enabler/method-registry.ts`.
 3. `CardComponent` or `DropinComponents` loads the Nuvei SafeCharge Web SDK from `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js` and calls the processor through `apiService` in `enabler/src/services/api-service.ts`.
-4. `apiService.createPayment()` sends `POST /payments` with `X-Session-ID`. The processor registers this route in `processor/src/server/plugins/nuvei-payment.plugin.ts` and authenticates it with the commercetools session header hook.
-5. `NuveiPaymentService.createPaymentIntent()` reads the cart ID from request context, fetches the cart through the commercetools Connect Payments SDK, calculates the planned payment amount, calls `NuveiClient.openOrder()`, and creates a commercetools Payment through `CtPaymentCreationService.handleCtPaymentCreation()`.
+4. `apiService.createPayment()` sends `POST /payments/session` with `X-Session-ID`. The processor registers this route in `processor/src/server/plugins/nuvei-payment.plugin.ts` and authenticates it with the commercetools session header hook. The request body can include `paymentMethodOptions` and defaults to `card` when omitted.
+5. `NuveiPaymentService.createPaymentSession()` reads the cart ID from request context, fetches the cart through the commercetools Connect Payments SDK, calculates the planned payment amount, calls `NuveiClient.openOrder()`, and creates a commercetools Payment through `CtPaymentCreationService.handleCtPaymentCreation()`.
 6. The processor returns the cart ID, Nuvei `sessionToken`, commercetools payment reference, and merchant return URL to the enabler.
 7. The enabler renders the Nuvei widget using `SafeCharge(...).createPayment(...)` and passes `merchant_unique_id` as the commercetools payment reference.
-8. When the widget reports an approved result, `confirmPaymentResult()` calls `POST /payments/confirmPayments/:paymentReference` with the Nuvei session token.
+8. When the widget reports an approved result, `confirmPaymentResult()` calls `POST /payments/confirm/:paymentReference` with the Nuvei session token.
 9. `NuveiPaymentService.confirmPayment()` retrieves the commercetools Payment, verifies that the authenticated session cart owns that Payment, calls `NuveiClient.getPaymentStatus()`, validates amount/currency/cart identity, and updates the Payment with an `Authorization` transaction in `Success` or `Failure` state.
 
 ### Server-driven transaction creation
@@ -71,7 +71,7 @@ graph TD
 | `PAYMENT_METHOD_REGISTRY` | `enabler/src/payment-enabler/method-registry.ts`, `processor/src/dtos/operations/payment-components.dto.ts` | Registry of supported payment methods: `card` component and `embedded` drop-in. |
 | `CardComponentBuilder` / `CardComponent` | `enabler/src/components/card.ts` | Browser card integration that creates a payment session, loads Nuvei SDK, renders the card widget, and confirms approved results. |
 | `DropinEmbeddedBuilder` / `DropinComponents` | `enabler/src/dropin/dropin-embedded.ts` | Browser drop-in integration for the embedded Nuvei Simply Connect widget. |
-| `apiService` | `enabler/src/services/api-service.ts` | Thin fetch client for `POST /payments`, `GET /payments`, and `POST /payments/confirmPayments/:id`. |
+| `apiService` | `enabler/src/services/api-service.ts` | Thin fetch client for `POST /payments/session` and `POST /payments/confirm/:id`. |
 | `NuveiClient` | `processor/src/clients/nuvei.client.ts` | Server-side Nuvei REST client for `openOrder`, `getPaymentStatus`, `settleTransaction`, `voidTransaction`, `refundTransaction`, and DMN checksum validation. |
 | `NuveiPaymentService` | `processor/src/services/nuvei-payment.service.ts` | Core orchestration service for configuration, status, payment creation, transaction handling, payment modifications, confirmation, and DMN processing. |
 | `CtPaymentCreationService` | `processor/src/services/ct-payment-creation.service.ts` | Creates commercetools Payments and attaches them to carts. |
@@ -85,12 +85,12 @@ graph TD
 | --- | --- | --- | --- | --- |
 | `GET` | `/config` | `processor/src/routes/operation.route.ts` | commercetools session header | Return frontend Nuvei environment, merchant ID, and merchant site ID. |
 | `GET` | `/status` | `processor/src/routes/operation.route.ts` | JWT | Run commercetools permission and Nuvei reachability checks. |
+| `GET` | `/health` | `processor/src/routes/operation.route.ts` | None | No auth. Returns `{ status: ok|degraded, checks: [{name, status}] }` based on config-var presence. |
 | `GET` | `/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return supported drop-ins, components, and express methods. |
 | `POST` | `/payment-intents/:id` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_payment_intents` | Capture, cancel, refund, or reverse a payment intent. |
 | `POST` | `/transactions` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_transactions` | Create a server-driven Nuvei order and commercetools Payment for a cart. |
-| `GET` | `/payments` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session without explicit payment method options. |
-| `POST` | `/payments` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for a selected payment method (`card` or `embedded`). |
-| `POST` | `/payments/confirmPayments/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a widget-approved payment with Nuvei and update the commercetools Payment. |
+| `POST` | `/payments/session` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for a selected payment method (`card` or `embedded`), defaulting to `card` if omitted. |
+| `POST` | `/payments/confirm/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a widget-approved payment with Nuvei and update the commercetools Payment. |
 | `POST` | `/webhooks/nuvei` | `processor/src/routes/nuvei-payment.route.ts` | Nuvei checksum/header hook | Process Nuvei DMN webhooks and reconcile Payment transactions. |
 
 ## Transaction and status mapping

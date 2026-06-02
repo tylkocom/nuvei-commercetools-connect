@@ -1,0 +1,294 @@
+{
+  "info": {
+    "name": "Nuvei Connector Local Testing",
+    "description": "Exercises the Nuvei connector locally with mocked commercetools state. Start the mock server with `cd testing && npm start`. Use the Mock Server folder for the hard-coded Express helper and the Processor App folder for the real processor endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "00 Mock Server",
+      "description": "Requests against testing/mock-commercetools-server.mjs on {{mockBaseUrl}}.",
+      "item": [
+        {
+          "name": "01 Mock Server Landing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/",
+            "description": "Verifies the local testing helper server is running."
+          }
+        },
+        {
+          "name": "02 Inspect Mock CT Ledger",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/ledger",
+            "description": "Shows the hard-coded mock cart, payment, transactions, payment status, and recent observed requests."
+          }
+        },
+        {
+          "name": "03 Reset Mock CT Ledger",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/reset",
+            "description": "Resets the mock payment to pending state and clears transactions/request history."
+          }
+        },
+        {
+          "name": "04 Mock Frontend Config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/config",
+            "description": "Mock equivalent of processor GET /config. Returns frontend-safe Nuvei config only."
+          }
+        },
+        {
+          "name": "05 Mock Payment Components",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/payment-components",
+            "description": "Mock equivalent of processor GET /payment-components. Confirms card component and embedded drop-in are advertised."
+          }
+        },
+        {
+          "name": "06 Mock Create Payment Intent - Card",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"paymentMethodOptions\": {\n    \"card\": {}\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payments/session",
+            "description": "Mock equivalent of processor POST /payments/session. Normal caller: enabler browser code -> processor. Real processor behavior: reads CT cart/payment amount, calls Nuvei openOrder.do, creates CT Payment. Mock behavior: returns hard-coded cartId/paymentReference and generated mock sessionToken."
+          }
+        },
+        {
+          "name": "07 Mock Create Payment Intent - Dropin",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"paymentMethodOptions\": {\n    \"embedded\": {}\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payments/session",
+            "description": "Mock equivalent of processor POST /payments/session for embedded drop-in."
+          }
+        },
+        {
+          "name": "08 Mock Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payments/confirm/{{paymentId}}",
+            "description": "Mock equivalent of processor POST /payments/confirm/:paymentId. Normal caller: enabler browser code after Nuvei SDK onResult. Mock behavior: adds Authorization Success to local ledger."
+          }
+        },
+        {
+          "name": "09 Mock DMN Webhook - Authorization OK",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"merchantId\": \"mock-merchant-id\",\n  \"merchantSiteId\": \"mock-merchant-site-id\",\n  \"merchant_unique_id\": \"{{paymentId}}\",\n  \"clientUniqueId\": \"cart-local-001\",\n  \"transactionType\": \"Auth\",\n  \"ppp_status\": \"OK\",\n  \"Status\": \"OK\",\n  \"totalAmount\": \"10.00\",\n  \"currency\": \"EUR\",\n  \"responseTimeStamp\": \"2026-06-02.12:00:00\",\n  \"TransactionID\": \"{{nuveiTransactionId}}\",\n  \"PPP_TransactionID\": \"{{nuveiTransactionId}}\",\n  \"productId\": \"\",\n  \"advanceResponseChecksum\": \"paste-real-or-computed-checksum\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/webhooks/nuvei",
+            "description": "Mock equivalent of a Nuvei DMN callback to POST /webhooks/nuvei. The mock logs exact headers/body and converts the payload into a ledger transaction. Checksum is intentionally not enforced by the mock."
+          }
+        },
+        {
+          "name": "10 Mock Capture Payment Intent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"capturePayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Mock equivalent of processor POST /payment-intents/:paymentId for capture. Mock behavior: adds Charge Success to local ledger."
+          }
+        },
+        {
+          "name": "11 Mock Cancel Authorization",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"cancelPayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Mock equivalent of processor POST /payment-intents/:paymentId for cancel authorization. Mock behavior: adds CancelAuthorization Success to local ledger."
+          }
+        },
+        {
+          "name": "12 Mock Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"refundPayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{mockBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Mock equivalent of processor POST /payment-intents/:paymentId for refund. Mock behavior: adds Refund Success to local ledger."
+          }
+        },
+        {
+          "name": "13 Mock CT Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/mock-ct/carts/cart-local-001",
+            "description": "Directly inspects the hard-coded mock cart object."
+          }
+        },
+        {
+          "name": "14 Mock CT Get Payment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{mockBaseUrl}}/mock-ct/payments/{{paymentId}}",
+            "description": "Directly inspects the hard-coded mock payment object."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Processor App",
+      "description": "Requests against the real processor app on {{processorBaseUrl}}. These require the processor to be running and may require real/mocked auth/session services.",
+      "item": [
+        {
+          "name": "01 Processor Config",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Session-ID", "value": "{{sessionId}}" }],
+            "url": "{{processorBaseUrl}}/config",
+            "description": "Real processor GET /config. Normal caller: commercetools Checkout / enabler setup -> processor. Tests processor/src/routes/operation.route.ts and frontend-safe Nuvei config handling."
+          }
+        },
+        {
+          "name": "02 Processor Payment Components",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{bearerToken}}" }],
+            "url": "{{processorBaseUrl}}/payment-components",
+            "description": "Real processor GET /payment-components. Requires a JWT accepted by the processor unless auth is mocked/bypassed locally."
+          }
+        },
+        {
+          "name": "00 Processor Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{processorBaseUrl}}/health",
+            "description": "Unauthenticated config-var check. Returns { status: 'ok'|'degraded', checks: [...] }. No auth headers required. Use to verify processor config vars are present without needing a Checkout session."
+          }
+        },
+        {
+          "name": "03 Processor Create Card Payment Intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"paymentMethodOptions\": {\n    \"card\": {}\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payments/session",
+            "description": "Real processor POST /payments/session for card. Normal caller: enabler/src/services/api-service.ts. Tests route/service/client path that creates a Nuvei openOrder and CT Payment."
+          }
+        },
+        {
+          "name": "04 Processor Create Dropin Payment Intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"paymentMethodOptions\": {\n    \"embedded\": {}\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payments/session",
+            "description": "Real processor POST /payments/session for embedded drop-in. Tests same Nuvei openOrder path with paymentMethodOptions.embedded."
+          }
+        },
+        {
+          "name": "05 Processor Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-Session-ID", "value": "{{sessionId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payments/confirm/{{paymentId}}",
+            "description": "Real processor POST /payments/confirm/:paymentId. Normal caller: enabler after Nuvei SDK onResult. Tests Nuvei getPaymentStatus verification and CT Payment transaction update."
+          }
+        },
+        {
+          "name": "06 Processor DMN Webhook Replay",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"merchantId\": \"paste-real-merchant-id\",\n  \"merchantSiteId\": \"paste-real-merchant-site-id\",\n  \"merchant_unique_id\": \"{{paymentId}}\",\n  \"clientUniqueId\": \"cart-local-001\",\n  \"transactionType\": \"Auth\",\n  \"ppp_status\": \"OK\",\n  \"Status\": \"OK\",\n  \"totalAmount\": \"10.00\",\n  \"currency\": \"EUR\",\n  \"responseTimeStamp\": \"2026-06-02.12:00:00\",\n  \"TransactionID\": \"{{nuveiTransactionId}}\",\n  \"PPP_TransactionID\": \"{{nuveiTransactionId}}\",\n  \"productId\": \"\",\n  \"advanceResponseChecksum\": \"paste-real-or-computed-checksum\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/webhooks/nuvei",
+            "description": "Real processor POST /webhooks/nuvei. Normal caller: Nuvei sandbox DMN. This manual request is for replay/debugging captured DMNs."
+          }
+        },
+        {
+          "name": "07 Processor Capture Payment Intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{oauthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"capturePayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Real processor POST /payment-intents/:paymentId for capture. Tests Nuvei settleTransaction and CT Charge update. Requires OAuth auth/authorization unless mocked locally."
+          }
+        },
+        {
+          "name": "08 Processor Cancel Authorization",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{oauthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"cancelPayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Real processor POST /payment-intents/:paymentId for cancel authorization. Tests Nuvei voidTransaction and CT CancelAuthorization update."
+          }
+        },
+        {
+          "name": "09 Processor Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{oauthToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"action\": \"refundPayment\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{processorBaseUrl}}/payment-intents/{{paymentId}}",
+            "description": "Real processor POST /payment-intents/:paymentId for refund. Tests Nuvei refundTransaction and CT Refund update."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Tunnel and DMN",
+      "description": "Use these to verify a public tunnel forwards to local /webhooks/nuvei before configuring Nuvei Dashboard DMN URL.",
+      "item": [
+        {
+          "name": "01 Public Tunnel DMN Endpoint",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"merchant_unique_id\": \"{{paymentId}}\",\n  \"transactionType\": \"Auth\",\n  \"ppp_status\": \"OK\",\n  \"Status\": \"OK\",\n  \"totalAmount\": \"10.00\",\n  \"currency\": \"EUR\",\n  \"TransactionID\": \"{{nuveiTransactionId}}\",\n  \"PPP_TransactionID\": \"{{nuveiTransactionId}}\",\n  \"advanceResponseChecksum\": \"paste-real-or-computed-checksum\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{tunnelBaseUrl}}/webhooks/nuvei",
+            "description": "If tunneling the mock server, target localhost:8089. If tunneling the real processor, target localhost:8080. Configure this URL in Nuvei Dashboard -> Settings -> My Integration Settings -> DMN URL."
+          }
+        }
+      ]
+    }
+  ]
+}

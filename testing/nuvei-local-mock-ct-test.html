@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuvei Local Test Guide</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --success: #4ade80;
+            --success-glow: rgba(74, 222, 128, 0.3);
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --code-bg: #0b1220;
+            --border: #334155;
+            --step-1: #f472b6;
+            --step-2: #a78bfa;
+            --step-3: #60a5fa;
+            --step-4: #38bdf8;
+            --step-5: #2dd4bf;
+            --step-6: #4ade80;
+            --step-7: #fbbf24;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Header & Progress */
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--accent), var(--step-1));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header-subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-container {
+            background: var(--surface);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .progress-title {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .progress-count {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .progress-bar-bg {
+            height: 12px;
+            background: var(--code-bg);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--step-1), var(--step-4), var(--step-6));
+            border-radius: 6px;
+            transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            width: 0%;
+            position: relative;
+        }
+
+        .progress-bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Section Cards */
+        .step-card {
+            background: var(--surface);
+            border-radius: 1rem;
+            margin-bottom: 1.25rem;
+            border: 2px solid var(--border);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .step-card:hover {
+            border-color: var(--surface-hover);
+        }
+
+        .step-card.completed {
+            border-color: var(--success);
+            box-shadow: 0 0 20px var(--success-glow);
+        }
+
+        .step-card.completed .step-header {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.1), transparent);
+        }
+
+        .step-header {
+            padding: 1.25rem 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            position: relative;
+            user-select: none;
+            transition: background 0.3s ease;
+        }
+
+        .step-number {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+            color: white;
+        }
+
+        .step-card[data-step="1"] .step-number { background: linear-gradient(135deg, var(--step-1), #db2777); }
+        .step-card[data-step="2"] .step-number { background: linear-gradient(135deg, var(--step-2), #7c3aed); }
+        .step-card[data-step="3"] .step-number { background: linear-gradient(135deg, var(--step-3), #2563eb); }
+        .step-card[data-step="4"] .step-number { background: linear-gradient(135deg, var(--step-4), #0891b2); }
+        .step-card[data-step="5"] .step-number { background: linear-gradient(135deg, var(--step-5), #0d9488); }
+        .step-card[data-step="6"] .step-number { background: linear-gradient(135deg, var(--step-6), #16a34a); }
+        .step-card[data-step="7"] .step-number { background: linear-gradient(135deg, var(--step-7), #d97706); }
+        .step-card[data-step="8"] .step-number { background: linear-gradient(135deg, #f87171, #dc2626); }
+
+        .step-card.completed .step-number {
+            background: var(--success) !important;
+            transform: scale(1.1);
+        }
+
+        .step-title-area {
+            flex: 1;
+        }
+
+        .step-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 0.15rem;
+        }
+
+        .step-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .step-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .btn-done {
+            background: linear-gradient(135deg, var(--success), #16a34a);
+            color: #064e3b;
+        }
+
+        .btn-done:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--success-glow);
+        }
+
+        .btn-undo {
+            background: var(--surface-hover);
+            color: var(--text);
+        }
+
+        .btn-undo:hover {
+            background: var(--border);
+        }
+
+        .toggle-icon {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.3s ease;
+            color: var(--text-muted);
+        }
+
+        .step-card.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .step-body {
+            padding: 0 1.5rem 1.5rem 1.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .step-card.collapsed .step-body {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Content styling */
+        .section-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 700;
+            color: var(--accent);
+            margin: 1.5rem 0 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-label:first-child {
+            margin-top: 0;
+        }
+
+        p {
+            margin-bottom: 0.75rem;
+            color: var(--text);
+        }
+
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            overflow-x: auto;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            color: var(--text);
+            margin-bottom: 1rem;
+        }
+
+        code {
+            font-family: 'SF Mono', Monaco, monospace;
+            background: var(--code-bg);
+            padding: 0.15rem 0.4rem;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+            color: var(--accent);
+        }
+
+        pre code {
+            padding: 0;
+            background: transparent;
+            color: inherit;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1), rgba(168, 85, 247, 0.1));
+            border: 1px solid var(--accent);
+            border-radius: 0.75rem;
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+        }
+
+        .highlight-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 0.4rem 0;
+            padding-left: 1.75rem;
+            position: relative;
+        }
+
+        .checklist li::before {
+            content: '□';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        /* Dopamine feedback */
+        .celebration {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 1000;
+            text-align: center;
+            opacity: 0;
+        }
+
+        .celebration.active {
+            animation: celebratePop 1.5s ease forwards;
+        }
+
+        .celebration-emoji {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .celebration-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--success), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        @keyframes celebratePop {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            40% { transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -60%) scale(0.9); }
+        }
+
+        /* Confetti particles */
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        /* Focus helper */
+        .focus-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--warning), #d97706);
+            color: #451a03;
+            margin-left: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .step-card:not(.completed) .step-header:hover .focus-badge {
+            display: inline-block;
+        }
+
+        /* Chain test special styling */
+        .chain-card {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(245, 158, 11, 0.05));
+            border-color: var(--warning);
+        }
+
+        .chain-card .step-number {
+            background: linear-gradient(135deg, var(--warning), #d97706) !important;
+        }
+
+        .chain-list {
+            counter-reset: chain;
+            list-style: none;
+            padding: 0;
+        }
+
+        .chain-list li {
+            counter-increment: chain;
+            padding: 0.75rem 0 0.75rem 3rem;
+            position: relative;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chain-list li:last-child {
+            border-bottom: none;
+        }
+
+        .chain-list li::before {
+            content: counter(chain);
+            position: absolute;
+            left: 0;
+            top: 0.75rem;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--surface-hover);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+
+        .chain-arrow {
+            color: var(--accent);
+            font-weight: bold;
+            margin: 0 0.3rem;
+        }
+
+        .info-card {
+            background: var(--code-bg);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+
+        .info-card-title {
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .info-grid dt {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-grid dd {
+            color: var(--text);
+            font-family: monospace;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .header h1 { font-size: 1.6rem; }
+            .step-header { padding: 1rem; gap: 0.75rem; }
+            .step-number { width: 36px; height: 36px; font-size: 1rem; }
+            .step-title { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Nuvei Local Test Guide</h1>
+        <p class="header-subtitle">Mocked commercetools + Real Nuvei Sandbox</p>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-header">
+            <span class="progress-title">Test Progress</span>
+            <span class="progress-count"><span id="completed-count">0</span> / <span id="total-count">8</span> done</span>
+        </div>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="0" id="step-visibility">
+        <div class="step-header" onclick="toggleStep('step-visibility')">
+            <div class="step-number" style="background: linear-gradient(135deg, #94a3b8, #64748b);">👁</div>
+            <div class="step-title-area">
+                <div class="step-title">Before You Start: Open Your Visibility Points</div>
+                <div class="step-subtitle">Keep these tabs/tools open during the whole test</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-visibility')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="info-card">
+                <div class="info-card-title">Fixed Mock IDs (use these everywhere)</div>
+                <div class="info-grid">
+                    <dt>Mock cart ID:</dt><dd>cart-local-001</dd>
+                    <dt>Mock payment ID:</dt><dd>payment-local-001</dd>
+                    <dt>Amount:</dt><dd>10.00</dd>
+                    <dt>Currency:</dt><dd>EUR</dd>
+                </div>
+            </div>
+
+            <div class="section-label">Checklist</div>
+            <ul class="checklist">
+                <li>Browser DevTools: Network tab + Console tab</li>
+                <li>Processor logs terminal (inbound requests, outbound Nuvei calls, mock CT reads/writes)</li>
+                <li>Tunnel inspector (to see exact inbound Nuvei DMN headers/body)</li>
+                <li>Mock CT ledger (cart state, payment state, transaction list)</li>
+                <li>Nuvei sandbox dashboard (order/session, authorization, DMN delivery)</li>
+            </ul>
+
+            <p style="margin-top:1rem; color:var(--text-muted); font-size:0.9rem;">
+                <strong>Pro tip:</strong> Do not hand-craft Nuvei API calls unless debugging. The connector should produce the normal Nuvei requests.
+            </p>
+
+            <div class="highlight-box">
+                <p><strong>Test shape:</strong></p>
+                <pre>Browser / CT Checkout equivalent
+  -> enabler app in this repo
+  -> processor app in this repo
+  -> Nuvei sandbox
+  -> processor app via DMN
+  -> mocked commercetools payment/cart store</pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="1" id="step-1">
+        <div class="step-header" onclick="toggleStep('step-1')">
+            <div class="step-number">1</div>
+            <div class="step-title-area">
+                <div class="step-title">POST /payments/session <span class="focus-badge">Start here</span></div>
+                <div class="step-subtitle">Create the Nuvei openOrder and mock CT Payment</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-1')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>enabler browser code → processor</p>
+            <p>In this repo, the request is made by <code>enabler/src/services/api-service.ts</code></p>
+            <p>Card source: <code>enabler/src/components/card.ts</code></p>
+            <p>Drop-in source: <code>enabler/src/dropin/dropin-embedded.ts</code></p>
+
+            <div class="section-label">Local Endpoint</div>
+            <pre>POST http://localhost:8080/payments/session
+X-Session-ID: &lt;mock-session-id&gt;</pre>
+
+            <p><strong>Card body:</strong></p>
+            <pre>{"paymentMethodOptions":{"card":{}}}</pre>
+
+            <p><strong>Embedded drop-in body:</strong></p>
+            <pre>{"paymentMethodOptions":{"embedded":{}}}</pre>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests the processor's Nuvei <code>openOrder</code> creation path.</p>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/nuvei-payment.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/clients/nuvei.client.ts
+processor/src/services/ct-payment-creation.service.ts</pre>
+            <p>Important internal call:</p>
+            <pre>nuveiClient().openOrder({
+  amount,
+  currency,
+  clientUniqueId: cart.id,
+})</pre>
+
+            <div class="section-label">Normal Downstream Calls</div>
+            <pre>processor -> mock commercetools cart/payment service
+processor -> Nuvei sandbox openOrder.do
+processor -> mock commercetools create Payment</pre>
+
+            <div class="section-label">Expected Response</div>
+            <pre>{
+  "cartId": "cart-local-001",
+  "sessionToken": "&lt;nuvei-session-token&gt;",
+  "paymentReference": "payment-local-001",
+  "merchantReturnUrl": "http://localhost:..."
+}</pre>
+
+            <div class="section-label">Logs to Capture</div>
+            <pre>INBOUND  POST /payments/session
+MOCK CT  getCart(cart-local-001)
+MOCK CT  getPaymentAmount(cart-local-001)
+OUTBOUND Nuvei openOrder.do request
+INBOUND  Nuvei openOrder.do response
+MOCK CT  create/update Payment payment-local-001
+OUTBOUND response to browser with sessionToken/paymentReference</pre>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="2" id="step-2">
+        <div class="step-header" onclick="toggleStep('step-2')">
+            <div class="step-number">2</div>
+            <div class="step-title-area">
+                <div class="step-title">Nuvei SDK Payment Submission</div>
+                <div class="step-subtitle">Browser renders widget and submits the test card</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-2')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>enabler browser code → Nuvei browser SDK/CDN → Nuvei sandbox</p>
+            <p>This is <strong>not</strong> a processor endpoint.</p>
+            <p>The enabler loads: <code>https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js</code></p>
+            <p>SDK loader source: <code>enabler/src/services/nuvei-sdk.ts</code></p>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests the enabler-to-Nuvei browser integration.</p>
+            <p>Code under test:</p>
+            <pre>enabler/src/components/card.ts
+enabler/src/dropin/dropin-embedded.ts
+enabler/src/services/nuvei-sdk.ts
+enabler/src/services/api-service.ts</pre>
+            <p>Then <code>card.ts</code> / <code>dropin-embedded.ts</code> calls:</p>
+            <pre>sfc.createPayment({
+  sessionToken: paymentRes.sessionToken,
+  merchant_unique_id: paymentRes.paymentReference,
+  ...
+})</pre>
+
+            <div class="highlight-box">
+                <p><strong>First approval card number:</strong></p>
+                <p style="font-size:1.3rem; font-family:monospace; letter-spacing:2px; color:var(--success);">4000027891380961</p>
+            </div>
+
+            <div class="section-label">Expected Behavior</div>
+            <pre>Nuvei widget renders
+payment completes
+onResult fires</pre>
+            <p>Then the enabler proceeds to <code>POST /payments/confirm/:paymentId</code>.</p>
+
+            <div class="section-label">Browser Visibility</div>
+            <p>Watch Browser DevTools <strong>Network</strong>:</p>
+            <pre>- connector-enabler asset
+- safecharge.js
+- POST /payments/session
+- Nuvei SDK network calls
+- POST /payments/confirm/:paymentId</pre>
+            <p>Watch Browser DevTools <strong>Console</strong>:</p>
+            <pre>- SDK load errors
+- onResult payload if instrumented</pre>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="3" id="step-3">
+        <div class="step-header" onclick="toggleStep('step-3')">
+            <div class="step-number">3</div>
+            <div class="step-title-area">
+                <div class="step-title">POST /payments/confirm/:paymentId</div>
+                <div class="step-subtitle">Verify Nuvei status and update mock CT Payment</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-3')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>enabler browser code → processor</p>
+            <p>Source: <code>enabler/src/services/api-service.ts</code></p>
+
+            <div class="section-label">Local Endpoint</div>
+            <pre>POST http://localhost:8080/payments/confirm/payment-local-001
+X-Session-ID: &lt;mock-session-id&gt;</pre>
+            <p><strong>Body:</strong></p>
+            <pre>{
+  "sessionToken": "&lt;nuvei-session-token-from-/payments/session&gt;"
+}</pre>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests the processor's post-widget Nuvei status verification path.</p>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/nuvei-payment.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/clients/nuvei.client.ts</pre>
+            <p>Important internal call:</p>
+            <pre>nuveiClient().getPaymentStatus({ sessionToken })</pre>
+            <p>If Nuvei says approved, the processor updates the mock CT payment with:</p>
+            <pre>{
+  "type": "Authorization",
+  "state": "Success",
+  "interactionId": "&lt;nuvei-transaction-id&gt;"
+}</pre>
+
+            <div class="section-label">Normal Downstream Calls</div>
+            <pre>processor -> mock CT getPayment(payment-local-001)
+processor -> mock CT getCart(cart-local-001)
+processor -> Nuvei getPaymentStatus.do
+processor -> mock CT updatePayment(payment-local-001)</pre>
+
+            <div class="section-label">Expected Response</div>
+            <p><strong>Approved:</strong></p>
+            <pre>{"outcome":"approved"}</pre>
+            <p><strong>Declined:</strong></p>
+            <pre>{"outcome":"rejected"}</pre>
+
+            <div class="section-label">Logs to Capture</div>
+            <pre>INBOUND  POST /payments/confirm/payment-local-001
+MOCK CT  getPayment(payment-local-001)
+MOCK CT  getCart(cart-local-001)
+OUTBOUND Nuvei getPaymentStatus.do request
+INBOUND  Nuvei getPaymentStatus.do response
+MOCK CT  updatePayment Authorization Success/Failure
+OUTBOUND approved/rejected response</pre>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="4" id="step-4">
+        <div class="step-header" onclick="toggleStep('step-4')">
+            <div class="step-number">4</div>
+            <div class="step-title-area">
+                <div class="step-title">POST /webhooks/nuvei (DMN)</div>
+                <div class="step-subtitle">Nuvei delivers the webhook to the processor</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-4')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>Nuvei sandbox → processor</p>
+            <p>This is the <strong>DMN webhook</strong>.</p>
+
+            <div class="section-label">Local Endpoint</div>
+            <p>The processor endpoint is:</p>
+            <pre>POST http://localhost:8080/webhooks/nuvei</pre>
+            <p>Nuvei cannot call private localhost directly, so expose it through a tunnel:</p>
+            <pre>https://&lt;your-tunnel&gt;/webhooks/nuvei</pre>
+            <p>Set that URL in the Nuvei sandbox dashboard:</p>
+            <pre>Settings -> My Integration Settings -> DMN URL</pre>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests the processor's real Nuvei DMN handling path.</p>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/nuvei-payment.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/clients/nuvei.client.ts
+processor/src/services/converters/nuvei-event.converter.ts
+processor/src/services/payment-converter.ts</pre>
+            <p>Important checks:</p>
+            <pre>validateDmnChecksum(...)
+assertDmnMatchesConfig(...)
+ctPaymentService.getPayment(...)
+convertDmnToPaymentUpdate(...)
+assertDmnUpdateMatchesPayment(...)
+assertDmnMatchesNuveiStatus(...)
+ctPaymentService.updatePayment(...)</pre>
+
+            <div class="section-label">Normal Downstream Calls</div>
+            <pre>Nuvei -> processor /webhooks/nuvei
+processor -> mock CT getPayment(payment-local-001)
+processor -> Nuvei getPaymentStatus.do
+processor -> mock CT updatePayment(...)</pre>
+
+            <div class="section-label">Expected Successful DMN Effect</div>
+            <p>Mock CT payment should end with <strong>one</strong> authorization transaction, not two:</p>
+            <pre>{
+  "id": "payment-local-001",
+  "transactions": [
+    {
+      "type": "Authorization",
+      "state": "Success",
+      "interactionId": "&lt;Nuvei TransactionID&gt;"
+    }
+  ]
+}</pre>
+            <p>If frontend confirmation already added the same transaction, DMN should be idempotent.</p>
+
+            <div class="section-label">Logs to Capture</div>
+            <p><strong>Tunnel inspector:</strong></p>
+            <pre>Raw request headers
+Raw request body
+Content-Type
+Exact fields Nuvei sends</pre>
+            <p><strong>Processor logs:</strong></p>
+            <pre>INBOUND  POST /webhooks/nuvei
+DMN checksum valid/invalid
+DMN merchant matches config
+MOCK CT getPayment(payment-local-001)
+OUTBOUND Nuvei getPaymentStatus.do
+MOCK CT updatePayment(...)
+DMN processed successfully</pre>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="5" id="step-5">
+        <div class="step-header" onclick="toggleStep('step-5')">
+            <div class="step-number">5</div>
+            <div class="step-title-area">
+                <div class="step-title">GET /config</div>
+                <div class="step-subtitle">Verify frontend-safe Nuvei config is exposed</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-5')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>commercetools Checkout / enabler setup → processor</p>
+
+            <div class="section-label">Local Endpoint</div>
+            <pre>GET http://localhost:8080/config
+X-Session-ID: &lt;mock-session-id&gt;</pre>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests that frontend-safe Nuvei config is exposed.</p>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/operation.route.ts
+processor/src/services/nuvei-payment.service.ts</pre>
+            <p>Expected response should include safe fields like:</p>
+            <pre>{
+  "environment": "test",
+  "merchantId": "...",
+  "merchantSiteId": "..."
+}</pre>
+            <p>It <strong>must not</strong> expose:</p>
+            <pre>NUVEI_SECRET_KEY
+CTP_CLIENT_SECRET
+checksums
+tokens</pre>
+            <p>This is a setup endpoint, not the main payment path.</p>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="6" id="step-6">
+        <div class="step-header" onclick="toggleStep('step-6')">
+            <div class="step-number">6</div>
+            <div class="step-title-area">
+                <div class="step-title">GET /payment-components</div>
+                <div class="step-subtitle">Verify advertised payment methods</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-6')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="section-label">Normal Caller</div>
+            <p>commercetools Checkout → processor</p>
+
+            <div class="section-label">Local Endpoint</div>
+            <pre>GET http://localhost:8080/payment-components</pre>
+            <p>Normally this uses JWT auth, so for local mock testing either mock/bypass that auth or call it through the same auth shape your test harness provides.</p>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests the processor's advertised payment methods.</p>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/operation.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/dtos/operations/payment-components.dto.ts</pre>
+            <p>Expected:</p>
+            <pre>{
+  "components": ["card"],
+  "dropins": ["embedded"]
+}</pre>
+            <p>This confirms Checkout will only ask the enabler to build methods this project actually supports.</p>
+        </div>
+    </div>
+
+    <div class="step-card" data-step="7" id="step-7">
+        <div class="step-header" onclick="toggleStep('step-7')">
+            <div class="step-number">7</div>
+            <div class="step-title-area">
+                <div class="step-title">POST /payment-intents/:paymentId</div>
+                <div class="step-subtitle">Server-side post-authorization operations</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-7')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <div class="highlight-box">
+                <p><strong>Use this after authorization works.</strong> Do not start here.</p>
+            </div>
+
+            <div class="section-label">Normal Caller</div>
+            <p>commercetools Payment Intents API / Checkout backend → processor</p>
+
+            <div class="section-label">Local Endpoint</div>
+            <pre>POST http://localhost:8080/payment-intents/payment-local-001</pre>
+
+            <div class="section-label">What This Tests</div>
+            <p>This tests server-side post-authorization operations:</p>
+            <pre>capture
+cancel authorization
+refund
+reverse</pre>
+            <p>Code under test:</p>
+            <pre>processor/src/routes/operation.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/clients/nuvei.client.ts</pre>
+            <p>Normal downstream calls:</p>
+            <pre>processor -> mock CT getPayment(...)
+processor -> Nuvei settleTransaction.do / voidTransaction.do / refundTransaction.do
+processor -> mock CT updatePayment(...)</pre>
+            <p>Start with <code>/payments/session</code>, browser SDK, <code>/confirm</code>, and <code>/webhooks/nuvei</code> first.</p>
+        </div>
+    </div>
+
+    <div class="step-card chain-card" data-step="8" id="step-chain">
+        <div class="step-header" onclick="toggleStep('step-chain')">
+            <div class="step-number">★</div>
+            <div class="step-title-area">
+                <div class="step-title">Full Test Chain</div>
+                <div class="step-subtitle">The complete sequence from start to finish</div>
+            </div>
+            <div class="step-actions">
+                <button class="btn btn-done" onclick="event.stopPropagation(); markDone('step-chain')">Done!</button>
+                <svg class="toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </div>
+        <div class="step-body">
+            <p>Run this exact chain for the first focused local test: <strong>approved card, real Nuvei, mocked CT</strong>.</p>
+
+            <ol class="chain-list">
+                <li>Browser/enabler calls: <code>POST /payments/session</code></li>
+                <li>Processor calls: <code>Nuvei openOrder.do</code></li>
+                <li>Processor writes: mock CT Payment with interfaceId/sessionToken</li>
+                <li>Browser/enabler renders: Nuvei SafeCharge SDK using sessionToken</li>
+                <li>Browser submits: card <strong>4000027891380961</strong></li>
+                <li>Nuvei SDK calls: <code>onResult(...)</code></li>
+                <li>Browser/enabler calls: <code>POST /payments/confirm/payment-local-001</code></li>
+                <li>Processor calls: <code>Nuvei getPaymentStatus.do</code></li>
+                <li>Processor writes: mock CT Authorization Success</li>
+                <li>Nuvei independently calls: <code>POST /webhooks/nuvei</code></li>
+                <li>Processor validates: checksum + merchant + amount + currency + Nuvei status</li>
+                <li>Processor writes/skips: mock CT update, idempotently</li>
+            </ol>
+
+            <div class="section-label">What This Proves</div>
+            <p>It tests these project parts:</p>
+            <pre>enabler/src/components/card.ts
+enabler/src/services/api-service.ts
+enabler/src/services/nuvei-sdk.ts
+
+processor/src/routes/nuvei-payment.route.ts
+processor/src/services/nuvei-payment.service.ts
+processor/src/clients/nuvei.client.ts
+processor/src/services/ct-payment-creation.service.ts
+processor/src/services/converters/nuvei-event.converter.ts</pre>
+            <p>It does <strong>not</strong> test real commercetools yet. That is intentional.</p>
+
+            <div class="section-label">Key Observation This Test Must Produce</div>
+            <p>The DMN must show exactly how Nuvei correlates the payment:</p>
+            <pre>Does Nuvei send merchant_unique_id = payment-local-001?
+Does Nuvei send clientUniqueId = cart-local-001?
+Does Nuvei send both?</pre>
+            <p>This matters because:</p>
+            <pre>- The enabler passes merchant_unique_id to sfc.createPayment(...).
+- The processor DMN handler currently reads body.merchant_unique_id.
+- The processor openOrder call currently sends clientUniqueId: cart.id.</pre>
+            <p>So this local Nuvei-first test directly validates whether this repo's frontend, processor, and DMN correlation agree.</p>
+        </div>
+    </div>
+
+    <!-- Celebration overlay -->
+    <div class="celebration" id="celebration">
+        <span class="celebration-emoji" id="celebration-emoji">🎉</span>
+        <span class="celebration-text" id="celebration-text">Step complete!</span>
+    </div>
+
+    <script>
+        const messages = [
+            { emoji: "🎉", text: "Nice work!" },
+            { emoji: "✨", text: "Crushed it!" },
+            { emoji: "🚀", text: "On a roll!" },
+            { emoji: "🔥", text: "You got this!" },
+            { emoji: "💪", text: "Step complete!" },
+            { emoji: "🎯", text: "Bullseye!" },
+            { emoji: "⭐", text: "Gold star!" },
+            { emoji: "🌈", text: "So good!" },
+            { emoji: "⚡", text: "Zapped it!" },
+        ];
+
+        function toggleStep(id) {
+            const card = document.getElementById(id);
+            card.classList.toggle('collapsed');
+        }
+
+        function markDone(id) {
+            const card = document.getElementById(id);
+            const isDone = card.classList.contains('completed');
+
+            if (isDone) {
+                card.classList.remove('completed');
+                const btn = card.querySelector('.btn-done');
+                btn.textContent = 'Done!';
+                btn.classList.remove('btn-undo');
+                btn.classList.add('btn-done');
+            } else {
+                card.classList.add('completed');
+                card.classList.add('collapsed');
+                const btn = card.querySelector('.btn-done');
+                btn.textContent = 'Undo';
+                btn.classList.remove('btn-done');
+                btn.classList.add('btn-undo');
+                celebrate();
+            }
+
+            updateProgress();
+        }
+
+        function celebrate() {
+            const cel = document.getElementById('celebration');
+            const msg = messages[Math.floor(Math.random() * messages.length)];
+            document.getElementById('celebration-emoji').textContent = msg.emoji;
+            document.getElementById('celebration-text').textContent = msg.text;
+
+            cel.classList.remove('active');
+            void cel.offsetWidth; // force reflow
+            cel.classList.add('active');
+
+            spawnConfetti();
+        }
+
+        function spawnConfetti() {
+            const colors = ['#f472b6', '#a78bfa', '#60a5fa', '#38bdf8', '#2dd4bf', '#4ade80', '#fbbf24', '#f87171'];
+            for (let i = 0; i < 30; i++) {
+                const el = document.createElement('div');
+                el.className = 'confetti';
+                el.style.background = colors[Math.floor(Math.random() * colors.length)];
+                el.style.left = Math.random() * 100 + 'vw';
+                el.style.top = '-10px';
+                el.style.width = (Math.random() * 8 + 4) + 'px';
+                el.style.height = (Math.random() * 8 + 4) + 'px';
+                el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                el.style.transform = `rotate(${Math.random() * 360}deg)`;
+                document.body.appendChild(el);
+
+                const duration = Math.random() * 1000 + 1000;
+                const xDrift = (Math.random() - 0.5) * 200;
+
+                el.animate([
+                    { transform: `translate(0, 0) rotate(0deg)`, opacity: 1 },
+                    { transform: `translate(${xDrift}px, 100vh) rotate(${Math.random() * 720}deg)`, opacity: 0 }
+                ], {
+                    duration: duration,
+                    easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                }).onfinish = () => el.remove();
+            }
+        }
+
+        function updateProgress() {
+            const cards = document.querySelectorAll('.step-card');
+            const done = document.querySelectorAll('.step-card.completed');
+            const count = done.length;
+            const total = cards.length;
+            const pct = (count / total) * 100;
+
+            document.getElementById('completed-count').textContent = count;
+            document.getElementById('total-count').textContent = total;
+            document.getElementById('progress-fill').style.width = pct + '%';
+        }
+
+        // Initialize
+        updateProgress();
+    </script>
+</body>
+</html>
