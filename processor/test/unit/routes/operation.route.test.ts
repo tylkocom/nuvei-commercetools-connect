@@ -23,6 +23,10 @@ vi.mock("@commercetools/connect-payments-sdk", () => ({
 
 vi.mock("@sinclair/typebox", () => ({
   Type: {
+    Array: (items: unknown) => ({ type: "array", items }),
+    Enum: (values: Record<string, string>) => ({ enum: Object.values(values) }),
+    Object: (properties: Record<string, unknown>) => ({ type: "object", properties }),
+    Optional: (schema: unknown) => schema,
     String: () => ({ type: "string" }),
   },
 }));
@@ -30,10 +34,6 @@ vi.mock("@sinclair/typebox", () => ({
 vi.mock("../../../src/dtos/operations/config.dto", () => ({
   ConfigResponseSchema: { type: "object" },
   ConfigResponseSchemaDTO: {},
-}));
-
-vi.mock("../../../src/dtos/operations/payment-components.dto", () => ({
-  SupportedPaymentComponentsSchema: { type: "object" },
 }));
 
 vi.mock("../../../src/dtos/operations/payment-intents.dto", () => ({
@@ -64,6 +64,7 @@ vi.mock("../../../src/services/abstract-payment.service", () => ({
 // ---------------------------------------------------------------------------
 
 import { operationsRoute } from "../../../src/routes/operation.route";
+import { PAYMENT_METHOD_REGISTRY } from "../../../src/dtos/operations/payment-components.dto";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -119,6 +120,18 @@ function makeReply() {
   return reply;
 }
 
+function expectedPaymentComponentsFromRegistry() {
+  return {
+    dropins: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin").map((entry) => ({
+      type: entry.advertisedType,
+    })),
+    components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map((entry) => ({
+      type: entry.advertisedType,
+    })),
+    express: [],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -144,11 +157,9 @@ describe("operation routes", () => {
       merchantSiteId: "s1",
     });
     paymentService.status.mockResolvedValue({ status: "UP" });
-    paymentService.getSupportedPaymentComponents.mockResolvedValue({
-      dropins: [{ type: "embedded" }],
-      components: [{ type: "card" }],
-      express: [],
-    });
+    paymentService.getSupportedPaymentComponents.mockResolvedValue(
+      expectedPaymentComponentsFromRegistry(),
+    );
     paymentService.modifyPayment.mockResolvedValue({ outcome: "approved" });
     paymentService.handleTransaction.mockResolvedValue({
       transactionStatus: { state: "Pending", errors: [] },
@@ -240,11 +251,12 @@ describe("operation routes", () => {
       await componentsRoute!.handler({}, reply);
 
       expect(paymentService.getSupportedPaymentComponents).toHaveBeenCalledOnce();
-      expect(reply.send).toHaveBeenCalledWith({
+      expect(expectedPaymentComponentsFromRegistry()).toEqual({
         dropins: [{ type: "embedded" }],
         components: [{ type: "card" }],
         express: [],
       });
+      expect(reply.send).toHaveBeenCalledWith(expectedPaymentComponentsFromRegistry());
       expect(reply.code).toHaveBeenCalledWith(200);
     });
   });

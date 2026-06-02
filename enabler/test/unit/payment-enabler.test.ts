@@ -137,6 +137,24 @@ describe("NuveiEnabler", () => {
     expect(typeof builder.build).toBe("function");
   });
 
+  it("creates builders for every registry-advertised method", async () => {
+    const enabler = new NuveiEnabler(makeEnablerOptions());
+
+    for (const entry of PAYMENT_METHOD_REGISTRY) {
+      if (entry.kind === "component") {
+        const builder = await enabler.createComponentBuilder(entry.advertisedType);
+        expect(builder.componentHasSubmit).toBe(false);
+        expect(typeof builder.build).toBe("function");
+        continue;
+      }
+
+      const builder = await enabler.createDropinBuilder(entry.advertisedType);
+      expect(builder.dropinHasSubmit).toBe(false);
+      expect(typeof builder.build).toBe("function");
+      expect(entry.transitional).toBe(true);
+    }
+  });
+
   it("rejects unsupported component types before SDK or processor side effects", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
