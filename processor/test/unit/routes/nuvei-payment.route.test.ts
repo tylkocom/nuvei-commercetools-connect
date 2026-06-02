@@ -1,0 +1,203 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { PaymentSetupError, PublicPaymentErrorCode } from "../../../src/dtos/operations/payment-errors.dto";
+
+vi.mock("@commercetools/connect-payments-sdk", () => ({
+  SessionHeaderAuthenticationHook: class {
+    authenticate = () => async () => {};
+  },
+}));
+
+vi.mock("../../../src/services/nuvei-payment.service", () => ({
+  DmnChecksumInvalidError: class extends Error {},
+  NuveiPaymentService: class {},
+}));
+
+vi.mock("../../../src/libs/logger/index", () => ({
+  log: {
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+import { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
+import { paymentRoutes } from "../../../src/routes/nuvei-payment.route";
+import { log } from "../../../src/libs/logger/index";
+
+type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+
+type RouteEntry = {
+  method: string;
+  url: string;
+  handler: RouteHandler;
+};
+
+type TestRouteRegistrar = (url: string, opts: unknown, handler: RouteHandler) => void;
+
+type TestFastify = {
+  get: TestRouteRegistrar;
+  post: TestRouteRegistrar;
+};
+
+type BuiltApp = {
+  fastify: TestFastify;
+  routes: RouteEntry[];
+};
+
+type ReturnStatus = (code: number) => ReplyDouble;
+
+type ReplyDouble = {
+  status: ReturnStatus;
+  send: (body: unknown) => ReplyDouble;
+};
+
+type PaymentRouteRequest = {
+  body: unknown;
+};
+
+type MockCreatePaymentIntent = {
+  (options?: unknown): Promise<unknown>;
+  mockResolvedValue: (value: unknown) => void;
+  mockRejectedValue: (value: unknown) => void;
+};
+
+type PaymentServiceDouble = {
+  createPaymentIntent: MockCreatePaymentIntent;
+};
+function buildApp(): BuiltApp {
+  const routes: RouteEntry[] = [];
+  const fastify: TestFastify = {
+    get: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
+      routes.push({ method: "GET", url, handler });
+    }),
+    post: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
+      routes.push({ method: "POST", url, handler });
+    }),
+  };
+
+  return { fastify, routes };
+}
+
+function makeReply(): ReplyDouble & { sent: unknown[]; statuses: number[] } {
+  const sent: unknown[] = [];
+  const statuses: number[] = [];
+  const reply = {
+    status: vi.fn((code: number) => {
+      statuses.push(code);
+      return reply;
+    }),
+    send: vi.fn((body: unknown) => {
+      sent.push(body);
+      return reply;
+    }),
+    sent,
+    statuses,
+  };
+  return reply;
+}
+
+describe("payment routes", () => {
+  let app: BuiltApp;
+  let paymentService: PaymentServiceDouble;
+
+  beforeEach(async () => {
+    vi.mocked(log.warn).mockReset();
+    paymentService = {
+      createPaymentIntent: vi.fn(),
+    };
+    app = buildApp();
+
+    await paymentRoutes(
+      app.fastify as unknown as Parameters<typeof paymentRoutes>[0],
+      {
+        paymentService,
+        sessionHeaderAuthHook: new SessionHeaderAuthenticationHook(),
+      } as unknown as Parameters<typeof paymentRoutes>[1],
+    );
+  });
+
+  it("POST / returns successful payment response", async () => {
+    paymentService.createPaymentIntent.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-1",
+      merchantReturnUrl: "https://example.com/return",
+    });
+
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    expect(postRoute).toBeDefined();
+
+    const body = { paymentMethodOptions: { card: {} } };
+    const reply = makeReply();
+    await postRoute?.handler({ body } satisfies PaymentRouteRequest, reply);
+
+    expect(paymentService.createPaymentIntent).toHaveBeenCalledWith(body);
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-1",
+      merchantReturnUrl: "https://example.com/return",
+    });
+  });
+
+  it("POST / maps unsupported methods to a safe public error", async () => {
+    paymentService.createPaymentIntent.mockRejectedValue(
+      new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
+        category: "method_unsupported",
+        requestedMethod: "wechatpay",
+      }),
+    );
+
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    const reply = makeReply();
+    await postRoute?.handler(
+      { body: { paymentMethodOptions: { wechatpay: { token: "secret" } } } } satisfies PaymentRouteRequest,
+      reply,
+    );
+
+    expect(reply.status).toHaveBeenCalledWith(422);
+    expect(reply.send).toHaveBeenCalledWith({
+      code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      message: "Payment method is not supported.",
+    });
+    expect(reply.sent[0]).toEqual({
+      code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      message: "Payment method is not supported.",
+    });
+    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
+    expect(log.warn).toHaveBeenCalledWith("Payment setup request rejected.", {
+      route: "POST /payments",
+      code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      category: "method_unsupported",
+      requestedMethod: "wechatpay",
+    });
+    expect(log.warn).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ paymentMethodOptions: expect.anything() }),
+    );
+  });
+
+  it("POST / maps malformed requests to a safe public error", async () => {
+    paymentService.createPaymentIntent.mockRejectedValue(
+      new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "method_ambiguous",
+      }),
+    );
+
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    const reply = makeReply();
+    await postRoute?.handler(
+      { body: { paymentMethodOptions: { card: {}, embedded: {} } } } satisfies PaymentRouteRequest,
+      reply,
+    );
+
+    expect(reply.status).toHaveBeenCalledWith(400);
+    expect(reply.send).toHaveBeenCalledWith({
+      code: PublicPaymentErrorCode.REQUEST_MALFORMED,
+      message: "Payment setup request is malformed.",
+    });
+    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
+  });
+});

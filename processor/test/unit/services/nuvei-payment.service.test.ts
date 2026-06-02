@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PaymentModificationStatus } from "../../../src/dtos/operations/payment-intents.dto";
+import { PaymentModificationStatus, type AmountSchemaDTO } from "../../../src/dtos/operations/payment-intents.dto";
+import type { Payment } from "@commercetools/platform-sdk";
+import type {
+  CommercetoolsCartService,
+  CommercetoolsOrderService,
+  CommercetoolsPaymentService,
+} from "@commercetools/connect-payments-sdk";
 
 // ---------------------------------------------------------------------------
 // Mock all external modules before importing the class under test.
@@ -114,19 +120,45 @@ vi.mock("../../../src/services/converters/nuvei-event.converter", () => ({
 
 import { NuveiPaymentService } from "../../../src/services/nuvei-payment.service";
 import { statusHandler } from "@commercetools/connect-payments-sdk";
+import { PaymentSetupError, PublicPaymentErrorCode } from "../../../src/dtos/operations/payment-errors.dto";
+import { log } from "../../../src/libs/logger/index";
+import {
+  PAYMENT_METHOD_REGISTRY,
+  SUPPORTED_PAYMENT_METHODS,
+  isSupportedPaymentMethod,
+} from "../../../src/dtos/operations/payment-components.dto";
 
 // ---------------------------------------------------------------------------
+type StatusHandlerOptions = {
+  checks: Array<() => Promise<unknown>>;
+};
+
+type StatusHandlerBody = {
+  status: string;
+  timestamp: string;
+  version: string;
+  checks: unknown[];
+};
+
+type MockedStatusHandler = {
+  mockImplementation: (
+    implementation: (opts: StatusHandlerOptions) => () => Promise<{ body: StatusHandlerBody }>,
+  ) => void;
+};
+
+const mockedStatusHandler = statusHandler as unknown as MockedStatusHandler;
+
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeMockPayment(overrides: Record<string, unknown> = {}) {
+function makeMockPayment(overrides: Record<string, unknown> = {}): Payment {
   return {
     id: "payment-1",
     interfaceId: "nuvei-tx-100",
     amountPlanned: { centAmount: 1000, currencyCode: "USD" },
     transactions: [],
     ...overrides,
-  } as any;
+  } as unknown as Payment;
 }
 
 function createService() {
@@ -148,9 +180,9 @@ function createService() {
   mockUpdatePayment.mockResolvedValue(undefined);
 
   const service = new NuveiPaymentService({
-    ctCartService: ctCartService as any,
-    ctPaymentService: ctPaymentService as any,
-    ctOrderService: ctOrderService as any,
+    ctCartService: ctCartService as unknown as CommercetoolsCartService,
+    ctPaymentService: ctPaymentService as unknown as CommercetoolsPaymentService,
+    ctOrderService: ctOrderService as unknown as CommercetoolsOrderService,
   });
 
   return { service };
@@ -162,6 +194,9 @@ function createService() {
 
 describe("NuveiPaymentService", () => {
   beforeEach(() => {
+    vi.mocked(log.warn).mockReset();
+    vi.mocked(log.error).mockReset();
+    vi.mocked(log.info).mockReset();
     mockNuveiClientInstance.settleTransaction.mockReset();
     mockNuveiClientInstance.voidTransaction.mockReset();
     mockNuveiClientInstance.refundTransaction.mockReset();
@@ -204,7 +239,7 @@ describe("NuveiPaymentService", () => {
 
       let capturedChecks: Array<() => Promise<unknown>> = [];
 
-      (statusHandler as unknown as ReturnType<typeof vi.fn>).mockImplementation((opts: any) => {
+      mockedStatusHandler.mockImplementation((opts) => {
         capturedChecks = opts.checks;
         return async () => ({
           body: {
@@ -245,7 +280,7 @@ describe("NuveiPaymentService", () => {
 
       let capturedChecks: Array<() => Promise<unknown>> = [];
 
-      (statusHandler as unknown as ReturnType<typeof vi.fn>).mockImplementation((opts: any) => {
+      mockedStatusHandler.mockImplementation((opts) => {
         capturedChecks = opts.checks;
         return async () => ({
           body: {
@@ -272,6 +307,7 @@ describe("NuveiPaymentService", () => {
         name: string;
         status: string;
         message: string;
+
         details?: { error: string };
       }>;
       const checkResult = await nuveiCheck();
@@ -282,16 +318,32 @@ describe("NuveiPaymentService", () => {
     });
   });
 
+  describe("processor payment method registry", () => {
+    it("accepts exactly card and transitional embedded", () => {
+      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
+      expect(isSupportedPaymentMethod("embedded")).toBe(true);
+      expect(isSupportedPaymentMethod("dropin")).toBe(false);
+      expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "embedded")).toMatchObject({
+        kind: "dropin",
+        advertisedType: "embedded",
+        transitional: true,
+        pspMetadata: {},
+      });
+    });
+  });
+
   // -------------------------------------------------------------------------
   // getSupportedPaymentComponents()
   // -------------------------------------------------------------------------
   describe("getSupportedPaymentComponents()", () => {
-    it("returns embedded dropin and card component", async () => {
+    it("returns registry-derived embedded dropin and card component", async () => {
       const { service } = createService();
       const result = await service.getSupportedPaymentComponents();
-      expect(result.dropins).toContainEqual({ type: "embedded" });
-      expect(result.components).toContainEqual({ type: "card" });
-      expect(result.express).toEqual([]);
+      expect(result).toEqual({
+        dropins: [{ type: "embedded" }],
+        components: [{ type: "card" }],
+        express: [],
+      });
     });
   });
 
@@ -341,7 +393,7 @@ describe("NuveiPaymentService", () => {
             { type: "Authorization", state: "Success", interactionId: "auth-tx-1" },
           ],
         }),
-        amount: { centAmount: 1234, currencyCode: "KWD", fractionDigits: 3 } as any,
+        amount: { centAmount: 1234, currencyCode: "KWD", fractionDigits: 3 } as unknown as AmountSchemaDTO,
       });
 
       expect(mockNuveiClientInstance.settleTransaction).toHaveBeenCalledWith(
@@ -501,23 +553,24 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it("passes paymentMethod 'dropin' when paymentMethodOptions contains dropin", async () => {
+    it("passes paymentMethod 'embedded' when paymentMethodOptions contains embedded", async () => {
       const { service } = createService();
 
       mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-dropin" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-embedded" });
 
-      await service.createPaymentIntent({ paymentMethodOptions: { dropin: {} } });
+      await service.createPaymentIntent({ paymentMethodOptions: { embedded: {} } });
 
+      expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledOnce();
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
         expect.objectContaining({
-          paymentMethod: "dropin",
+          paymentMethod: "embedded",
         }),
       );
     });
 
-    it("passes paymentMethod undefined when no options provided", async () => {
+    it("passes paymentMethod 'card' when no options are provided", async () => {
       const { service } = createService();
 
       mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
@@ -528,23 +581,62 @@ describe("NuveiPaymentService", () => {
 
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
         expect.objectContaining({
-          paymentMethod: undefined,
+          paymentMethod: "card",
         }),
       );
     });
 
-    it("throws for unsupported payment method", async () => {
+    it("rejects unsupported payment methods before Nuvei or commercetools side effects", async () => {
       const { service } = createService();
-
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
-      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-wechat" });
 
       await expect(
         service.createPaymentIntent({ paymentMethodOptions: { wechatpay: { flow: "qrcode" } } }),
-      ).rejects.toThrow('Unsupported payment method "wechatpay"');
+      ).rejects.toMatchObject({ code: PublicPaymentErrorCode.METHOD_UNSUPPORTED });
 
+      expect(mockGetCart).not.toHaveBeenCalled();
+      expect(mockGetPaymentAmount).not.toHaveBeenCalled();
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
       expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["multiple method keys", { paymentMethodOptions: { card: {}, embedded: {} } }],
+      ["no method keys", { paymentMethodOptions: {} }],
+      ["empty method key", { paymentMethodOptions: { "": {} } }],
+      ["non-object options", []],
+      ["non-object paymentMethodOptions", { paymentMethodOptions: [] }],
+      ["non-object method payload", { paymentMethodOptions: { card: null } }],
+      ["non-empty method payload", { paymentMethodOptions: { card: { unexpected: true } } }],
+    ])("rejects malformed %s before Nuvei or commercetools side effects", async (_, options) => {
+      const { service } = createService();
+
+      await expect(service.createPaymentIntent(options)).rejects.toMatchObject({
+        code: PublicPaymentErrorCode.REQUEST_MALFORMED,
+      });
+
+      expect(mockGetCart).not.toHaveBeenCalled();
+      expect(mockGetPaymentAmount).not.toHaveBeenCalled();
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it("emits redacted setup diagnostics without raw request payload", async () => {
+      const { service } = createService();
+
+      await expect(
+        service.createPaymentIntent({ paymentMethodOptions: { wechatpay: { token: "secret" } } }),
+      ).rejects.toBeInstanceOf(PaymentSetupError);
+
+      expect(log.warn).toHaveBeenCalledWith("Payment setup validation failed.", {
+        route: "POST /payments",
+        code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+        category: "method_unsupported",
+        requestedMethod: "wechatpay",
+      });
+      expect(log.warn).not.toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ paymentMethodOptions: expect.anything() }),
+      );
     });
 
     it("returns cartId, sessionToken, paymentReference, and merchantReturnUrl", async () => {

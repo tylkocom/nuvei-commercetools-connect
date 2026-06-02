@@ -69,23 +69,37 @@ import { operationsRoute } from "../../../src/routes/operation.route";
 // Helpers
 // ---------------------------------------------------------------------------
 
+type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
+
 interface RouteEntry {
   method: string;
   url: string;
-  handler: (request: any, reply: any) => Promise<any>;
+  handler: RouteHandler;
 }
 
-function buildApp() {
+type TestRouteRegistrar = (url: string, opts: unknown, handler: RouteHandler) => void;
+
+interface TestFastify {
+  get: TestRouteRegistrar;
+  post: TestRouteRegistrar;
+}
+
+type BuiltApp = {
+  fastify: TestFastify;
+  routes: RouteEntry[];
+};
+
+function buildApp(): BuiltApp {
   const routes: RouteEntry[] = [];
 
-  const fastify = {
-    get: vi.fn((url: string, _opts: any, handler: any) => {
+  const fastify: TestFastify = {
+    get: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
       routes.push({ method: "GET", url, handler });
     }),
-    post: vi.fn((url: string, _opts: any, handler: any) => {
+    post: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
       routes.push({ method: "POST", url, handler });
     }),
-  } as any;
+  };
 
   return { fastify, routes };
 }
@@ -120,7 +134,7 @@ describe("operation routes", () => {
     handleTransaction: vi.fn(),
   };
 
-  let app: ReturnType<typeof buildApp>;
+  let app: BuiltApp;
 
   beforeEach(async () => {
     vi.restoreAllMocks();
@@ -149,13 +163,16 @@ describe("operation routes", () => {
       AuthorityAuthorizationHook,
     } = await import("@commercetools/connect-payments-sdk");
 
-    await operationsRoute(app.fastify, {
-      sessionHeaderAuthHook: new SessionHeaderAuthenticationHook(),
-      oauth2AuthHook: new Oauth2AuthenticationHook(),
-      jwtAuthHook: new JWTAuthenticationHook(),
-      authorizationHook: new AuthorityAuthorizationHook(),
-      paymentService: paymentService as any,
-    } as any);
+    await operationsRoute(
+      app.fastify as unknown as Parameters<typeof operationsRoute>[0],
+      {
+        sessionHeaderAuthHook: new SessionHeaderAuthenticationHook(),
+        oauth2AuthHook: new Oauth2AuthenticationHook(),
+        jwtAuthHook: new JWTAuthenticationHook(),
+        authorizationHook: new AuthorityAuthorizationHook(),
+        paymentService,
+      } as unknown as Parameters<typeof operationsRoute>[1],
+    );
   });
 
   it("registers /config route that delegates to paymentService.config()", async () => {

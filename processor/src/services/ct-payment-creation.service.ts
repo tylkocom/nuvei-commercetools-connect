@@ -7,15 +7,13 @@ import { PaymentTransactions } from "../dtos/operations/payment-intents.dto.js";
 import { getConfig } from "../config/config.js";
 import { log } from "../libs/logger/index.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
+import { METHOD_NAMES } from "../dtos/operations/payment-components.dto.js";
 
 export type CtPaymentCreationServiceOptions = {
   ctCartService: CommercetoolsCartService;
   ctPaymentService: CommercetoolsPaymentService;
 };
 
-const METHOD_NAMES: Record<string, string> = {
-  card: "Nuvei card",
-};
 
 export class CtPaymentCreationService {
   private ctCartService: CommercetoolsCartService;

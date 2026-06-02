@@ -16,8 +16,8 @@ import {
   StatusResponse,
 } from "./types/operation.type.js";
 import {
+  PAYMENT_METHOD_REGISTRY,
   SupportedPaymentComponentsSchemaDTO,
-  SUPPORTED_PAYMENT_METHODS,
   isSupportedPaymentMethod,
 } from "../dtos/operations/payment-components.dto.js";
 import {
@@ -40,6 +40,10 @@ import {
   type NuveiDmnUpdateData,
 } from "./converters/nuvei-event.converter.js";
 import type { Payment } from "@commercetools/platform-sdk";
+import {
+  PaymentSetupError,
+  PublicPaymentErrorCode,
+} from "../dtos/operations/payment-errors.dto.js";
 
 export type NuveiPaymentServiceOptions = {
   ctCartService: CommercetoolsCartService;
@@ -110,11 +114,62 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return `${token.slice(0, 6)}...[redacted]...${token.slice(-4)}`;
   }
 
-  private getRequestedPaymentMethod(options?: {
-    paymentMethodOptions?: Record<string, Record<string, unknown>>;
-  }): string | undefined {
-    const methods = Object.keys(options?.paymentMethodOptions ?? {});
-    return methods.length > 0 ? methods[0] : undefined;
+  public validatePaymentMethodOptions(options?: unknown): "card" | "embedded" {
+    if (options === undefined) {
+      return "card";
+    }
+
+    if (!this.isPlainObject(options)) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "options_not_object",
+      });
+    }
+
+    const paymentMethodOptions = (options as { paymentMethodOptions?: unknown }).paymentMethodOptions;
+    if (paymentMethodOptions === undefined) {
+      return "card";
+    }
+
+    if (!this.isPlainObject(paymentMethodOptions)) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "method_options_not_object",
+      });
+    }
+
+    const methods = Object.keys(paymentMethodOptions);
+    if (methods.length !== 1) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: methods.length === 0 ? "method_missing" : "method_ambiguous",
+      });
+    }
+
+    const [paymentMethod] = methods;
+    if (!paymentMethod) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "method_empty",
+      });
+    }
+
+    if (!isSupportedPaymentMethod(paymentMethod)) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
+        category: "method_unsupported",
+        requestedMethod: paymentMethod,
+      });
+    }
+
+    const methodOptions = (paymentMethodOptions as Record<string, unknown>)[paymentMethod];
+    if (!this.isPlainObject(methodOptions) || Object.keys(methodOptions).length > 0) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "method_payload_invalid",
+        requestedMethod: paymentMethod,
+      });
+    }
+
+    return paymentMethod;
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
   private paymentHasInteraction(payment: Payment, interactionId: string): boolean {
@@ -368,14 +423,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
    */
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
-      dropins: [
-        {
-          type: "embedded",
-        },
-      ],
-      components: SUPPORTED_PAYMENT_METHODS.filter((m) => m !== "dropin").map((m) => ({
-        type: m,
+      dropins: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin").map((entry) => ({
+        type: entry.advertisedType,
       })),
+      components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map(
+        (entry) => ({
+          type: entry.advertisedType,
+        }),
+      ),
       express: [],
     };
   }
@@ -682,15 +737,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
    * @param options - Optional payment method options
    * @returns Promise with cartId, sessionToken, paymentReference, merchantReturnUrl
    */
-  public async createPaymentIntent(options?: {
-    paymentMethodOptions?: Record<string, Record<string, unknown>>;
-  }): Promise<{
+  public async createPaymentIntent(options?: unknown): Promise<{
     cartId: string;
     sessionToken: string;
     paymentReference: string;
     merchantReturnUrl: string;
   }> {
     try {
+      const paymentMethod = this.validatePaymentMethodOptions(options);
       const cartId = getCartIdFromContext();
       const cart = await this.ctCartService.getCart({ id: cartId });
       const amountPlanned = await this.ctCartService.getPaymentAmount({ cart });
@@ -700,6 +754,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         cartId: cart.id,
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
+        paymentMethod,
       });
 
       const openOrderResponse = await nuveiClient().openOrder({
@@ -709,13 +764,6 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
 
       const sessionToken = openOrderResponse.sessionToken;
-      const paymentMethod = this.getRequestedPaymentMethod(options);
-
-      if (paymentMethod && !isSupportedPaymentMethod(paymentMethod)) {
-        throw new Error(
-          `Unsupported payment method "${paymentMethod}". Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
-        );
-      }
 
       const paymentReference = await this.paymentCreationService.handleCtPaymentCreation({
         interactionId: sessionToken,
@@ -740,9 +788,17 @@ export class NuveiPaymentService extends AbstractPaymentService {
         merchantReturnUrl,
       };
     } catch (error) {
-      log.error("Error creating payment intent", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      if (error instanceof PaymentSetupError) {
+        log.warn("Payment setup validation failed.", {
+          route: "POST /payments",
+          code: error.code,
+          ...error.diagnostics,
+        });
+      } else {
+        log.error("Error creating payment intent", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       throw error;
     }
   }

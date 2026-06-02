@@ -18,6 +18,11 @@ import {
   NuveiPaymentService,
 } from "../services/nuvei-payment.service.js";
 import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
+import {
+  PaymentSetupError,
+  PublicPaymentErrorSchema,
+  type PublicPaymentErrorSchemaDTO,
+} from "../dtos/operations/payment-errors.dto.js";
 import { log } from "../libs/logger/index.js";
 
 type PaymentRoutesOptions = {
@@ -59,7 +64,10 @@ export const paymentRoutes = async (
   );
 
   // POST / - New endpoint with payment method options support
-  fastify.post<{ Body: PaymentMethodOptionsSchemaDTO; Reply: PaymentResponseSchemaDTO }>(
+  fastify.post<{
+    Body: PaymentMethodOptionsSchemaDTO;
+    Reply: PaymentResponseSchemaDTO | PublicPaymentErrorSchemaDTO;
+  }>(
     "/",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
@@ -67,12 +75,27 @@ export const paymentRoutes = async (
         body: PaymentMethodOptionsSchema,
         response: {
           200: PaymentResponseSchema,
+          400: PublicPaymentErrorSchema,
+          422: PublicPaymentErrorSchema,
         },
       },
     },
     async (request, reply) => {
-      const resp = await opts.paymentService.createPaymentIntent(request.body);
-      return reply.status(200).send(resp);
+      try {
+        const resp = await opts.paymentService.createPaymentIntent(request.body);
+        return reply.status(200).send(resp);
+      } catch (error) {
+        if (error instanceof PaymentSetupError) {
+          log.warn("Payment setup request rejected.", {
+            route: "POST /payments",
+            code: error.code,
+            ...error.diagnostics,
+          });
+          return reply.status(error.statusCode).send(error.toPublicError());
+        }
+
+        throw error;
+      }
     },
   );
 
