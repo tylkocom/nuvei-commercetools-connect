@@ -695,6 +695,308 @@ describe("NuveiPaymentService", () => {
       );
     });
   });
+  // -------------------------------------------------------------------------
+  // confirmPayment() – tri-state outcome and canonical PPP identity
+  // These tests define the REQUIRED behavior per D-01 through D-18.
+  // They FAIL against the current implementation (Task 1 RED).
+  // -------------------------------------------------------------------------
+  describe("confirmPayment() – tri-state outcome and canonical PPP identity", () => {
+    it("returns { outcome: 'approved' } for SUCCESS+APPROVED with canonical PPP_TransactionID (D-01, D-15)", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "APPROVED",
+        transactionId: "fiscal-tx-1",
+        PPP_TransactionID: "ppp-tx-123",
+        amount: "10.00",
+        currency: "USD",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      // Must write Success Authorization using PPP as interactionId, not fiscal transactionId
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Success",
+            interactionId: "ppp-tx-123",
+          }),
+        }),
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({ interactionId: "fiscal-tx-1" }),
+        }),
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({ interactionId: "session-token-1" }),
+        }),
+      );
+    });
+
+    it("approved official-shaped status without PPP returns { outcome: 'pending' } and does not call updatePayment (D-03, D-04, D-09, D-14)", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+      // Official-shaped getPaymentStatus: has transactionId but NO PPP_TransactionID variants
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "APPROVED",
+        transactionId: "fiscal-tx-1",
+        amount: "10.00",
+        currency: "USD",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "pending" });
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("rejected (DECLINED) without PPP returns { outcome: 'rejected' } and does not write CT terminal (D-05, D-06, D-12, D-14, D-16)", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "DECLINED",
+        transactionId: "fiscal-tx-1",
+        amount: "10.00",
+        currency: "USD",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      // Must NOT write any CT terminal transaction (no sessionToken or fiscal ID fallback)
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("rejected (ERROR) without PPP returns { outcome: 'rejected' } and does not write CT terminal (D-16)", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "ERROR",
+        transactionId: "fiscal-tx-1",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("rejected with PPP_TransactionID writes one Failure Authorization using PPP as interactionId (D-16)", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "DECLINED",
+        PPP_TransactionID: "ppp-tx-rejected-456",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      expect(mockUpdatePayment).toHaveBeenCalledTimes(1);
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Failure",
+            interactionId: "ppp-tx-rejected-456",
+          }),
+        }),
+      );
+      // Must NOT use sessionToken or fiscal ID as interactionId
+      expect(mockUpdatePayment).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({ interactionId: "session-token-1" }),
+        }),
+      );
+    });
+
+    it("duplicate rejected canonical PPP short-circuits without second updatePayment (D-16, D-18)", async () => {
+      const { service } = createService();
+      // Payment already has Failure Authorization with the same PPP interactionId
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            { type: "Authorization", state: "Failure", interactionId: "ppp-tx-rejected-456" },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "DECLINED",
+        PPP_TransactionID: "ppp-tx-rejected-456",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      // Must NOT append another Failure transaction
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("duplicate approved canonical PPP short-circuits without second updatePayment (D-15, D-18)", async () => {
+      const { service } = createService();
+      // Payment already has Success Authorization with the same PPP interactionId
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            { type: "Authorization", state: "Success", interactionId: "ppp-tx-123" },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "APPROVED",
+        PPP_TransactionID: "ppp-tx-123",
+        amount: "10.00",
+        currency: "USD",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      // Must NOT append another transaction
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["missing status and transactionStatus", { transactionId: "fiscal-tx" }],
+      ["PENDING transactionStatus with SUCCESS", { status: "SUCCESS", transactionStatus: "PENDING" }],
+      ["UPDATE status", { status: "UPDATE", transactionStatus: "APPROVED" }],
+      ["cashier ERROR status (not SUCCESS+DECLINED)", { status: "ERROR" }],
+      ["unknown transactionStatus string", { status: "SUCCESS", transactionStatus: "UNKNOWN_FUTURE_VALUE" }],
+      ["null transactionStatus", { status: "SUCCESS", transactionStatus: null }],
+    ])(
+      "inconclusive/unknown Nuvei status (%s) returns { outcome: 'pending' } without CT write (D-03, D-08, D-09, D-17)",
+      async (_, statusOverrides) => {
+        const { service } = createService();
+        mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+        mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+          transactionId: "fiscal-tx-1",
+          PPP_TransactionID: "ppp-tx-inconclusive",
+          ...statusOverrides,
+        });
+
+        const result = await service.confirmPayment("payment-1", "session-token-1");
+
+        expect(result).toEqual({ outcome: "pending" });
+        expect(mockUpdatePayment).not.toHaveBeenCalled();
+      },
+    );
+
+    it("session/cart mismatch throws a technical error and is not converted to a rejected outcome (D-06)", async () => {
+      const { service } = createService();
+      // Cart does NOT contain this payment
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        paymentInfo: { payments: [{ id: "other-payment-entirely" }] },
+      });
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+
+      // Must throw a technical error, not return an outcome
+      await expect(
+        service.confirmPayment("payment-1", "session-token-1"),
+      ).rejects.toThrow("Payment does not belong to authenticated cart session");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn() – canonical PPP identity (D-11 through D-13, D-18)
+  // These tests define PPP-based dedup and identity behavior.
+  // They FAIL against the current implementation (Task 1 RED).
+  // -------------------------------------------------------------------------
+  describe("processNuveiDmn() – canonical PPP identity", () => {
+    it("deduplication uses PPP_TransactionID, not fiscal TransactionID (D-18)", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      // Payment has a transaction whose interactionId is the PPP value
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "nuvei-tx-100",
+          transactions: [
+            { type: "Authorization", state: "Success", interactionId: "50001" }, // same as baseDmnFields PPP
+          ],
+        }),
+      );
+
+      const body: Record<string, unknown> = {
+        merchant_unique_id: "payment-1",
+        PPP_TransactionID: "50001",         // canonical PPP – already present on payment
+        TransactionID: "tx-auth-new-fiscal", // different fiscal TX – must NOT prevent dedup
+        transactionType: "Auth",
+        ppp_status: "OK",
+        totalAmount: "10.00",
+        currency: "USD",
+      };
+
+      await service.processNuveiDmn(body);
+
+      // Must short-circuit because PPP already exists on payment
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("DMN with PPP_TransactionId (alt casing) is accepted for dedup (D-13)", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "nuvei-tx-100",
+          transactions: [
+            { type: "Authorization", state: "Success", interactionId: "60002" },
+          ],
+        }),
+      );
+
+      const body: Record<string, unknown> = {
+        merchant_unique_id: "payment-1",
+        PPP_TransactionId: "60002",   // alt casing: PPP_TransactionId
+        transactionType: "Auth",
+        ppp_status: "OK",
+        totalAmount: "10.00",
+        currency: "USD",
+      };
+
+      await service.processNuveiDmn(body);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("DMN with ppp_TransactionID (lowercase ppp) is accepted for dedup (D-13)", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "nuvei-tx-100",
+          transactions: [
+            { type: "Authorization", state: "Success", interactionId: "70003" },
+          ],
+        }),
+      );
+
+      const body: Record<string, unknown> = {
+        merchant_unique_id: "payment-1",
+        ppp_TransactionID: "70003",   // alt casing: ppp_TransactionID
+        transactionType: "Auth",
+        ppp_status: "OK",
+        totalAmount: "10.00",
+        currency: "USD",
+      };
+
+      await service.processNuveiDmn(body);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
 
   // -------------------------------------------------------------------------
   // reversePayment()

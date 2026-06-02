@@ -66,6 +66,7 @@ type MockCreatePaymentSession = {
 type MockConfirmPayment = {
   (paymentReference: string, sessionToken: string): Promise<unknown>;
   mockResolvedValue: (value: unknown) => void;
+  mockRejectedValue: (value: unknown) => void;
 };
 
 type PaymentServiceDouble = {
@@ -276,5 +277,67 @@ describe("payment routes", () => {
       message: "Payment setup request is malformed.",
     });
     expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /confirm/:id – tri-state outcome contract (D-01, D-05, D-06)
+  // These tests FAIL against the current implementation and will pass after
+  // Task 2 implementation.
+  // -------------------------------------------------------------------------
+
+  it("POST /confirm/:id – pending service result returns 200 { outcome: 'pending' } (D-01, D-05)", async () => {
+    paymentService.confirmPayment.mockResolvedValue({ outcome: "pending" });
+
+    const confirmRoute = app.routes.find((r) => r.method === "POST" && r.url === "/confirm/:id");
+    expect(confirmRoute).toBeDefined();
+
+    const reply = makeReply();
+    await confirmRoute?.handler(
+      { params: { id: "payment-1" }, body: { sessionToken: "session-token-1" } },
+      reply,
+    );
+
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith({ outcome: "pending" });
+  });
+
+  it("POST /confirm/:id – rejected service result returns 402 { outcome: 'rejected' } (D-05)", async () => {
+    paymentService.confirmPayment.mockResolvedValue({ outcome: "rejected" });
+
+    const confirmRoute = app.routes.find((r) => r.method === "POST" && r.url === "/confirm/:id");
+    expect(confirmRoute).toBeDefined();
+
+    const reply = makeReply();
+    await confirmRoute?.handler(
+      { params: { id: "payment-1" }, body: { sessionToken: "session-token-1" } },
+      reply,
+    );
+
+    expect(reply.status).toHaveBeenCalledWith(402);
+    expect(reply.send).toHaveBeenCalledWith({ outcome: "rejected" });
+  });
+
+  it("POST /confirm/:id – thrown technical error is NOT returned as { outcome: 'rejected' } (D-06)", async () => {
+    // Arrange: service throws a technical error (session/cart mismatch, etc.)
+    paymentService.confirmPayment.mockRejectedValue(
+      new Error("Payment does not belong to authenticated cart session"),
+    );
+
+    const fastify = await buildFastifyApp(paymentService);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/confirm/payment-1",
+      payload: { sessionToken: "session-token-1" },
+    });
+
+    // Must NOT be a business 402 rejected outcome
+    expect(response.statusCode).not.toBe(402);
+    expect(response.statusCode).not.toBe(400);
+    // Must NOT contain business rejected body
+    const body = JSON.parse(response.body) as Record<string, unknown>;
+    expect(body).not.toEqual({ outcome: "rejected" });
+
+    await fastify.close();
   });
 });

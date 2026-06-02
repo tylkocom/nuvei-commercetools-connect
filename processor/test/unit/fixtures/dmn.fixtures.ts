@@ -221,3 +221,66 @@ export function makePaymentStatusResponse(
     ...overrides,
   };
 }
+
+// ---------------------------------------------------------------------------
+// PPP-only DMN – has PPP_TransactionID but no fiscal TransactionID/TransactionId
+// Tests that converter and dedup work without optional fiscal ID (D-12, D-13)
+// ---------------------------------------------------------------------------
+
+export const dmnAuthOkPppOnly: Record<string, unknown> = baseDmnFields({
+  // No TransactionID or TransactionId – only PPP_TransactionID from baseDmnFields
+  transactionType: "Auth",
+  ppp_status: "OK",
+  Status: "APPROVED",
+  totalAmount: "10.00",
+  ErrCode: "0",
+});
+
+// ---------------------------------------------------------------------------
+// Alt PPP casing: PPP_TransactionId (capital T, lowercase d)
+// Nuvei DMN examples include both PPP_TransactionID and PPP_TransactionId (D-13)
+// ---------------------------------------------------------------------------
+
+export const dmnAuthAltPppTransactionId: Record<string, unknown> = {
+  ...baseDmnFields({
+    transactionType: "Auth",
+    ppp_status: "OK",
+    Status: "APPROVED",
+    totalAmount: "10.00",
+    ErrCode: "0",
+  }),
+  PPP_TransactionId: "60002",        // alt casing: capital T, lowercase d
+};
+delete (dmnAuthAltPppTransactionId as Record<string, unknown>).PPP_TransactionID;
+
+// ---------------------------------------------------------------------------
+// Alt PPP casing: ppp_TransactionID (lowercase ppp_)
+// Nuvei DMN checksum docs use ppp_TransactionID (D-13)
+// ---------------------------------------------------------------------------
+
+export const dmnAuthAltPppLower: Record<string, unknown> = {
+  ...baseDmnFields({
+    transactionType: "Auth",
+    ppp_status: "OK",
+    Status: "APPROVED",
+    totalAmount: "10.00",
+    ErrCode: "0",
+  }),
+  ppp_TransactionID: "70003",        // alt casing: lowercase ppp_
+};
+delete (dmnAuthAltPppLower as Record<string, unknown>).PPP_TransactionID;
+
+// ---------------------------------------------------------------------------
+// Duplicate PPP – same PPP_TransactionID as dmnAuthOk (50001) but different fiscal ID
+// Tests that dedup is based on PPP identity, not fiscal TransactionID (D-18)
+// ---------------------------------------------------------------------------
+
+export const dmnDuplicatePppAuth: Record<string, unknown> = baseDmnFields({
+  TransactionID: "tx-auth-new-fiscal-999", // different fiscal TX
+  transactionType: "Auth",
+  ppp_status: "OK",
+  Status: "APPROVED",
+  totalAmount: "10.00",
+  ErrCode: "0",
+  // PPP_TransactionID: "50001" inherited from baseDmnFields – same as dmnAuthOk
+});
