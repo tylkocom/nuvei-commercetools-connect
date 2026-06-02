@@ -26,7 +26,7 @@ describe("apiService", () => {
     await apiService({ baseApi: "https://processor.example.com/", sessionId: "session-123" })
       .createPayment({ paymentMethodOptions: { card: {} } });
 
-    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments", {
+    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments/session", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -39,14 +39,14 @@ describe("apiService", () => {
   it("createPayment sends an empty object body when no params are provided", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ sessionToken: "st", paymentReference: "ref" }),
+      json: () => Promise.resolve({ cartId: "cart", sessionToken: "st", paymentReference: "ref" }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     await apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
       .createPayment();
 
-    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments", {
+    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments/session", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Session-ID": "s" },
       body: JSON.stringify({}),
@@ -63,49 +63,15 @@ describe("apiService", () => {
 
     await expect(
       apiService({ baseApi: "https://processor.example.com", sessionId: "s" }).createPayment(),
-    ).rejects.toThrow("Failed to create payment: 500 Internal Server Error");
+    ).rejects.toThrow("Failed to create payment session.");
   });
 
-  // ---------------------------------------------------------------------------
-  // getPayment
-  // ---------------------------------------------------------------------------
-
-  it("getPayment sends a GET request to /payments", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ sessionToken: "st", paymentReference: "ref" }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await apiService({ baseApi: "https://processor.example.com", sessionId: "session-123" })
-      .getPayment();
-
-    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments", {
-      headers: {
-        "Content-Type": "application/json",
-        "X-Session-ID": "session-123",
-      },
-    });
-  });
-
-  it("getPayment throws a descriptive error on non-2xx response", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" }).getPayment(),
-    ).rejects.toThrow("Failed to get payment: 404 Not Found");
-  });
 
   // ---------------------------------------------------------------------------
   // confirmPayment
   // ---------------------------------------------------------------------------
 
-  it("confirmPayment POSTs to /payments/confirmPayments/:ref with correct body", async () => {
+  it("confirmPayment POSTs to /payments/confirm/:ref with correct body", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ outcome: "confirmed" }),
@@ -116,7 +82,7 @@ describe("apiService", () => {
       .confirmPayment({ sessionToken: "st-456", paymentReference: "ref-789" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://processor.example.com/payments/confirmPayments/ref-789",
+      "https://processor.example.com/payments/confirm/ref-789",
       {
         method: "POST",
         headers: {
@@ -149,15 +115,15 @@ describe("apiService", () => {
   it("strips a trailing slash from baseApi so requests do not contain double slashes", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ sessionToken: "st", paymentReference: "ref" }),
+      json: () => Promise.resolve({ cartId: "cart", sessionToken: "st", paymentReference: "ref" }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     await apiService({ baseApi: "https://processor.example.com/", sessionId: "s" })
-      .getPayment();
+      .createPayment();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://processor.example.com/payments",
+      "https://processor.example.com/payments/session",
       expect.anything(),
     );
   });

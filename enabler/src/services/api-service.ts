@@ -13,14 +13,15 @@ import {
 } from "../payment-enabler/payment-enabler.js";
 import type { NuveiResult } from "./nuvei-sdk.js";
 
-/** Shape of the response returned by `POST /payments`. */
+/** Shape of the response returned by `POST /payments/session`. */
 export type PaymentSessionResponse = {
+  cartId: string;
   sessionToken: string;
   paymentReference: string;
   merchantReturnUrl?: string;
 };
 
-/** Shape of the response returned by `POST /payments/confirmPayments/:ref`. */
+/** Shape of the response returned by `POST /payments/confirm/:ref`. */
 export type ConfirmPaymentResponse = {
   outcome: string;
 };
@@ -28,7 +29,6 @@ export type ConfirmPaymentResponse = {
 /** Public contract exposed to consuming code. */
 export type ApiService = {
   createPayment: (opts?: CreatePaymentRequest) => Promise<PaymentSessionResponse>;
-  getPayment: () => Promise<PaymentSessionResponse>;
   confirmPayment: (opts: ConfirmPaymentRequest) => Promise<ConfirmPaymentResponse>;
 };
 
@@ -94,7 +94,7 @@ export function apiService(opts: { baseApi: string; sessionId: string }): ApiSer
 
   return {
     async createPayment(params?: CreatePaymentRequest): Promise<PaymentSessionResponse> {
-      const res = await fetch(`${baseApi}/payments`, {
+      const res = await fetch(`${baseApi}/payments/session`, {
         method: "POST",
         headers,
         body: JSON.stringify(params ?? {}),
@@ -103,30 +103,23 @@ export function apiService(opts: { baseApi: string; sessionId: string }): ApiSer
         const publicError = await readPublicPaymentError(res);
         if (publicError) {
           throw new PaymentSetupError(publicError.code, publicError.message, {
-            route: "POST /payments",
+            route: "POST /payments/session",
             status: res.status,
           });
         }
         throw new PaymentSetupError(
           PublicPaymentErrorCode.REQUEST_MALFORMED,
           "Failed to create payment session.",
-          { route: "POST /payments", status: res.status },
+          { route: "POST /payments/session", status: res.status },
         );
       }
       return res.json();
     },
 
-    async getPayment(): Promise<PaymentSessionResponse> {
-      const res = await fetch(`${baseApi}/payments`, { headers });
-      if (!res.ok) {
-        throw new Error(`Failed to get payment: ${res.status} ${res.statusText}`);
-      }
-      return res.json();
-    },
 
     async confirmPayment(params: ConfirmPaymentRequest): Promise<ConfirmPaymentResponse> {
       const res = await fetch(
-        `${baseApi}/payments/confirmPayments/${params.paymentReference}`,
+        `${baseApi}/payments/confirm/${params.paymentReference}`,
         {
           method: "POST",
           headers,
