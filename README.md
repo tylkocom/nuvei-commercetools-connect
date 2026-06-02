@@ -1,5 +1,7 @@
 # Nuvei Commercetools Connector
 
+!!WIP
+
 A production-ready [commercetools Connect](https://docs.commercetools.com/connect) payment Connector for [Nuvei](https://www.nuvei.com/), designed to work natively with **commercetools Checkout** (Complete Checkout and Payment Only modes).
 
 ## Architecture

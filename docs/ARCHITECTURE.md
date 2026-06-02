@@ -16,17 +16,17 @@ The Nuvei commercetools Connector integrates [Nuvei](https://www.nuvei.com/) as 
 ## Payment Flow
 
 ```
-┌──────────┐    ┌──────────┐    ┌───────────┐    ┌──────────┐    ┌──────────────────┐
-│ Customer  │───>│ Checkout  │───>│ Processor  │───>│  Nuvei   │───>│ Nuvei Widget     │
-│ (Browser) │    │ (CT)     │    │ (Connect)  │    │ openOrder│    │ (Simply Connect) │
-└──────────┘    └──────────┘    └───────────┘    └──────────┘    └────────┬─────────┘
-                                                                      │
-      ┌───────────────────────────────────────────────────────────────┘
+┌───────────┐    ┌───────────┐    ┌───────────┐    ┌──────────┐    ┌──────────────────┐
+│ Customer  │───>│ Checkout  │───>│ Processor │───>│  Nuvei   │───>│ Nuvei Widget     │
+│ (Browser) │    │ (CT)      │    │ (Connect) │    │ openOrder│    │ (Simply Connect) │
+└───────────┘    └───────────┘    └───────────┘    └──────────┘    └────────┬─────────┘
+                                                                            │
+      ┌─────────────────────────────────────────────────────────────────────┘
       │  Customer completes payment in widget
       ▼
 ┌──────────┐    ┌───────────┐    ┌──────────┐
-│ Nuvei    │───>│ Processor  │───>│ CT       │
-│ DMN      │    │ /webhooks  │    │ Payment  │
+│ Nuvei    │───>│ Processor │───>│ CT       │
+│ DMN      │    │ /webhooks │    │ Payment  │
 └──────────┘    └───────────┘    └──────────┘
 
 Step-by-step:
