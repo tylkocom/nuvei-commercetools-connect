@@ -81,7 +81,7 @@ describe("DropinEmbeddedBuilder", () => {
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "payment-ref-123",
-      amount: 10,
+      amount: "10.00",
       currency: "USD",
     });
 
@@ -100,7 +100,7 @@ describe("DropinEmbeddedBuilder", () => {
           env: "int",
           merchantId: "merchant-123",
           merchantSiteId: "site-456",
-          amount: 10,
+          amount: "10.00",
           currency: "USD",
           renderTo: "#container",
         }),
@@ -124,7 +124,7 @@ describe("DropinEmbeddedBuilder", () => {
     mockCreatePayment.mockResolvedValue({
       sessionToken: "known-session-token",
       paymentReference: "payment-ref-123",
-      amount: 10,
+      amount: "10.00",
       currency: "USD",
     });
 

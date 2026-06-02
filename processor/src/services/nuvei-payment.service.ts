@@ -805,7 +805,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     sessionToken: string;
     paymentReference: string;
     merchantReturnUrl: string;
-    amount: number;
+    amount: string;
     currency: string;
   }> {
     try {
@@ -851,7 +851,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         sessionToken,
         paymentReference,
         merchantReturnUrl,
-        amount: Number(formattedAmount),
+        amount: formattedAmount,
         currency: amountPlanned.currencyCode,
       };
     } catch (error) {

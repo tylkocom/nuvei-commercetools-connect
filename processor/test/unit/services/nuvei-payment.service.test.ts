@@ -663,6 +663,8 @@ describe("NuveiPaymentService", () => {
         sessionToken: "session-token-xyz",
         paymentReference: "payment-ref-1",
         merchantReturnUrl: "https://example.com/return",
+        amount: "10.00",
+        currency: "USD",
       });
     });
   });

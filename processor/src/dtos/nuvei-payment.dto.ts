@@ -6,7 +6,7 @@ export const PaymentResponseSchema = Type.Object({
   sessionToken: Type.String(),
   paymentReference: Type.String(),
   merchantReturnUrl: Type.String(),
-  amount: Type.Number(),
+  amount: Type.String(),
   currency: Type.String(),
 });
 

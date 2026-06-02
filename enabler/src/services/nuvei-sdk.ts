@@ -26,7 +26,7 @@ export type CheckoutFunction = (config: {
   country?: string;
   locale?: string;
   currency?: string;
-  amount?: number;
+  amount?: number | string;
   fullName?: string;
   email?: string;
   billingAddress?: Record<string, string>;

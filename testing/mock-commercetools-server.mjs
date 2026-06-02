@@ -283,7 +283,7 @@ app.post("/payments/session", async (req, res) => {
     sessionToken,
     paymentReference: ledger.payment.id,
     merchantReturnUrl: "http://localhost:8089/return",
-    amount: ledger.cart.totalPrice.centAmount / 100,
+    amount: (ledger.cart.totalPrice.centAmount / 100).toFixed(2),
     currency: ledger.cart.totalPrice.currencyCode,
     ...(orderId ? { orderId } : {}),
   });
