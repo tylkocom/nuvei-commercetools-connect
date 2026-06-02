@@ -86,8 +86,22 @@ export interface NuveiTransactionResponse {
 }
 
 export class NuveiApiError extends Error {
-  public constructor(public readonly responseBody: unknown) {
-    super("Nuvei API request failed");
+  public readonly errCode?: number | string;
+  public readonly reason?: string;
+
+  public constructor(responseBody: Record<string, unknown>) {
+    const rawErrCode = responseBody.errCode;
+    const errCode =
+      typeof rawErrCode === "number" || typeof rawErrCode === "string"
+        ? rawErrCode
+        : undefined;
+    const reason =
+      typeof responseBody.reason === "string"
+        ? responseBody.reason
+        : "Nuvei API request failed";
+    super(reason);
+    this.errCode = errCode;
+    this.reason = reason;
   }
 }
 
