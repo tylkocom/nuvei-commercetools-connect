@@ -221,7 +221,7 @@ Expected result:
 - `POST /payments/session` creates a Nuvei session and a CT Payment.
 - Frontend confirmation calls `POST /payments/confirm/:paymentId`.
 - CT Payment has an `Authorization` transaction with state `Success`.
-- Authorization `interactionId` is the Nuvei transaction ID after confirmation.
+- Authorization `interactionId` is the canonical Nuvei `PPP_TransactionID` after confirmation.
 - Nuvei dashboard shows an approved authorization.
 - DMN processing does not create duplicate transactions.
 
@@ -244,8 +244,8 @@ Expected result:
 
 - Payment Only Checkout renders the enabler asset.
 - Payment authorization succeeds.
-- CT Payment has one successful `Authorization` for the Nuvei transaction.
-- DMN is idempotent with frontend confirmation.
+- CT Payment has one successful `Authorization` with `interactionId` set to canonical Nuvei `PPP_TransactionID`.
+- DMN deduplication is based on `PPP_TransactionID`; a second DMN with the same value does not create a duplicate transaction.
 
 ## Scenario 8: Declined Card
 
@@ -265,7 +265,8 @@ Expected result:
 
 - Shopper sees a safe payment failure message.
 - No raw Nuvei secret, checksum, or sensitive card data is shown.
-- CT Payment has an `Authorization` transaction with state `Failure`, or the failure is clearly deferred to DMN if that is the chosen behavior.
+- `POST /payments/confirm/:paymentId` returns HTTP `402` with `{ "outcome": "rejected" }`. The enabler routes this to `onError` with a safe error.
+- CT Payment has an `Authorization` transaction with state `Failure` and `interactionId` set to canonical `PPP_TransactionID` only if `PPP_TransactionID` was present in the Nuvei status response; without it, no CT terminal transaction is written for the declined attempt.
 - Processor logs include useful redacted context.
 
 ## Scenario 9: 3DS Frictionless Approval

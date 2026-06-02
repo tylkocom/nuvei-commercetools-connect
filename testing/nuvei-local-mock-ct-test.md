@@ -303,15 +303,13 @@ Important internal call:
 nuveiClient().getPaymentStatus({ sessionToken })
 ```
 
-If Nuvei says approved, the processor updates the mock CT payment with:
+The processor classifies the Nuvei status and returns one of three outcomes:
 
-```json
-{
-  "type": "Authorization",
-  "state": "Success",
-  "interactionId": "<nuvei-transaction-id>"
-}
-```
+- **Approved**: writes a CT `Authorization` transaction with `state: "Success"` and `interactionId` set to the canonical Nuvei `PPP_TransactionID`.
+- **Rejected**: returns HTTP `402`. If `PPP_TransactionID` is available, writes a CT `Authorization` transaction with `state: "Failure"` and `interactionId` set to `PPP_TransactionID`. If `PPP_TransactionID` is absent, no CT transaction is written.
+- **Pending**: returns HTTP `200` with `{ "outcome": "pending" }`. No CT transaction is written.
+
+`PPP_TransactionID` is the mandatory canonical Nuvei payment-page identifier. `sessionToken` and optional fiscal `TransactionID` are never used as terminal CT transaction identity.
 
 ### Normal downstream calls
 
@@ -319,12 +317,12 @@ If Nuvei says approved, the processor updates the mock CT payment with:
 processor -> mock CT getPayment(payment-local-001)
 processor -> mock CT getCart(cart-local-001)
 processor -> Nuvei getPaymentStatus.do
-processor -> mock CT updatePayment(payment-local-001)
+processor -> mock CT updatePayment(payment-local-001)  [approved and rejected-with-PPP only]
 ```
 
 ### Expected response
 
-Approved:
+Approved (HTTP 200):
 
 ```json
 {
@@ -332,11 +330,19 @@ Approved:
 }
 ```
 
-Declined:
+Rejected (HTTP 402):
 
 ```json
 {
   "outcome": "rejected"
+}
+```
+
+Pending (HTTP 200):
+
+```json
+{
+  "outcome": "pending"
 }
 ```
 
@@ -348,8 +354,8 @@ MOCK CT  getPayment(payment-local-001)
 MOCK CT  getCart(cart-local-001)
 OUTBOUND Nuvei getPaymentStatus.do request
 INBOUND  Nuvei getPaymentStatus.do response
-MOCK CT  updatePayment Authorization Success/Failure
-OUTBOUND approved/rejected response
+MOCK CT  updatePayment Authorization Success/Failure  [approved/rejected-with-PPP only]
+OUTBOUND approved/rejected/pending response
 ```
 
 ## Endpoint 4: `POST /webhooks/nuvei`
@@ -428,13 +434,13 @@ Mock CT payment should end with one authorization transaction, not two:
     {
       "type": "Authorization",
       "state": "Success",
-      "interactionId": "<Nuvei TransactionID>"
+      "interactionId": "<Nuvei PPP_TransactionID>"
     }
   ]
 }
 ```
 
-If frontend confirmation already added the same transaction, DMN should be idempotent.
+If frontend confirmation already added the same transaction, DMN should be idempotent. DMN deduplication uses `PPP_TransactionID` as the canonical identity key.
 
 ### Logs to capture
 

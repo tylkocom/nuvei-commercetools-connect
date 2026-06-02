@@ -34,8 +34,8 @@ graph TD
 5. `NuveiPaymentService.createPaymentSession()` reads the cart ID from request context, fetches the cart through the commercetools Connect Payments SDK, calculates the planned payment amount, calls `NuveiClient.openOrder()`, and creates a commercetools Payment through `CtPaymentCreationService.handleCtPaymentCreation()`.
 6. The processor returns the cart ID, Nuvei `sessionToken`, commercetools payment reference, and merchant return URL to the enabler.
 7. The enabler renders the Nuvei widget using `SafeCharge(...).createPayment(...)` and passes `merchant_unique_id` as the commercetools payment reference.
-8. When the widget reports an approved result, `confirmPaymentResult()` calls `POST /payments/confirm/:paymentReference` with the Nuvei session token.
-9. `NuveiPaymentService.confirmPayment()` retrieves the commercetools Payment, verifies that the authenticated session cart owns that Payment, calls `NuveiClient.getPaymentStatus()`, validates amount/currency/cart identity, and updates the Payment with an `Authorization` transaction in `Success` or `Failure` state.
+8. After the widget reports a result, `confirmPaymentResult()` calls `POST /payments/confirm/:paymentReference` with the Nuvei session token.
+9. `NuveiPaymentService.confirmPayment()` retrieves the commercetools Payment, verifies that the authenticated session cart owns that Payment, calls `NuveiClient.getPaymentStatus()`, classifies the Nuvei status, and returns a tri-state outcome: `approved`, `rejected`, or `pending`. Approved confirmation writes one CT `Authorization` transaction with `state: "Success"` and `interactionId` set to the canonical Nuvei `PPP_TransactionID`. Rejected confirmation writes one CT `Authorization` transaction with `state: "Failure"` and `interactionId` set to `PPP_TransactionID` only when `PPP_TransactionID` is available; without it, the endpoint returns `rejected` without a CT write. Pending (inconclusive or unknown Nuvei status) does not write a CT transaction. HTTP status is `200` for approved and pending, `402` for rejected. Technical or request failures remain `400`/`5xx` and are not business outcomes.
 
 ### Server-driven transaction creation
 
@@ -69,7 +69,7 @@ graph TD
 | `NuveiEnabler` | `enabler/src/index.ts` | Public browser entry point that creates card component and embedded drop-in builders. |
 | `PaymentEnabler`, `PaymentComponentBuilder`, `PaymentDropinBuilder` | `enabler/src/payment-enabler/payment-enabler.ts` | Frontend contracts consumed by commercetools Checkout or custom storefront code. |
 | `PAYMENT_METHOD_REGISTRY` | `enabler/src/payment-enabler/method-registry.ts`, `processor/src/dtos/operations/payment-components.dto.ts` | Registry of supported payment methods: `card` component and `embedded` drop-in. |
-| `CardComponentBuilder` / `CardComponent` | `enabler/src/components/card.ts` | Browser card integration that creates a payment session, loads Nuvei SDK, renders the card widget, and confirms approved results. |
+| `CardComponentBuilder` / `CardComponent` | `enabler/src/components/card.ts` | Browser card integration that creates a payment session, loads Nuvei SDK, renders the card widget, and routes tri-state confirmation outcomes: `approved` calls `onComplete`, `rejected` calls `onError` with a safe error, and `pending` calls the optional `onPending` callback. |
 | `DropinEmbeddedBuilder` / `DropinComponents` | `enabler/src/dropin/dropin-embedded.ts` | Browser drop-in integration for the embedded Nuvei Simply Connect widget. |
 | `apiService` | `enabler/src/services/api-service.ts` | Thin fetch client for `POST /payments/session` and `POST /payments/confirm/:id`. |
 | `NuveiClient` | `processor/src/clients/nuvei.client.ts` | Server-side Nuvei REST client for `openOrder`, `getPaymentStatus`, `settleTransaction`, `voidTransaction`, `refundTransaction`, and DMN checksum validation. |
@@ -90,7 +90,7 @@ graph TD
 | `POST` | `/payment-intents/:id` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_payment_intents` | Capture, cancel, refund, or reverse a payment intent. |
 | `POST` | `/transactions` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_transactions` | Create a server-driven Nuvei order and commercetools Payment for a cart. |
 | `POST` | `/payments/session` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for a selected payment method (`card` or `embedded`), defaulting to `card` if omitted. |
-| `POST` | `/payments/confirm/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a widget-approved payment with Nuvei and update the commercetools Payment. |
+| `POST` | `/payments/confirm/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a payment with Nuvei and return `{ outcome: "approved" \| "rejected" \| "pending" }`. HTTP `200` for approved and pending, `402` for rejected. CT `Authorization` `interactionId` uses canonical Nuvei `PPP_TransactionID` only. |
 | `POST` | `/webhooks/nuvei` | `processor/src/routes/nuvei-payment.route.ts` | Nuvei checksum/header hook | Process Nuvei DMN webhooks and reconcile Payment transactions. |
 
 ## Transaction and status mapping
@@ -171,9 +171,10 @@ The frontend enabler receives runtime configuration from its host application ra
 - Browser-to-processor payment creation and confirmation require a commercetools session ID through `X-Session-ID`.
 - Checkout operations that modify payment intents or create transactions use OAuth2 authentication plus explicit authority checks.
 - DMN webhook processing validates Nuvei checksum material and configured merchant identifiers before updating commercetools Payment data.
-- DMN processing is idempotent for repeated transaction IDs already present on the Payment.
+- DMN processing is idempotent: duplicate confirmation attempts are short-circuited using canonical `PPP_TransactionID` as the deduplication key.
 - Payment confirmation verifies that the Payment belongs to the authenticated cart session before accepting a Nuvei session token.
-- Successful payment confirmations and successful DMNs validate Nuvei-reported amount, currency, cart identity, and transaction identity before marking a commercetools transaction successful.
+- Successful payment confirmations validate Nuvei-reported amount, currency, and cart identity before writing CT transactions. CT `Authorization` `interactionId` is always the canonical Nuvei `PPP_TransactionID`; `sessionToken` and optional fiscal `TransactionID` are never used as terminal transaction identity.
+- Successful DMNs validate Nuvei-reported amount, currency, cart identity, and `PPP_TransactionID` identity before updating commercetools Payment data.
 - Fastify sets defensive response headers (`x-content-type-options`, `referrer-policy`, `x-frame-options`, and `permissions-policy`) for all responses.
 - CORS allows requests with no `Origin`, the configured commercetools Checkout URL, and any explicitly configured `CORS_ALLOWED_ORIGINS`.
 - The Nuvei SDK script is loaded with a fixed subresource integrity hash from `enabler/src/services/nuvei-sdk.ts`.

@@ -45,7 +45,7 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
    npm start --prefix testing
    ```
 
-   The mock server listens on `http://localhost:8089` by default and exposes `/ledger`, `/config`, `/payment-components`, `/payments`, `/payments/confirmPayments/payment-local-001`, `/webhooks/nuvei`, and `/payment-intents/payment-local-001`.
+   The mock server listens on `http://localhost:8089` by default and exposes `/ledger`, `/config`, `/payment-components`, `/payments`, `/payments/confirm/payment-local-001`, `/webhooks/nuvei`, and `/payment-intents/payment-local-001`.
 
 ## Project layout
 
@@ -86,7 +86,7 @@ const dropin = builder.build({ showPayButton: true });
 dropin.mount("#payment-container");
 ```
 
-Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments` endpoint to create a payment session, renders the embedded Nuvei widget into `#payment-container`, and calls `onComplete` after an approved widget result is confirmed through `POST /payments/confirmPayments/:id`.
+Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the embedded Nuvei widget into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback. `onComplete` is only called for approved outcomes.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
@@ -151,8 +151,7 @@ The connector follows the commercetools payment integration split defined in `co
 - `processor` is deployed as a Connect `service` application on `/` and starts `node dist/index.js` after `npm run build --prefix processor`.
 - `processor` validates required configuration at startup in `processor/src/config/config.ts`.
 - `processor` exposes:
-  - `GET /payments` and `POST /payments` for payment session creation.
-  - `POST /payments/confirmPayments/:id` for confirming successful Nuvei widget results.
+  - `POST /payments/session` and `POST /payments/confirm/:id` for payment session creation and widget result confirmation. `POST /payments/confirm/:id` returns `{ outcome: "approved" | "rejected" | "pending" }` with HTTP `200` for approved and pending, `402` for rejected.
   - `POST /webhooks/nuvei` for Nuvei DMN webhook processing with raw-body checksum validation.
   - `GET /config`, `GET /status`, `GET /payment-components`, `POST /payment-intents/:id`, and `POST /transactions` for Connect payment operations.
 - `processor/src/services/nuvei-payment.service.ts` implements authorization, capture, cancel, refund, reverse, transaction creation, payment confirmation, and DMN reconciliation.

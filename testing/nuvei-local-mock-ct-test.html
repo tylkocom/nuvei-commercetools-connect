@@ -726,24 +726,27 @@ processor/src/services/nuvei-payment.service.ts
 processor/src/clients/nuvei.client.ts</pre>
             <p>Important internal call:</p>
             <pre>nuveiClient().getPaymentStatus({ sessionToken })</pre>
-            <p>If Nuvei says approved, the processor updates the mock CT payment with:</p>
-            <pre>{
-  "type": "Authorization",
-  "state": "Success",
-  "interactionId": "&lt;nuvei-transaction-id&gt;"
-}</pre>
+            <p>The processor classifies the Nuvei status and returns one of three outcomes:</p>
+            <ul>
+              <li><strong>Approved</strong>: writes a CT <code>Authorization</code> transaction with <code>state: "Success"</code> and <code>interactionId</code> set to the canonical Nuvei <code>PPP_TransactionID</code>.</li>
+              <li><strong>Rejected</strong>: returns HTTP <code>402</code>. If <code>PPP_TransactionID</code> is available, writes a CT <code>Authorization</code> transaction with <code>state: "Failure"</code> and <code>interactionId</code> set to <code>PPP_TransactionID</code>. If absent, no CT transaction is written.</li>
+              <li><strong>Pending</strong>: returns HTTP <code>200</code> with <code>{"outcome":"pending"}</code>. No CT transaction is written.</li>
+            </ul>
+            <p><code>PPP_TransactionID</code> is the mandatory canonical Nuvei payment-page identifier. <code>sessionToken</code> and optional fiscal <code>TransactionID</code> are never used as terminal CT transaction identity.</p>
 
             <div class="section-label">Normal Downstream Calls</div>
             <pre>processor -> mock CT getPayment(payment-local-001)
 processor -> mock CT getCart(cart-local-001)
 processor -> Nuvei getPaymentStatus.do
-processor -> mock CT updatePayment(payment-local-001)</pre>
+processor -> mock CT updatePayment(payment-local-001)  [approved and rejected-with-PPP only]</pre>
 
             <div class="section-label">Expected Response</div>
-            <p><strong>Approved:</strong></p>
+            <p><strong>Approved (HTTP 200):</strong></p>
             <pre>{"outcome":"approved"}</pre>
-            <p><strong>Declined:</strong></p>
+            <p><strong>Rejected (HTTP 402):</strong></p>
             <pre>{"outcome":"rejected"}</pre>
+            <p><strong>Pending (HTTP 200):</strong></p>
+            <pre>{"outcome":"pending"}</pre>
 
             <div class="section-label">Logs to Capture</div>
             <pre>INBOUND  POST /payments/confirm/payment-local-001
@@ -751,8 +754,8 @@ MOCK CT  getPayment(payment-local-001)
 MOCK CT  getCart(cart-local-001)
 OUTBOUND Nuvei getPaymentStatus.do request
 INBOUND  Nuvei getPaymentStatus.do response
-MOCK CT  updatePayment Authorization Success/Failure
-OUTBOUND approved/rejected response</pre>
+MOCK CT  updatePayment Authorization Success/Failure  [approved/rejected-with-PPP only]
+OUTBOUND approved/rejected/pending response</pre>
         </div>
     </div>
 
@@ -812,11 +815,11 @@ processor -> mock CT updatePayment(...)</pre>
     {
       "type": "Authorization",
       "state": "Success",
-      "interactionId": "&lt;Nuvei TransactionID&gt;"
+      "interactionId": "&lt;Nuvei PPP_TransactionID&gt;"
     }
   ]
 }</pre>
-            <p>If frontend confirmation already added the same transaction, DMN should be idempotent.</p>
+            <p>If frontend confirmation already added the same transaction, DMN should be idempotent. DMN deduplication uses <code>PPP_TransactionID</code> as the canonical identity key.</p>
 
             <div class="section-label">Logs to Capture</div>
             <p><strong>Tunnel inspector:</strong></p>
