@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node mock-commercetools-server.mjs"
+    "start": "node mock-commercetools-server.mjs",
+    "test:api": "node api-e2e-test.mjs",
+    "tunnel:dmn": "node start-dmn-tunnel.mjs"
   },
   "dependencies": {
     "express": "^4.18.3"
