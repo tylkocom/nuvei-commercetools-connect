@@ -193,6 +193,12 @@ export type EnablerOptions = {
   onComplete?: (result: PaymentResult) => void;
   /** Called when the Nuvei widget or the enabler encounters an error. */
   onError?: (error: unknown) => void;
+  /**
+   * Called when the processor confirms the payment is pending (inconclusive
+   * state). The payment is neither approved nor rejected at this point.
+   * No polling is performed — the merchant should await a DMN webhook.
+   */
+  onPending?: (result: PendingPaymentResult) => void;
 };
 
 /**
@@ -201,6 +207,15 @@ export type EnablerOptions = {
 export type PaymentResult =
   | { isSuccess: true; paymentReference: string; sessionToken: string }
   | { isSuccess: false };
+
+/**
+ * Result passed to {@link EnablerOptions.onPending} when the processor
+ * returns a pending confirmation outcome.
+ */
+export type PendingPaymentResult = {
+  paymentReference: string;
+  sessionToken: string;
+};
 
 /**
  * Options for individual payment component builders.

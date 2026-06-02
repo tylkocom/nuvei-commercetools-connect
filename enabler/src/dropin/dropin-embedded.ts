@@ -94,7 +94,7 @@ class DropinComponents implements DropinComponent {
         },
         renderTo: selector,
         onResult: (result: NuveiResult) => {
-          this.handleNuveiResult(result, paymentRes.paymentReference);
+          this.handleNuveiResult(result, paymentRes.paymentReference, paymentRes.sessionToken);
         },
       });
 
@@ -106,13 +106,15 @@ class DropinComponents implements DropinComponent {
   }
 
   /** Processes the result callback from the Nuvei widget. */
-  private handleNuveiResult(result: NuveiResult, paymentReference: string): void {
+  private handleNuveiResult(result: NuveiResult, paymentReference: string, knownSessionToken: string): void {
     void confirmPaymentResult(
       result,
       paymentReference,
+      knownSessionToken,
       this.api,
       this.baseOptions.onComplete,
       this.baseOptions.onError,
+      this.baseOptions.onPending,
     );
   }
 }

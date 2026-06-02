@@ -77,20 +77,22 @@ class CardComponent implements PaymentComponent {
       renderTo: selector,
       showPayButton: this.componentOptions.showPayButton ?? true,
       onResult: (result: NuveiResult) => {
-        this.handleNuveiResult(result, paymentRes.paymentReference);
+        this.handleNuveiResult(result, paymentRes.paymentReference, paymentRes.sessionToken);
       },
     });
 
     this.mounted = true;
   }
 
-  private handleNuveiResult(result: NuveiResult, paymentReference: string): void {
+  private handleNuveiResult(result: NuveiResult, paymentReference: string, knownSessionToken: string): void {
     void confirmPaymentResult(
       result,
       paymentReference,
+      knownSessionToken,
       this.api,
       this.baseOptions.onComplete,
       this.baseOptions.onError,
+      this.baseOptions.onPending,
     );
   }
 }
