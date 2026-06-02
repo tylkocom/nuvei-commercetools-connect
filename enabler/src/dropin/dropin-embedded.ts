@@ -86,6 +86,7 @@ class DropinComponents implements DropinComponent {
       // 2. Create and render the payment form.
       sfc.createPayment({
         sessionToken: paymentRes.sessionToken,
+        merchant_unique_id: paymentRes.paymentReference,
         cardHolderName: true,
         billingAddress: {
           country: "US",

@@ -92,6 +92,31 @@ describe("CardComponent", () => {
     });
   });
 
+  it("passes merchant_unique_id to Nuvei createPayment", async () => {
+    const mockSfcCreatePayment = vi.fn();
+    const mockSafeCharge = vi.fn().mockReturnValue({
+      createPayment: mockSfcCreatePayment,
+    });
+    mockLoadNuveiSdk.mockResolvedValue(mockSafeCharge);
+    mockCreatePayment.mockResolvedValue({
+      sessionToken: "st-123",
+      paymentReference: "payment-ref-123",
+    });
+
+    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const component = builder.build({ showPayButton: true });
+
+    component.mount("#container");
+    await vi.waitFor(() =>
+      expect(mockSfcCreatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionToken: "st-123",
+          merchant_unique_id: "payment-ref-123",
+        }),
+      ),
+    );
+  });
+
   it("mount() calls onError when init fails", async () => {
     const error = new Error("SDK unavailable");
     mockLoadNuveiSdk.mockRejectedValue(error);

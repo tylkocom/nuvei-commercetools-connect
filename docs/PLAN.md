@@ -6,14 +6,14 @@ The connector has a working first-pass implementation for a Nuvei/commercetools 
 
 Verification performed:
 
-- `processor`: `npm test` passed, 80 tests.
+- `processor`: `npm test` passed, 83 tests.
 - `processor`: `npm run build` passed.
-- `enabler`: `npm test` passed, 39 tests.
+- `enabler`: `npm test` passed, 41 tests.
 - `enabler`: `npm run build` passed.
 
 ## Key Findings
 
-1. DMN correlation is not proven. `openOrder` uses `clientUniqueId: cart.id`, while DMN handling requires `merchant_unique_id` to be the commercetools Payment ID. Because the Payment is created after `openOrder`, real DMN mapping may fail unless Nuvei returns/configures that field elsewhere.
+1. DMN correlation still needs sandbox proof. The enabler now sends the commercetools Payment ID as Nuvei `merchant_unique_id` during browser payment creation, and DMN processing cross-checks Nuvei status against DMN `clientUniqueId`. Real Nuvei sandbox payloads still need to confirm `merchant_unique_id` is returned exactly as sent for all relevant flows.
 
 2. Enabler submit support is contradictory. The card component advertises submit support but throws for external submit when `showPayButton` is false. The drop-in advertises submit support but `submit()` is a no-op.
 
@@ -33,11 +33,10 @@ Verification performed:
 
 ### 1. Fix Payment Correlation
 
-- Decide the canonical correlation model across `openOrder`, frontend confirmation, DMN, capture, cancel, and refund.
 - Confirm with real Nuvei sandbox payloads which fields are returned in DMNs.
 - Ensure every DMN can map reliably to exactly one commercetools Payment.
 - Store or derive the Nuvei identifiers needed for later capture, cancel, refund, and reconciliation.
-- Add tests for missing IDs, mismatched cart/payment, duplicate DMNs, and out-of-order DMNs.
+- Add tests for out-of-order DMNs and any correlation fields observed only in sandbox payloads.
 
 ### 2. Harden Webhook Processing
 

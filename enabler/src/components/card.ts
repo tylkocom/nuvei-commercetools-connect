@@ -70,6 +70,7 @@ class CardComponent implements PaymentComponent {
 
     sfc.createPayment({
       sessionToken: paymentRes.sessionToken,
+      merchant_unique_id: paymentRes.paymentReference,
       cardHolderName: true,
       billingAddress: {
         country: "US",

@@ -205,6 +205,43 @@ function defaultPaymentStatus(
   };
 }
 
+function setupSuccessfulStatusCheck(opts: {
+  statusOverrides?: Record<string, unknown>;
+  bodyOverrides?: Record<string, unknown>;
+} = {}) {
+  const { service } = createService();
+
+  mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+  mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+  mockConvertDmnToPaymentUpdate.mockReturnValue(
+    defaultConverterReturn({
+      pspReference: "tx-auth-001",
+      transactions: [
+        {
+          type: PaymentTransactions.AUTHORIZATION,
+          interactionId: "tx-auth-001",
+          amount: { centAmount: 1000, currencyCode: "USD" },
+          state: "Success",
+        },
+      ],
+    }),
+  );
+  mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+    defaultPaymentStatus({
+      sessionToken: "nuvei-session-token",
+      ...opts.statusOverrides,
+    }),
+  );
+
+  return {
+    service,
+    body: {
+      ...dmnAuthOk,
+      ...opts.bodyOverrides,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -654,6 +691,33 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow(
         "Nuvei payment status transaction does not match DMN",
+      );
+    });
+
+    it("rejects when Nuvei status clientUniqueId does not match DMN", async () => {
+      const { service, body } = setupSuccessfulStatusCheck({
+        statusOverrides: { clientUniqueId: "different-cart-id" },
+      });
+
+      await expect(service.processNuveiDmn(body)).rejects.toThrow(
+        "Nuvei payment status clientUniqueId does not match DMN",
+      );
+    });
+
+    it("rejects when DMN clientUniqueId is missing from successful status check", async () => {
+      const { service, body } = setupSuccessfulStatusCheck();
+      delete body.clientUniqueId;
+
+      await expect(service.processNuveiDmn(body)).rejects.toThrow("DMN is missing clientUniqueId");
+    });
+
+    it("rejects when Nuvei status clientUniqueId is missing from successful status check", async () => {
+      const { service, body } = setupSuccessfulStatusCheck({
+        statusOverrides: { clientUniqueId: undefined },
+      });
+
+      await expect(service.processNuveiDmn(body)).rejects.toThrow(
+        "Nuvei payment status is missing clientUniqueId",
       );
     });
   });

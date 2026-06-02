@@ -679,10 +679,12 @@ describe("NuveiPaymentService", () => {
         sessionToken: "nuvei-tx-100",
         amount: "10.00",
         currency: "USD",
+        clientUniqueId: "cart-123",
       });
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
+        clientUniqueId: "cart-123",
         TransactionID: "dmn-tx-1",
         totalAmount: "10.00",
         currency: "USD",

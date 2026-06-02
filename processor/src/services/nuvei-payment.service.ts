@@ -223,6 +223,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   private async assertDmnMatchesNuveiStatus(
     updateData: NuveiDmnUpdateData,
     payment: Payment,
+    dmnBody: Record<string, unknown>,
   ): Promise<void> {
     const successfulPaymentTransaction = updateData.transactions.find(
       (tx) =>
@@ -256,10 +257,24 @@ export class NuveiPaymentService extends AbstractPaymentService {
       throw new Error("Nuvei payment status transaction does not match DMN");
     }
 
+    const dmnClientUniqueId = dmnBody.clientUniqueId;
+    if (dmnClientUniqueId === undefined) {
+      throw new Error("DMN is missing clientUniqueId");
+    }
+
+    if (statusBody.clientUniqueId === undefined) {
+      throw new Error("Nuvei payment status is missing clientUniqueId");
+    }
+
+    if (String(statusBody.clientUniqueId) !== String(dmnClientUniqueId)) {
+      throw new Error("Nuvei payment status clientUniqueId does not match DMN");
+    }
+
+    // confirmPayment validates against session context; DMNs validate against the signed DMN body.
     this.assertNuveiStatusMatchesPayment(
       statusBody as Record<string, unknown>,
       payment,
-      String(statusBody.clientUniqueId ?? ""),
+      String(dmnClientUniqueId),
       true,
     );
   }
@@ -869,7 +884,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ctPayment.amountPlanned?.centAmount,
     );
     this.assertDmnUpdateMatchesPayment(updateData, ctPayment);
-    await this.assertDmnMatchesNuveiStatus(updateData, ctPayment);
+    await this.assertDmnMatchesNuveiStatus(updateData, ctPayment, body);
 
     for (const tx of updateData.transactions) {
       await this.ctPaymentService.updatePayment({
