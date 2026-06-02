@@ -4,21 +4,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockValidateDmnChecksum = vi.fn();
-
-vi.mock("../../../src/clients/nuvei.client", () => ({
-  nuveiClient: () => ({
-    validateDmnChecksum: mockValidateDmnChecksum,
-  }),
-}));
-
-vi.mock("../../../src/config/config", () => ({
-  getConfig: () => ({
-    nuveiDmnChecksumAlgorithm: "sha256",
-  }),
-  config: {},
-}));
-
 vi.mock("../../../src/libs/logger/index", () => ({
   log: {
     info: vi.fn(),
@@ -42,6 +27,11 @@ vi.mock("../../../src/dtos/operations/payment-intents.dto", () => ({
 }));
 
 vi.mock("../../../src/services/nuvei-payment.service", () => ({
+  DmnChecksumInvalidError: class DmnChecksumInvalidError extends Error {
+    constructor() {
+      super("Invalid DMN checksum");
+    }
+  },
   NuveiPaymentService: class {},
 }));
 
@@ -50,6 +40,7 @@ vi.mock("../../../src/services/nuvei-payment.service", () => ({
 // ---------------------------------------------------------------------------
 
 import { nuveiWebhookRoutes } from "../../../src/routes/nuvei-payment.route";
+import { DmnChecksumInvalidError } from "../../../src/services/nuvei-payment.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -107,7 +98,6 @@ describe("webhook route", () => {
   let nuveiHeaderAuthHook: any;
 
   beforeEach(async () => {
-    mockValidateDmnChecksum.mockReset();
     mockProcessNuveiDmn.mockReset();
     app = buildApp();
 
@@ -118,11 +108,10 @@ describe("webhook route", () => {
     await nuveiWebhookRoutes(app.fastify, { paymentService, nuveiHeaderAuthHook } as any);
   });
 
-  it("valid DMN body with correct checksum → calls processNuveiDmn, returns 200", async () => {
+  it("DMN body → calls processNuveiDmn, returns 200", async () => {
     const webhookRoute = app.routes.find((r) => r.url === "/nuvei");
     expect(webhookRoute).toBeDefined();
 
-    mockValidateDmnChecksum.mockReturnValue(true);
     mockProcessNuveiDmn.mockResolvedValue(undefined);
 
     const body = {
@@ -134,7 +123,6 @@ describe("webhook route", () => {
     const reply = makeReply();
     await webhookRoute!.handler({ body } as any, reply);
 
-    expect(mockValidateDmnChecksum).toHaveBeenCalledWith(body, "sha256");
     expect(mockProcessNuveiDmn).toHaveBeenCalledWith(body);
     expect(reply.status).toHaveBeenCalledWith(200);
   });
@@ -143,7 +131,7 @@ describe("webhook route", () => {
     const webhookRoute = app.routes.find((r) => r.url === "/nuvei");
     expect(webhookRoute).toBeDefined();
 
-    mockValidateDmnChecksum.mockReturnValue(false);
+    mockProcessNuveiDmn.mockRejectedValue(new DmnChecksumInvalidError());
 
     const body = {
       merchant_unique_id: "payment-1",
@@ -153,7 +141,7 @@ describe("webhook route", () => {
     const reply = makeReply();
     await webhookRoute!.handler({ body } as any, reply);
 
-    expect(mockProcessNuveiDmn).not.toHaveBeenCalled();
+    expect(mockProcessNuveiDmn).toHaveBeenCalledWith(body);
     expect(reply.status).toHaveBeenCalledWith(400);
   });
 
@@ -161,7 +149,6 @@ describe("webhook route", () => {
     const webhookRoute = app.routes.find((r) => r.url === "/nuvei");
     expect(webhookRoute).toBeDefined();
 
-    mockValidateDmnChecksum.mockReturnValue(true);
     mockProcessNuveiDmn.mockRejectedValue(new Error("Processing error"));
 
     const body = {

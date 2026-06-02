@@ -47,6 +47,12 @@ export type NuveiPaymentServiceOptions = {
   ctOrderService: CommercetoolsOrderService;
 };
 
+export class DmnChecksumInvalidError extends Error {
+  public constructor() {
+    super("Invalid DMN checksum");
+  }
+}
+
 export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private nuveiEventConverter: NuveiEventConverter;
@@ -824,7 +830,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     const isValid = nuveiClient().validateDmnChecksum(body, config.nuveiDmnChecksumAlgorithm);
     if (!isValid) {
-      throw new Error("Invalid DMN checksum");
+      throw new DmnChecksumInvalidError();
     }
 
     this.assertDmnMatchesConfig(body);

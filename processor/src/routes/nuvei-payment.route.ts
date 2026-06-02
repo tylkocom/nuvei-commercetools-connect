@@ -13,11 +13,12 @@ import {
   PaymentIntentResponseSchema,
   PaymentModificationStatus,
 } from "../dtos/operations/payment-intents.dto.js";
-import { NuveiPaymentService } from "../services/nuvei-payment.service.js";
+import {
+  DmnChecksumInvalidError,
+  NuveiPaymentService,
+} from "../services/nuvei-payment.service.js";
 import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
-import { nuveiClient } from "../clients/nuvei.client.js";
 import { log } from "../libs/logger/index.js";
-import { getConfig } from "../config/config.js";
 
 type PaymentRoutesOptions = {
   paymentService: NuveiPaymentService;
@@ -132,20 +133,19 @@ export const nuveiWebhookRoutes = async (
     },
     async (request, reply) => {
       const body = request.body as Record<string, unknown>;
-      const config = getConfig();
-
-      const isValid = nuveiClient().validateDmnChecksum(body, config.nuveiDmnChecksumAlgorithm);
-      if (!isValid) {
-        log.error("Invalid DMN checksum received.", {
-          merchantId: String(body.merchant_id),
-        });
-        return reply.status(400).send({ error: "Invalid checksum." });
-      }
 
       try {
         await opts.paymentService.processNuveiDmn(body);
         return reply.status(200).send();
       } catch (error) {
+        const isChecksumError = error instanceof DmnChecksumInvalidError;
+        if (isChecksumError) {
+          log.error("Invalid DMN checksum received.", {
+            merchantId: body.merchant_id,
+          });
+          return reply.status(400).send({ error: "Invalid checksum." });
+        }
+
         log.error("Error processing Nuvei DMN", {
           error: error instanceof Error ? error.message : "Unknown error",
         });
