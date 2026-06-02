@@ -586,18 +586,28 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it("rejects unsupported payment methods before Nuvei or commercetools side effects", async () => {
-      const { service } = createService();
+    it.each(["paypal", "dropin", "wechatpay"])(
+      "rejects unsupported payment method %s before Nuvei or commercetools side effects",
+      async (unsupportedMethod) => {
+        const { service } = createService();
 
-      await expect(
-        service.createPaymentIntent({ paymentMethodOptions: { wechatpay: { flow: "qrcode" } } }),
-      ).rejects.toMatchObject({ code: PublicPaymentErrorCode.METHOD_UNSUPPORTED });
+        await expect(
+          service.createPaymentIntent({ paymentMethodOptions: { [unsupportedMethod]: {} } }),
+        ).rejects.toMatchObject({
+          code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+          message: "Payment method is not supported.",
+          diagnostics: expect.objectContaining({
+            category: "method_unsupported",
+            requestedMethod: unsupportedMethod,
+          }),
+        });
 
-      expect(mockGetCart).not.toHaveBeenCalled();
-      expect(mockGetPaymentAmount).not.toHaveBeenCalled();
-      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
-      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
-    });
+        expect(mockGetCart).not.toHaveBeenCalled();
+        expect(mockGetPaymentAmount).not.toHaveBeenCalled();
+        expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+        expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+      },
+    );
 
     it.each([
       ["multiple method keys", { paymentMethodOptions: { card: {}, embedded: {} } }],
