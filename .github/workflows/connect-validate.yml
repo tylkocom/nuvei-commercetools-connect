@@ -27,12 +27,28 @@ jobs:
           cache-dependency-path: |
             enabler/package-lock.json
             processor/package-lock.json
+            testing/package-lock.json
 
       - name: Install enabler dependencies
         run: npm ci --prefix enabler
 
       - name: Install processor dependencies
         run: npm ci --prefix processor
+
+      - name: Install testing dependencies
+        run: npm ci --prefix testing
+
+      - name: Build enabler
+        run: npm run build --prefix enabler
+
+      - name: Build processor
+        run: npm run build --prefix processor
+
+      - name: Test processor
+        run: npm run test --prefix processor
+
+      - name: Test enabler
+        run: npm run test --prefix enabler
 
       - name: Install commercetools CLI
         run: npm install --global @commercetools/cli@0.0.17

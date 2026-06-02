@@ -32,6 +32,14 @@ function makeEnablerOptions(): EnablerOptions {
   };
 }
 
+function stubDocument() {
+  vi.stubGlobal("document", {
+    querySelector: vi.fn().mockReturnValue({ innerHTML: "" }),
+    createElement: vi.fn(),
+    head: { appendChild: vi.fn() },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -39,6 +47,7 @@ function makeEnablerOptions(): EnablerOptions {
 describe("DropinEmbeddedBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("build() returns a DropinComponent instance", () => {
@@ -56,21 +65,19 @@ describe("DropinEmbeddedBuilder", () => {
     expect(builder.dropinHasSubmit).toBe(false);
   });
 
-  it("submit() throws for unsupported external submit", () => {
+  it("submit() throws because Simply Connect handles submission internally", () => {
     const builder = new DropinEmbeddedBuilder(makeEnablerOptions());
     const dropin = builder.build({ showPayButton: true });
 
     expect(() => dropin.submit()).toThrow(
-      "External submit is not supported by the Nuvei drop-in.",
+      "Simply Connect handles submission internally via the widget pay button.",
     );
   });
 
-  it("passes merchant_unique_id to Nuvei createPayment", async () => {
-    const mockSfcCreatePayment = vi.fn();
-    const mockSafeCharge = vi.fn().mockReturnValue({
-      createPayment: mockSfcCreatePayment,
-    });
-    mockLoadNuveiSdk.mockResolvedValue(mockSafeCharge);
+  it("passes correct config to checkout()", async () => {
+    stubDocument();
+    const mockCheckout = vi.fn();
+    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "payment-ref-123",
@@ -85,10 +92,13 @@ describe("DropinEmbeddedBuilder", () => {
       paymentMethodOptions: { embedded: {} },
     });
     await vi.waitFor(() =>
-      expect(mockSfcCreatePayment).toHaveBeenCalledWith(
+      expect(mockCheckout).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionToken: "st-123",
-          merchant_unique_id: "payment-ref-123",
+          env: "int",
+          merchantId: "merchant-123",
+          merchantSiteId: "site-456",
+          renderTo: "#container",
         }),
       ),
     );
@@ -99,18 +109,14 @@ describe("DropinEmbeddedBuilder", () => {
   // -------------------------------------------------------------------------
 
   it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
+    stubDocument();
     // The Nuvei widget result carries a DIFFERENT sessionToken than the one
     // returned by createPayment. confirmPaymentResult must receive the
     // known processor session token, not the browser-returned one.
-    const mockSfcCreatePayment = vi.fn().mockImplementation(
-      (opts: { onResult: (r: { transactionStatus: string; sessionToken: string }) => void }) => {
-        opts.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
-      },
-    );
-    const mockSafeCharge = vi.fn().mockReturnValue({
-      createPayment: mockSfcCreatePayment,
+    const mockCheckout = vi.fn().mockImplementation((config) => {
+      config.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
     });
-    mockLoadNuveiSdk.mockResolvedValue(mockSafeCharge);
+    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "known-session-token",
       paymentReference: "payment-ref-123",

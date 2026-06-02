@@ -11,11 +11,11 @@ describe("loadNuveiSdk", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Test: window.SafeCharge already exists → resolves immediately
+  // Test: window.checkout already exists → resolves immediately
   // ---------------------------------------------------------------------------
-  it("resolves immediately when window.SafeCharge already exists", async () => {
-    const mockSafeCharge = vi.fn();
-    vi.stubGlobal("window", { SafeCharge: mockSafeCharge });
+  it("resolves immediately when window.checkout already exists", async () => {
+    const mockCheckout = vi.fn();
+    vi.stubGlobal("window", { checkout: mockCheckout });
     vi.stubGlobal("document", {
       querySelector: vi.fn().mockReturnValue(null),
       createElement: vi.fn(),
@@ -25,7 +25,7 @@ describe("loadNuveiSdk", () => {
     const { loadNuveiSdk } = await import("../../src/services/nuvei-sdk");
     const result = await loadNuveiSdk();
 
-    expect(result).toBe(mockSafeCharge);
+    expect(result).toBe(mockCheckout);
   });
 
   // ---------------------------------------------------------------------------
@@ -78,8 +78,8 @@ describe("loadNuveiSdk", () => {
   // Test: existing script tag that has already loaded resolves correctly
   // ---------------------------------------------------------------------------
   it("resolves correctly when an existing script tag has already loaded", async () => {
-    const mockSafeCharge = vi.fn();
-    vi.stubGlobal("window", { SafeCharge: mockSafeCharge });
+    const mockCheckout = vi.fn();
+    vi.stubGlobal("window", { checkout: mockCheckout });
 
     const mockCreateElement = vi.fn();
     vi.stubGlobal("document", {
@@ -91,7 +91,7 @@ describe("loadNuveiSdk", () => {
     const { loadNuveiSdk } = await import("../../src/services/nuvei-sdk");
     const result = await loadNuveiSdk();
 
-    expect(result).toBe(mockSafeCharge);
+    expect(result).toBe(mockCheckout);
     // Should NOT create a new script element since the SDK is already loaded
     expect(mockCreateElement).not.toHaveBeenCalled();
   });
