@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Nuvei Real Processor E2E Test</title>
     <style>
         :root {
@@ -213,7 +216,9 @@
     <div class="log-panel" id="log">Logs will appear here...</div>
 
     <script type="module">
-        import { NuveiEnabler, DropinType, PaymentMethod } from "../enabler/public/connector-enabler.es.js";
+        (async () => {
+        // Cache-bust the enabler bundle on every reload
+        const { NuveiEnabler, DropinType, PaymentMethod } = await import(`../enabler/public/connector-enabler.es.js?cb=${Date.now()}`);
 
         const $ = (id) => document.getElementById(id);
         const logEl = $("log");
@@ -340,6 +345,7 @@
                 setStatus("Launch failed", "error");
             }
         });
+        })();
     </script>
 </body>
 </html>
