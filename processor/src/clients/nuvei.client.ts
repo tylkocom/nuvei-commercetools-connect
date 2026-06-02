@@ -52,6 +52,11 @@ export interface PaymentStatusResponse {
   transactionId?: string;
   errCode?: number;
   reason?: string;
+  // Optional PPP fields: getPaymentStatus officially omits these, but defensive parsing
+  // allows future sandbox evidence to flow through without code changes (D-14, research A1).
+  PPP_TransactionID?: string;
+  PPP_TransactionId?: string;
+  ppp_TransactionID?: string;
   paymentOption?:
     | { type: "card"; uniqueCC: string; threeD: Record<string, unknown> }
     | {

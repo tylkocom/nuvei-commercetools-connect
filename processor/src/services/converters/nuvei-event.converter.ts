@@ -93,7 +93,14 @@ export class NuveiEventConverter {
     plannedCentAmount?: number,
   ): NuveiDmnUpdateData {
     const paymentId = getRequiredString(body, "merchant_unique_id");
-    const transactionId = getRequiredStringFromKeys(body, ["TransactionID", "TransactionId"]);
+    // Canonical PPP identity for terminal interactionId and pspReference (D-13).
+    // Preferred order: PPP_TransactionID → PPP_TransactionId → ppp_TransactionID.
+    // Fiscal TransactionID/TransactionId is optional secondary evidence only.
+    const pppTransactionId = getRequiredStringFromKeys(body, [
+      "PPP_TransactionID",
+      "PPP_TransactionId",
+      "ppp_TransactionID",
+    ]);
     const nuveiTransactionType = getRequiredString(body, "transactionType");
     const nuveiStatus = getRequiredString(body, "ppp_status");
     const currency = getRequiredString(body, "currency");
@@ -103,7 +110,7 @@ export class NuveiEventConverter {
 
     const transaction: TransactionData = {
       type: transactionType,
-      interactionId: transactionId,
+      interactionId: pppTransactionId,
       amount: {
         centAmount: totalCentAmount,
         currencyCode: currency,
@@ -123,7 +130,7 @@ export class NuveiEventConverter {
 
     return {
       id: paymentId,
-      pspReference: transactionId,
+      pspReference: pppTransactionId,
       transactions: [transaction],
       ...(interfaceCode && { interfaceCode }),
       ...(cardCompany && { paymentMethod: cardCompany }),

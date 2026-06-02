@@ -142,7 +142,7 @@ describe("payment routes", () => {
   });
 
   it("registers POST /confirm/:id and not the legacy camelCase confirm route", async () => {
-    paymentService.confirmPayment.mockResolvedValue({ success: true });
+    paymentService.confirmPayment.mockResolvedValue({ outcome: "approved" });
 
     expect(app.routes.find((route) => route.method === "POST" && route.url === "/confirmPayments/:id")).toBeUndefined();
     const confirmRoute = app.routes.find((route) => route.method === "POST" && route.url === "/confirm/:id");

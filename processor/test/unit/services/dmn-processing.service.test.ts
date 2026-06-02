@@ -440,7 +440,7 @@ describe("NuveiPaymentService – DMN processing", () => {
   // processNuveiDmn – idempotency (duplicate DMNs)
   // -------------------------------------------------------------------------
   describe("duplicate DMN handling", () => {
-    it("skips update when TransactionID already exists on payment (idempotent)", async () => {
+    it("skips update when PPP_TransactionID already exists on payment (idempotent, D-18)", async () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
@@ -451,7 +451,7 @@ describe("NuveiPaymentService – DMN processing", () => {
             {
               type: "Authorization",
               state: "Success",
-              interactionId: "tx-auth-001", // same TransactionID as dmnDuplicateAuth
+              interactionId: "50001", // same as dmnDuplicateAuth's PPP_TransactionID (baseDmnFields default)
               amount: { centAmount: 1000, currencyCode: "USD" },
             },
           ],
@@ -463,7 +463,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
-    it("skips update for exact duplicate DMN body", async () => {
+    it("skips update for exact duplicate DMN body (PPP dedup, D-18)", async () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
@@ -474,14 +474,13 @@ describe("NuveiPaymentService – DMN processing", () => {
             {
               type: "Authorization",
               state: "Success",
-              interactionId: "tx-auth-001",
+              interactionId: "50001", // same PPP as dmnDuplicateAuth
               amount: { centAmount: 1000, currencyCode: "USD" },
             },
           ],
         }),
       );
 
-      // Send the same DMN body twice
       await service.processNuveiDmn(dmnDuplicateAuth);
 
       expect(mockUpdatePayment).not.toHaveBeenCalled();
@@ -662,7 +661,10 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
     });
 
-    it("rejects when Nuvei status transactionId does not match DMN TransactionID", async () => {
+    it("does not reject on fiscal transactionId mismatch (pspReference is now PPP, fiscal ID comparison removed)", async () => {
+      // After PPP canonicalization, the assertDmnMatchesNuveiStatus no longer compares
+      // statusBody.transactionId to updateData.pspReference (which is now PPP, not fiscal TX).
+      // The cross-check still validates status, sessionToken, clientUniqueId, amount, and currency.
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
@@ -671,11 +673,11 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
-          pspReference: "tx-auth-001",
+          pspReference: "ppp-50001",   // now PPP-based, not fiscal
           transactions: [
             {
               type: PaymentTransactions.AUTHORIZATION,
-              interactionId: "tx-auth-001",
+              interactionId: "ppp-50001",
               amount: { centAmount: 1000, currencyCode: "USD" },
               state: "Success",
             },
@@ -684,14 +686,15 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
         defaultPaymentStatus({
-          transactionId: "different-tx-id",
+          transactionId: "different-fiscal-tx-id",  // different from PPP – no longer validated
           sessionToken: "nuvei-session-token",
+          clientUniqueId: "cart-123",
         }),
       );
 
-      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow(
-        "Nuvei payment status transaction does not match DMN",
-      );
+      // Should succeed because fiscal transactionId comparison is removed (D-12, D-13)
+      await expect(service.processNuveiDmn(dmnAuthOk)).resolves.toBeUndefined();
+      expect(mockUpdatePayment).toHaveBeenCalled();
     });
 
     it("rejects when Nuvei status clientUniqueId does not match DMN", async () => {

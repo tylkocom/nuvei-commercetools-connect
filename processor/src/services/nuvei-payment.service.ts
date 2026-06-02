@@ -58,6 +58,46 @@ export class DmnChecksumInvalidError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Canonical Nuvei PPP identity constants (D-13)
+// PPP_TransactionID is the mandatory Nuvei payment-page transaction identifier.
+// All three variants are documented in Nuvei DMN docs/examples.
+// ---------------------------------------------------------------------------
+const PPP_TRANSACTION_ID_KEYS = ["PPP_TransactionID", "PPP_TransactionId", "ppp_TransactionID"] as const;
+
+/**
+ * Extract the canonical Nuvei PPP transaction ID from a Nuvei status/DMN body.
+ * Returns the first non-empty value found from documented PPP variants.
+ * Never treats lower-camel `transactionId` (fiscal gateway ID) as PPP.
+ */
+function extractCanonicalPpp(body: Record<string, unknown>): string | undefined {
+  for (const key of PPP_TRANSACTION_ID_KEYS) {
+    const value = body[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Strict Nuvei status classifier (D-08):
+ * - approved: status=SUCCESS AND transactionStatus=APPROVED
+ * - rejected: status=SUCCESS AND transactionStatus in {DECLINED, ERROR}
+ * - pending: everything else (unknown, missing, PENDING, UPDATE, cashier ERROR, etc.)
+ */
+function classifyNuveiStatus(
+  status: unknown,
+  transactionStatus: unknown,
+): "approved" | "rejected" | "pending" {
+  if (status === "SUCCESS") {
+    if (transactionStatus === "APPROVED") return "approved";
+    if (transactionStatus === "DECLINED" || transactionStatus === "ERROR") return "rejected";
+  }
+  return "pending";
+}
+
+
 export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private nuveiEventConverter: NuveiEventConverter;
@@ -305,13 +345,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       throw new Error("Nuvei payment status session token does not match payment");
     }
 
-    if (!statusBody.transactionId) {
-      throw new Error("Nuvei payment status is missing transactionId");
-    }
-
-    if (statusBody.transactionId !== updateData.pspReference) {
-      throw new Error("Nuvei payment status transaction does not match DMN");
-    }
+    // pspReference is now canonical PPP; do not compare fiscal transactionId to PPP (D-12, D-13).
 
     const dmnClientUniqueId = dmnBody.clientUniqueId;
     if (dmnClientUniqueId === undefined) {
@@ -833,87 +867,97 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * Confirm a payment after frontend Nuvei widget completion
+   * Confirm a payment after frontend Nuvei widget completion.
    *
-   * @remarks
-   * Verifies the payment status with Nuvei and updates the CT Payment
-   * with the appropriate Authorization transaction state.
+   * Returns a tri-state outcome: approved, rejected, or pending.
+   *
+   * CT terminal Authorization transactions are only written when canonical
+   * PPP identity (PPP_TransactionID/PPP_TransactionId/ppp_TransactionID) is
+   * available and no duplicate already exists. sessionToken and fiscal
+   * transactionId are never used as CT terminal interactionId (D-10 through D-18).
    *
    * @param paymentReference - The CT Payment ID
    * @param sessionToken - The Nuvei session token
-   * @returns Promise indicating success
+   * @returns Promise with outcome: "approved" | "rejected" | "pending"
    */
   public async confirmPayment(
     paymentReference: string,
     sessionToken: string,
-  ): Promise<{ success: boolean }> {
-    try {
-      log.info("Confirming payment with Nuvei.", {
+  ): Promise<{ outcome: "approved" | "rejected" | "pending" }> {
+    log.info("Confirming payment with Nuvei.", {
+      paymentReference,
+      sessionToken: this.redactToken(sessionToken),
+    });
+
+    const ctPayment = await this.ctPaymentService.getPayment({ id: paymentReference });
+    await this.assertSessionPaymentAccess(paymentReference, sessionToken, ctPayment);
+
+    const paymentStatus = await nuveiClient().getPaymentStatus({ sessionToken });
+    const statusBody = paymentStatus as Record<string, unknown>;
+    const outcome = classifyNuveiStatus(statusBody.status, statusBody.transactionStatus);
+    const cartId = getCartIdFromContext();
+    const requireFinancial = outcome === "approved";
+    this.assertNuveiStatusMatchesPayment(statusBody, ctPayment, cartId, requireFinancial);
+
+    if (outcome === "pending") {
+      log.info("Payment status is pending/inconclusive – no CT terminal write.", {
         paymentReference,
-        sessionToken: this.redactToken(sessionToken),
+        status: String(statusBody.status ?? ""),
+        transactionStatus: String(statusBody.transactionStatus ?? ""),
       });
-
-      const ctPayment = await this.ctPaymentService.getPayment({ id: paymentReference });
-      await this.assertSessionPaymentAccess(paymentReference, sessionToken, ctPayment);
-
-      const paymentStatus = await nuveiClient().getPaymentStatus({ sessionToken });
-      const statusBody = paymentStatus as Record<string, unknown>;
-      const isApproved =
-        statusBody.status === "SUCCESS" && statusBody.transactionStatus === "APPROVED";
-      const cartId = getCartIdFromContext();
-      this.assertNuveiStatusMatchesPayment(statusBody, ctPayment, cartId, isApproved);
-
-      if (isApproved) {
-        const transactionId = statusBody.transactionId as string | undefined;
-        if (!transactionId) {
-          throw new Error("Missing Nuvei transactionId for approved payment");
-        }
-
-        log.info("Payment approved by Nuvei.", {
-          paymentReference,
-          sessionToken: this.redactToken(sessionToken),
-          transactionId,
-        });
-
-        await this.ctPaymentService.updatePayment({
-          id: ctPayment.id,
-          pspReference: transactionId,
-          transaction: {
-            type: PaymentTransactions.AUTHORIZATION,
-            amount: ctPayment.amountPlanned,
-            state: "Success",
-            interactionId: transactionId,
-          },
-        });
-      } else {
-        log.info("Payment not approved by Nuvei.", {
-          paymentReference,
-          sessionToken: this.redactToken(sessionToken),
-          status: String(statusBody.status),
-          transactionStatus: String(statusBody.transactionStatus),
-        });
-
-        await this.ctPaymentService.updatePayment({
-          id: ctPayment.id,
-          pspReference: sessionToken,
-          transaction: {
-            type: PaymentTransactions.AUTHORIZATION,
-            amount: ctPayment.amountPlanned,
-            state: "Failure",
-            interactionId: sessionToken,
-          },
-        });
-      }
-
-      return { success: true };
-    } catch (error) {
-      log.error("Error confirming payment", {
-        error: error instanceof Error ? error.message : String(error),
-        paymentReference,
-        sessionToken: this.redactToken(sessionToken),
-      });
-      throw error;
+      return { outcome: "pending" };
     }
+
+    // approved or rejected terminal candidate – require canonical PPP for CT write (D-14 through D-16)
+    const ppp = extractCanonicalPpp(statusBody);
+
+    if (!ppp) {
+      // No canonical PPP identity available from getPaymentStatus (D-14).
+      // approved-without-PPP → pending (cannot safely write terminal CT record).
+      // rejected-without-PPP → return rejected business outcome without CT write.
+      log.info("No canonical PPP identity in Nuvei status – skipping CT terminal write.", {
+        paymentReference,
+        outcome,
+        status: String(statusBody.status ?? ""),
+        transactionStatus: String(statusBody.transactionStatus ?? ""),
+      });
+      return { outcome: outcome === "rejected" ? "rejected" : "pending" };
+    }
+
+    // Check for existing canonical PPP Authorization to deduplicate (D-18).
+    const alreadyRecorded = (ctPayment.transactions ?? []).some(
+      (tx) => tx.interactionId === ppp,
+    );
+
+    if (alreadyRecorded) {
+      log.info("Canonical PPP Authorization already recorded – short-circuiting.", {
+        paymentReference,
+        ppp,
+        outcome,
+      });
+      return { outcome };
+    }
+
+    const transactionState: "Success" | "Failure" = outcome === "approved" ? "Success" : "Failure";
+
+    log.info("Writing CT terminal Authorization.", {
+      paymentReference,
+      ppp,
+      state: transactionState,
+    });
+
+    await this.ctPaymentService.updatePayment({
+      id: ctPayment.id,
+      pspReference: ppp,
+      transaction: {
+        type: PaymentTransactions.AUTHORIZATION,
+        amount: ctPayment.amountPlanned,
+        state: transactionState,
+        interactionId: ppp,
+      },
+    });
+
+    return { outcome };
   }
 
   /**
@@ -948,17 +992,18 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     const ctPayment = await this.ctPaymentService.getPayment({ id: paymentId });
 
-    const transactionId = (body.TransactionID as string) || (body.TransactionId as string);
-
-    if (transactionId) {
+    // Idempotency: deduplicate by canonical PPP identity (D-18).
+    // Do not deduplicate on optional fiscal TransactionID alone.
+    const dmnPpp = extractCanonicalPpp(body);
+    if (dmnPpp) {
       const existingInteractionIds = (ctPayment.transactions || [])
         .map((tx) => tx.interactionId)
         .filter((id): id is string => !!id);
 
-      if (existingInteractionIds.includes(transactionId)) {
-        log.info("DMN already processed, skipping.", {
+      if (existingInteractionIds.includes(dmnPpp)) {
+        log.info("DMN already processed (PPP duplicate), skipping.", {
           paymentId,
-          transactionId,
+          ppp: dmnPpp,
         });
         return;
       }

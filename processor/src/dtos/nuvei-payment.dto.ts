@@ -25,3 +25,12 @@ export const PaymentConfirmRequestSchema = Type.Object({
 });
 
 export type PaymentConfirmRequestSchemaDTO = Static<typeof PaymentConfirmRequestSchema>;
+export const PaymentConfirmResponseSchema = Type.Object({
+  outcome: Type.Union([
+    Type.Literal("approved"),
+    Type.Literal("rejected"),
+    Type.Literal("pending"),
+  ]),
+});
+
+export type PaymentConfirmResponseSchemaDTO = Static<typeof PaymentConfirmResponseSchema>;

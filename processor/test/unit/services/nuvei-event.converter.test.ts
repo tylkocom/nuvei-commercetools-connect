@@ -3,7 +3,7 @@ import { NuveiEventConverter } from "../../../src/services/converters/nuvei-even
 
 const baseDmn = {
   merchant_unique_id: "payment-1",
-  TransactionID: "tx-1",
+  PPP_TransactionID: "ppp-tx-1",   // canonical PPP identity (D-13); TransactionID is now optional
   transactionType: "Auth",
   ppp_status: "OK",
   currency: "USD",

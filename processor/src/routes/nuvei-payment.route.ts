@@ -8,11 +8,9 @@ import {
   PaymentMethodOptionsSchemaDTO,
   PaymentConfirmRequestSchema,
   PaymentConfirmRequestSchemaDTO,
+  PaymentConfirmResponseSchema,
+  PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
-import {
-  PaymentIntentResponseSchema,
-  PaymentModificationStatus,
-} from "../dtos/operations/payment-intents.dto.js";
 import {
   DmnChecksumInvalidError,
   NuveiPaymentService,
@@ -84,7 +82,7 @@ export const paymentRoutes = async (
 
   fastify.post<{
     Body: PaymentConfirmRequestSchemaDTO;
-    Reply: { outcome: "approved" | "rejected" };
+    Reply: PaymentConfirmResponseSchemaDTO;
     Params: { id: string };
   }>(
     "/confirm/:id",
@@ -101,23 +99,16 @@ export const paymentRoutes = async (
         },
         body: PaymentConfirmRequestSchema,
         response: {
-          200: PaymentIntentResponseSchema,
+          200: PaymentConfirmResponseSchema,
+          402: PaymentConfirmResponseSchema,
         },
       },
     },
     async (request, reply) => {
       const { id } = request.params;
-      try {
-        await opts.paymentService.confirmPayment(id, request.body.sessionToken);
-
-        return reply.status(200).send({ outcome: PaymentModificationStatus.APPROVED });
-      } catch (error) {
-        log.error("Payment confirmation failed", {
-          error: error instanceof Error ? error.message : "Unknown error",
-          paymentId: id,
-        });
-        return reply.status(400).send({ outcome: PaymentModificationStatus.REJECTED });
-      }
+      const result = await opts.paymentService.confirmPayment(id, request.body.sessionToken);
+      const statusCode = result.outcome === "rejected" ? 402 : 200;
+      return reply.status(statusCode).send({ outcome: result.outcome });
     },
   );
 };
