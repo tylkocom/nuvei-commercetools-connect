@@ -69,7 +69,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal:** Fix payment confirmation correctness so `/payments/confirm/:id` returns approved/rejected/pending accurately, never false-approves Nuvei non-approved state, exposes pending to the enabler without polling, and uses canonical Nuvei `PPP_TransactionID` identity for terminal CT Authorization records and DMN idempotency.
 **Requirements**: RECON-01, RECON-05, RECON-06, SEC-01, SEC-02, TEST-03, TEST-04
 **Depends on:** Phase 1.1
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 

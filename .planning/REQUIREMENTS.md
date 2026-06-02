@@ -28,12 +28,12 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 
 ### Reconciliation
 
-- [ ] **RECON-01**: Processor stores or derives the identifiers required to relate Nuvei session tokens, Nuvei transaction IDs, cart IDs, and commercetools Payment IDs safely.
+- [x] **RECON-01**: Processor stores or derives the identifiers required to relate Nuvei session tokens, Nuvei transaction IDs, cart IDs, and commercetools Payment IDs safely.
 - [ ] **RECON-02**: DMN processing validates checksum, merchant ID, merchant site ID, payment correlation, amount, and currency before mutating a Payment.
 - [ ] **RECON-03**: Duplicate DMNs do not create duplicate commercetools transactions.
 - [ ] **RECON-04**: Out-of-order or ambiguous DMNs fail safely without updating unrelated Payments.
-- [ ] **RECON-05**: Frontend confirmation and DMN reconciliation agree on transaction identity and do not create conflicts.
-- [ ] **RECON-06**: Processor maps Nuvei statuses to commercetools transaction states with explicit handling for success, failure, pending, cancelled, expired, or action-required cases.
+- [x] **RECON-05**: Frontend confirmation and DMN reconciliation agree on transaction identity and do not create conflicts.
+- [x] **RECON-06**: Processor maps Nuvei statuses to commercetools transaction states with explicit handling for success, failure, pending, cancelled, expired, or action-required cases.
 - [ ] **RECON-07**: Capture uses the correct Nuvei authorization transaction identifier and records a `Charge` transaction.
 - [ ] **RECON-08**: Cancel authorization uses the correct Nuvei authorization transaction identifier and records a `CancelAuthorization` transaction.
 - [ ] **RECON-09**: Refund uses the correct Nuvei charge transaction identifier and records a `Refund` transaction.
@@ -54,8 +54,8 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 
 ### Frontend and Security
 
-- [ ] **SEC-01**: Browser confirmation supports approved, rejected, and pending/inconclusive outcomes.
-- [ ] **SEC-02**: Pending browser confirmation uses bounded polling or clear fallback behavior instead of treating all inconclusive statuses as hard errors.
+- [x] **SEC-01**: Browser confirmation supports approved, rejected, and pending/inconclusive outcomes.
+- [x] **SEC-02**: Pending browser confirmation uses bounded polling or clear fallback behavior instead of treating all inconclusive statuses as hard errors.
 - [ ] **SEC-03**: Nuvei SDK loader recovers after failed script loads and does not inject duplicate scripts.
 - [ ] **SEC-04**: Nuvei SDK SRI update and rotation process is documented and testable.
 - [ ] **SEC-05**: Processor logs redact secrets, checksums, session tokens, PAN-adjacent data, and sensitive raw payload fields.
@@ -68,7 +68,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 
 - [ ] **TEST-01**: Local mock commercetools scenarios cover payment creation, confirmation, DMN, capture, cancel, refund, and ledger inspection.
 - [ ] **TEST-02**: Sanitized Nuvei fixtures cover success, failure, duplicate, malformed, amount mismatch, currency mismatch, missing correlation, 3DS, capture, cancel, and refund cases.
-- [ ] **TEST-03**: Processor route-level tests cover `/payments`, `/payments/confirmPayments/:id`, `/payment-components`, `/payment-intents/:id`, and `/webhooks/nuvei`.
+- [x] **TEST-03**: Processor route-level tests cover `/payments`, `/payments/confirmPayments/:id`, `/payment-components`, `/payment-intents/:id`, and `/webhooks/nuvei`.
 - [ ] **TEST-04**: Enabler tests cover card mount, SDK load success/failure/retry, processor errors, declined payment results, and confirmation pending/failure states.
 - [ ] **TEST-05**: CI installs dependencies, builds, and runs tests for both `processor` and `enabler` using the chosen package strategy.
 - [ ] **TEST-06**: CI or documented release checks prevent README/deployment command drift from recurring.
@@ -131,12 +131,12 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | NUV-06 | Phase 2 | Pending |
 | NUV-07 | Phase 2 | Pending |
 | NUV-08 | Phase 2 | Pending |
-| RECON-01 | Phase 3 | Pending |
+| RECON-01 | Phase 3 | Complete |
 | RECON-02 | Phase 3 | Pending |
 | RECON-03 | Phase 3 | Pending |
 | RECON-04 | Phase 3 | Pending |
-| RECON-05 | Phase 3 | Pending |
-| RECON-06 | Phase 3 | Pending |
+| RECON-05 | Phase 3 | Complete |
+| RECON-06 | Phase 3 | Complete |
 | RECON-07 | Phase 3 | Pending |
 | RECON-08 | Phase 3 | Pending |
 | RECON-09 | Phase 3 | Pending |
@@ -151,8 +151,8 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | DATA-04 | Phase 4 | Pending |
 | DATA-05 | Phase 4 | Pending |
 | DATA-06 | Phase 4 | Pending |
-| SEC-01 | Phase 5 | Pending |
-| SEC-02 | Phase 5 | Pending |
+| SEC-01 | Phase 5 | Complete |
+| SEC-02 | Phase 5 | Complete |
 | SEC-03 | Phase 5 | Pending |
 | SEC-04 | Phase 5 | Pending |
 | SEC-05 | Phase 5 | Pending |
@@ -162,7 +162,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | SEC-09 | Phase 5 | Pending |
 | TEST-01 | Phase 6 | Pending |
 | TEST-02 | Phase 6 | Pending |
-| TEST-03 | Phase 6 | Pending |
+| TEST-03 | Phase 6 | Complete |
 | TEST-04 | Phase 6 | Pending |
 | TEST-05 | Phase 6 | Pending |
 | TEST-06 | Phase 6 | Pending |
