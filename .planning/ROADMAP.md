@@ -64,6 +64,19 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] 01.1-02-PLAN.md — Enabler URL updates, Postman collection, and ARCHITECTURE.md documentation.
 
+### Phase 01.1.1: Payment confirmation tri-state outcome correctness (INSERTED)
+
+**Goal:** Fix payment confirmation correctness so `/payments/confirm/:id` returns approved/rejected/pending accurately, never false-approves Nuvei non-approved state, exposes pending to the enabler without polling, and uses canonical Nuvei `PPP_TransactionID` identity for terminal CT Authorization records and DMN idempotency.
+**Requirements**: RECON-01, RECON-05, RECON-06, SEC-01, SEC-02, TEST-03, TEST-04
+**Depends on:** Phase 1.1
+**Plans:** 3 plans
+
+Plans:
+
+- [ ] Plan 01: Processor tri-state confirmation and canonical PPP terminal identity
+- [ ] Plan 02: Enabler tri-state parsing, callbacks, and known session-token handoff
+- [ ] Plan 03: Docs, local guides, and Postman alignment with tri-state contract
+
 ### Phase 2: Nuvei Sandbox Evidence and Checkout Validation
 
 **Goal**: Real Nuvei sandbox and commercetools Checkout card behavior is observed, sanitized, and sufficient to choose canonical correlation fields.
