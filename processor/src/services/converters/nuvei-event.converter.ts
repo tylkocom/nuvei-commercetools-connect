@@ -5,6 +5,8 @@ import {
   getStatusInterfaceCode,
 } from "../payment-converter.js";
 
+const currencyFractionDigitsCache = new Map<string, number>();
+
 export interface NuveiDmnUpdateData {
   id: string;
   pspReference: string;
@@ -47,12 +49,38 @@ function getOptionalString(body: Record<string, unknown>, key: string): string |
   return undefined;
 }
 
-function parseCentAmount(amount: unknown): number {
+function getCurrencyFractionDigits(currencyCode: string): number {
+  const cached = currencyFractionDigitsCache.get(currencyCode);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const fractionDigits = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode,
+    }).resolvedOptions().maximumFractionDigits;
+
+    if (fractionDigits === undefined) {
+      throw new Error(`Unsupported currency in DMN: ${currencyCode}`);
+    }
+
+    currencyFractionDigitsCache.set(currencyCode, fractionDigits);
+    return fractionDigits;
+  } catch (error) {
+    if (error instanceof RangeError) {
+      throw new Error(`Unsupported currency in DMN: ${currencyCode}`);
+    }
+    throw error;
+  }
+}
+
+function parseCentAmount(amount: unknown, currencyCode: string): number {
   const parsedAmount = Number(amount);
   if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
     throw new Error("Invalid totalAmount in DMN");
   }
-  return Math.round(parsedAmount * 100);
+  return Math.round(parsedAmount * 10 ** getCurrencyFractionDigits(currencyCode));
 }
 
 export class NuveiEventConverter {
@@ -66,10 +94,10 @@ export class NuveiEventConverter {
   ): NuveiDmnUpdateData {
     const paymentId = getRequiredString(body, "merchant_unique_id");
     const transactionId = getRequiredStringFromKeys(body, ["TransactionID", "TransactionId"]);
-    const totalCentAmount = parseCentAmount(body.totalAmount);
     const nuveiTransactionType = getRequiredString(body, "transactionType");
     const nuveiStatus = getRequiredString(body, "ppp_status");
     const currency = getRequiredString(body, "currency");
+    const totalCentAmount = parseCentAmount(body.totalAmount, currency);
     const transactionType = mapNuveiTransactionType(nuveiTransactionType);
     const transactionState = mapNuveiStatus(nuveiStatus);
 

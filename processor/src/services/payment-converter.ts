@@ -18,7 +18,7 @@ export function mapNuveiTransactionType(nuveiType: string): TransactionType {
     case "Chargeback":
       return "Chargeback";
     default:
-      return "Authorization";
+      throw new Error(`Unsupported Nuvei transactionType: ${nuveiType}`);
   }
 }
 
