@@ -166,6 +166,19 @@
 
 ---
 
+## Enabler Integration Modes
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Simply Connect only | Treat the current implementation as the only Phase 2 browser integration path. | |
+| Web SDK only | Revert toward the originally planned Web SDK path and ignore Simply Connect evidence. | |
+| Evaluate both modes | Treat Simply Connect as current/default, but explicitly research and capture evidence for Web SDK differences before future enabler planning. | ✓ |
+
+**User's choice:** Evaluate both modes.
+**Notes:** User identified a missing integration-planning dimension: Nuvei frontend component generation can use Simply Connect or Web SDK, and they behave differently. Current implementation has shifted toward Simply Connect while the original plan expected Web SDK. Long-term support for both is desired if evidence validates both paths.
+
+---
+
 ## Claude's Discretion
 
 - Exact evidence index JSON/Markdown schema.

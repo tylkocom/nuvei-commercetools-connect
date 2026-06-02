@@ -50,6 +50,14 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 - **D-22:** All other bugs discovered during sandbox testing must be recorded in the evidence index as fixture-backed findings with severity, scenario, observed behavior, expected behavior, and target phase.
 - **D-23:** Do not turn Phase 2 into reconciliation/security/frontend resilience hardening. Phase 3 owns reconciliation correctness; Phase 5 owns frontend resilience/security; Phase 7 owns operations/docs cleanup.
 
+### Enabler integration modes
+- **D-24:** Phase 2 must explicitly evaluate both Nuvei frontend integration modes: Simply Connect and Web SDK. Current code has shifted toward Simply Connect, but the original integration intent included Web SDK, and long-term support for both is desired if evidence shows both can be made safe and compatible.
+- **D-25:** Treat Simply Connect as the current implemented/default path for evidence capture because it is what the enabler currently uses.
+- **D-26:** Web SDK support is not automatically implemented in Phase 2. Phase 2 must gather enough evidence to decide how Web SDK differs from Simply Connect in component generation, request shape, result callbacks, 3DS handling, browser events, DMN payloads, and canonical identifier availability.
+- **D-27:** Evidence fixtures and the field matrix must label the frontend mode used for each scenario: `simply-connect` or `web-sdk`.
+- **D-28:** If both modes are feasible, downstream planning should preserve a clean enabler abstraction that can support both modes without conflating their result shapes or lifecycle semantics.
+- **D-29:** If Web SDK evidence cannot be captured because account setup, documentation, SDK access, or Checkout embedding constraints are missing, Phase 2 must record a blocker or follow-up decision rather than silently treating Simply Connect as the only supported frontend path.
+
 ### Claude's Discretion
 - Planner may choose exact JSON schema for the evidence index and fixture metadata as long as D-07 through D-20 are satisfied.
 - Planner may choose the exact local tunnel tool and raw workspace naming if it remains gitignored and documented.
@@ -77,13 +85,14 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 
 ### Existing docs and manual testing assets
 - `docs/TEST_SCENARIOS.md` — Existing scenario list; Phase 2 should turn relevant scenarios into observed evidence, not just documentation.
-- `docs/ARCHITECTURE.md` — Current API/data-flow description and PPP identity invariant.
+- `docs/ARCHITECTURE.md` — Current API/data-flow description and PPP identity invariant; currently contains Simply Connect/Web SDK wording that Phase 2 must clarify with observed evidence.
 - `testing/nuvei-local-mock-ct-test.md` — Local mock/tunnel harness guide and visibility points.
 - `testing/nuvei-local-mock-ct-test.html` — Local browser harness for exercising enabler + processor + Nuvei sandbox path.
 - `testing/mock-commercetools-server.mjs` — Local mock CT ledger service used before real Checkout validation.
 - `testing/postman-nuvei-connector-local-testing.collection.json` — Manual API collection; useful for session/confirm/DMN/operation calls.
 
 ### Code integration points
+- `enabler/src/services/nuvei-sdk.ts` — Current browser SDK loader; downstream research must distinguish the Simply Connect `checkout.js` path from older/alternate Web SDK `safecharge.js` integration patterns.
 - `enabler/src/components/card.ts` — Card flow that creates session, calls Nuvei SDK, and confirms payment.
 - `enabler/src/dropin/dropin-embedded.ts` — Transitional embedded flow, evidence only if retained in scenario coverage.
 - `enabler/src/services/api-service.ts` — Processor API client and tri-state confirmation behavior.
@@ -102,13 +111,14 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 - Local mock harness under `testing/` already gives a browser page, mock CT server, Postman collection, and ledger visibility for local Nuvei evidence capture.
 - Processor logs and mock CT ledger are already listed as visibility points in `testing/nuvei-local-mock-ct-test.md`.
 - Existing TypeScript/Vitest tests and Phase 1.1.1 fixtures encode canonical PPP behavior; useful as a comparison against real sandbox payloads.
-- `.github/workflows/connect-validate.yml` and `commercetools connect validate .` exist for Connect validation before real deployment attempts.
+- Test/manual docs currently use package-local npm commands and npm lockfiles; do not introduce pnpm/yarn assumptions.
+- Existing docs are inconsistent about Simply Connect vs Web SDK terminology (`checkout.js` vs `safecharge.js`). Phase 2 research must correct the mental model with observed Nuvei docs/sandbox behavior before planning any dual-mode enabler abstraction.
 
 ### Established Patterns
 - Processor routes are thin and service-owned; evidence capture should prefer observing real request/response/log behavior over changing route shape.
 - Nuvei API calls are centralized in `processor/src/clients/nuvei.client.ts`; any evidence logger/sanitizer should avoid spreading Nuvei protocol parsing across files.
 - DMN parsing is centralized in `processor/src/services/converters/nuvei-event.converter.ts`; fixture fields should be shaped to test this converter in Phase 3.
-- Test/manual docs currently use package-local npm commands and npm lockfiles; do not introduce pnpm/yarn assumptions.
+- Evidence fixtures must identify the frontend integration mode used (`simply-connect` or `web-sdk`) because these paths may differ in component generation, result callbacks, 3DS handling, and identifier availability.
 
 ### Integration Points
 - Local tunnel must expose the processor `/webhooks/nuvei` endpoint for sandbox DMNs.
@@ -124,6 +134,7 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 - User wants fixture bundle + index, not a narrative-only report.
 - User wants minimal human proof rather than mandatory screenshots for every scenario.
 - User accepts a gitignored raw capture workspace for debugging as long as committed artifacts are sanitized.
+- User identified a missing enabler integration planning dimension: Nuvei supports multiple frontend component-generation approaches (Simply Connect and Web SDK). The current implementation has shifted toward Simply Connect, but the original plan expected Web SDK; long-term design should support both if evidence validates both paths.
 
 </specifics>
 
