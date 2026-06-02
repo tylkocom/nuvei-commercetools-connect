@@ -82,9 +82,6 @@ export function validateConfig(): void {
     CTP_JWT_ISSUER: config.jwtIssuer,
     NUVEI_API_BASE_URL: config.nuveiApiBaseUrl,
     ...(config.returnUrl ? { RETURN_URL: config.returnUrl } : {}),
-    ...Object.fromEntries(
-      config.corsAllowedOrigins.map((origin, index) => [`CORS_ALLOWED_ORIGINS[${index}]`, origin]),
-    ),
   };
 
   for (const [key, value] of Object.entries(httpsUrls)) {

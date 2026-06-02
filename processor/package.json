@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "build": "rm -rf dist && tsc",
     "dev": "tsx src/index.ts",
-    "test": "vitest run",
+    "test": "node scripts/run-vitest.mjs",
     "connector:post-deploy": "node dist/connectors/post-deploy.js",
     "connector:pre-undeploy": "node dist/connectors/pre-undeploy.js"
   },
@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "@vitest/coverage-v8": "^4.1.5",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"

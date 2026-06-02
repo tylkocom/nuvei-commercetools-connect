@@ -6,7 +6,7 @@ import type {
 } from "../payment-enabler/payment-enabler.js";
 import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";
-import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
+import { loadNuveiSdk, type CheckoutResult } from "../services/nuvei-sdk.js";
 
 export class CardComponentBuilder implements PaymentComponentBuilder {
   public componentHasSubmit = false;
@@ -18,9 +18,17 @@ export class CardComponentBuilder implements PaymentComponentBuilder {
   }
 }
 
+/**
+ * Nuvei Simply Connect card component.
+ *
+ * Renders the Simply Connect checkout widget into a container.
+ * The widget handles card input, validation, 3DS, and submission.
+ */
 class CardComponent implements PaymentComponent {
   private mounted = false;
   private readonly api: ReturnType<typeof apiService>;
+  private sessionToken = "";
+  private paymentReference = "";
 
   constructor(
     private readonly baseOptions: EnablerOptions,
@@ -37,7 +45,7 @@ class CardComponent implements PaymentComponent {
   }
 
   submit(): void {
-    throw new Error("External submit is not supported by the Nuvei card component.");
+    throw new Error("Simply Connect handles submission internally via the widget pay button.");
   }
 
   isValid(): boolean {
@@ -54,41 +62,57 @@ class CardComponent implements PaymentComponent {
   }
 
   private async init(selector: string): Promise<void> {
-    const [SafeCharge, paymentRes] = await Promise.all([
-      loadNuveiSdk(),
+    const [paymentRes, checkout] = await Promise.all([
       this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.card]: {} } }),
+      loadNuveiSdk(),
     ]);
 
-    const sfc = SafeCharge({
+    this.sessionToken = paymentRes.sessionToken;
+    this.paymentReference = paymentRes.paymentReference;
+
+    const container = document.querySelector(selector);
+    if (!container) {
+      throw new Error(`Mount target not found: ${selector}`);
+    }
+
+    // Clear any previous content
+    container.innerHTML = "";
+
+    checkout({
+      sessionToken: this.sessionToken,
       env: this.baseOptions.env === "test" ? "int" : "prod",
       merchantId: this.baseOptions.merchantId,
       merchantSiteId: this.baseOptions.merchantSiteId,
       locale: this.baseOptions.locale,
-    });
-
-    sfc.createPayment({
-      sessionToken: paymentRes.sessionToken,
-      merchant_unique_id: paymentRes.paymentReference,
-      cardHolderName: true,
+      country: "US",
       billingAddress: {
+        email: "test@example.com",
         country: "US",
-        email: "",
       },
       renderTo: selector,
-      showPayButton: this.componentOptions.showPayButton ?? true,
-      onResult: (result: NuveiResult) => {
-        this.handleNuveiResult(result, paymentRes.paymentReference, paymentRes.sessionToken);
+      onResult: (result: CheckoutResult) => {
+        this.handleCheckoutResult(result);
       },
     });
 
     this.mounted = true;
   }
 
-  private handleNuveiResult(result: NuveiResult, paymentReference: string, knownSessionToken: string): void {
+  private handleCheckoutResult(result: CheckoutResult): void {
+    console.log("[NuveiEnabler] Simply Connect onResult:", JSON.stringify(result));
+
+    // Map Simply Connect result to our internal NuveiResult shape
+    const nuveiResult = {
+      transactionStatus: result.transactionStatus,
+      sessionToken: result.sessionToken,
+      errCode: result.errCode,
+      reason: result.reason,
+    };
+
     void confirmPaymentResult(
-      result,
-      paymentReference,
-      knownSessionToken,
+      nuveiResult,
+      this.paymentReference,
+      this.sessionToken,
       this.api,
       this.baseOptions.onComplete,
       this.baseOptions.onError,

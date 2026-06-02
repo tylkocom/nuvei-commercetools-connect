@@ -1,3 +1,1 @@
-import { NuveiEnabler } from "./index.js";
-
-export { NuveiEnabler as Enabler };
+export * from "./index.js";

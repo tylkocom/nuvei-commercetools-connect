@@ -1,0 +1,11 @@
+{
+  "name": "nuvei-local-testing-harness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node mock-commercetools-server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}

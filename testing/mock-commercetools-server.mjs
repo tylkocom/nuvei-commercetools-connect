@@ -2,7 +2,87 @@ import express from "express";
 import crypto from "node:crypto";
 
 const app = express();
+app.use((_req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "*");
+  res.setHeader("Access-Control-Allow-Headers", "*");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (_req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 const port = Number(process.env.PORT ?? 8089);
+
+// ---------------------------------------------------------------------------
+// Nuvei real-sandbox helpers (used when env vars are present)
+// ---------------------------------------------------------------------------
+const NUVEI_API_URL = "https://ppp-test.nuvei.com/ppp/api/v1";
+
+function getTimestamp() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const hours = String(now.getUTCHours()).padStart(2, "0");
+  const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(now.getUTCSeconds()).padStart(2, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+}
+
+function calculateNuveiChecksum(fields, payload, secretKey) {
+  const input = fields
+    .map((f) => {
+      if (f === "secretKey") return secretKey;
+      const v = payload[f];
+      return v === undefined || v === null ? "" : String(v);
+    })
+    .join("");
+  return crypto.createHash("sha256").update(input).digest("hex");
+}
+
+async function callNuveiOpenOrder({ amount, currency, clientUniqueId }) {
+  const merchantId = process.env.NUVEI_MERCHANT_ID;
+  const merchantSiteId = process.env.NUVEI_MERCHANT_SITE_ID;
+  const secretKey = process.env.NUVEI_SECRET_KEY;
+
+  if (!merchantId || !merchantSiteId || !secretKey) {
+    throw new Error("Missing NUVEI_MERCHANT_ID, NUVEI_MERCHANT_SITE_ID, or NUVEI_SECRET_KEY");
+  }
+
+  const clientRequestId = crypto.randomUUID();
+  const timeStamp = getTimestamp();
+
+  const payload = {
+    merchantId,
+    merchantSiteId,
+    clientRequestId,
+    amount,
+    currency,
+    timeStamp,
+    clientUniqueId,
+  };
+
+  const checksum = calculateNuveiChecksum(
+    ["merchantId", "merchantSiteId", "clientRequestId", "amount", "currency", "timeStamp", "secretKey"],
+    payload,
+    secretKey,
+  );
+
+  payload.checksum = checksum;
+
+  const response = await fetch(`${NUVEI_API_URL}/openOrder.do`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json();
+  if (!response.ok || Number(body.errCode) !== 0) {
+    const err = new Error(`Nuvei openOrder failed: ${body.reason || JSON.stringify(body)}`);
+    err.responseBody = body;
+    throw err;
+  }
+  return body;
+}
 
 app.use(
   express.json({
@@ -103,6 +183,10 @@ function upsertTransaction(transaction) {
   return { inserted: true, transaction };
 }
 
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", service: "mock-ct" });
+});
+
 app.get("/", (_req, res) => {
   res.type("html").send(`<!doctype html>
 <html lang="en">
@@ -154,13 +238,43 @@ app.get("/payment-components", (req, res) => {
   });
 });
 
-app.post("/payments/session", (req, res) => {
+app.post("/payments/session", async (req, res) => {
   record("INBOUND", "Create payment session", req, {
     normalCaller: "enabler browser code -> processor",
-    testedFlow: "processor Nuvei openOrder creation path; mocked here with hard-coded session token",
+    testedFlow: "processor Nuvei openOrder creation path; calls real Nuvei sandbox when credentials are present",
   });
 
-  const sessionToken = `mock-session-token-${crypto.randomUUID()}`;
+  const hasNuveiCreds =
+    process.env.NUVEI_MERCHANT_ID &&
+    process.env.NUVEI_MERCHANT_SITE_ID &&
+    process.env.NUVEI_SECRET_KEY;
+
+  let sessionToken;
+  let orderId;
+
+  if (hasNuveiCreds) {
+    try {
+      const amountStr = (ledger.cart.totalPrice.centAmount / 100).toFixed(2);
+      const nuveiRes = await callNuveiOpenOrder({
+        amount: amountStr,
+        currency: ledger.cart.totalPrice.currencyCode,
+        clientUniqueId: ledger.cart.id,
+      });
+      sessionToken = nuveiRes.sessionToken;
+      orderId = nuveiRes.orderId;
+      console.log("Nuvei openOrder succeeded:", { orderId, sessionToken: sessionToken?.slice(0, 8) + "..." });
+    } catch (err) {
+      console.error("Nuvei openOrder failed:", err.message, err.responseBody);
+      return res.status(502).json({
+        message: "Nuvei openOrder failed",
+        detail: err.responseBody || err.message,
+      });
+    }
+  } else {
+    sessionToken = `mock-session-token-${crypto.randomUUID()}`;
+    console.log("No Nuvei creds found; returning mock session token.");
+  }
+
   ledger.payment.interfaceId = sessionToken;
   ledger.payment.paymentMethodInfo.method = req.body?.paymentMethodOptions?.embedded ? "embedded" : "card";
 
@@ -169,6 +283,7 @@ app.post("/payments/session", (req, res) => {
     sessionToken,
     paymentReference: ledger.payment.id,
     merchantReturnUrl: "http://localhost:8089/return",
+    ...(orderId ? { orderId } : {}),
   });
 });
 

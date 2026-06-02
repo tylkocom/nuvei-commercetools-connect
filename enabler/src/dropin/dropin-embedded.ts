@@ -1,9 +1,8 @@
 /**
- * Embedded drop-in builder and component.
+ * Embedded drop-in builder and component using Nuvei Simply Connect.
  *
- * Dynamically loads the Nuvei Simply Connect (SafeCharge) Web SDK,
- * fetches a session token from the processor, and renders the widget
- * inside the merchant's page.
+ * Renders the Simply Connect checkout widget inside the merchant page.
+ * The widget handles all payment methods, card input, validation, 3DS, and submission.
  */
 
 import type {
@@ -14,7 +13,7 @@ import type {
 } from "../payment-enabler/payment-enabler.js";
 import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";
-import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
+import { loadNuveiSdk, type CheckoutResult } from "../services/nuvei-sdk.js";
 
 // ---------------------------------------------------------------------------
 // Builder
@@ -45,6 +44,8 @@ class DropinComponents implements DropinComponent {
   private readonly baseOptions: EnablerOptions;
   private readonly dropinOptions: DropinOptions;
   private readonly api: ReturnType<typeof apiService>;
+  private sessionToken = "";
+  private paymentReference = "";
 
   constructor(opts: { baseOptions: EnablerOptions; dropinOptions: DropinOptions }) {
     this.baseOptions = opts.baseOptions;
@@ -62,55 +63,69 @@ class DropinComponents implements DropinComponent {
   }
 
   submit(): void {
-    throw new Error("External submit is not supported by the Nuvei drop-in.");
+    throw new Error("Simply Connect handles submission internally via the widget pay button.");
   }
 
   // -- private helpers ------------------------------------------------------
 
-  /** Fetches session data from the processor and renders the widget. */
+  /** Fetches session data from the processor and renders the Simply Connect widget. */
   private async initNuveiWidget(selector: string): Promise<void> {
     try {
       // 1. Obtain session token and load SDK in parallel.
-      const [paymentRes, SafeCharge] = await Promise.all([
+      const [paymentRes, checkout] = await Promise.all([
         this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.embedded]: {} } }),
         loadNuveiSdk(),
       ]);
 
-      const sfc = SafeCharge({
+      this.sessionToken = paymentRes.sessionToken;
+      this.paymentReference = paymentRes.paymentReference;
+
+      const container = document.querySelector(selector);
+      if (!container) {
+        throw new Error(`Mount target not found: ${selector}`);
+      }
+
+      // Clear any previous content
+      container.innerHTML = "";
+
+      checkout({
+        sessionToken: this.sessionToken,
         env: this.baseOptions.env === "test" ? "int" : "prod",
         merchantId: this.baseOptions.merchantId,
         merchantSiteId: this.baseOptions.merchantSiteId,
         locale: this.baseOptions.locale,
-      });
-
-      // 2. Create and render the payment form.
-      sfc.createPayment({
-        sessionToken: paymentRes.sessionToken,
-        merchant_unique_id: paymentRes.paymentReference,
-        cardHolderName: true,
+        country: "US",
         billingAddress: {
+          email: "test@example.com",
           country: "US",
-          email: "",
         },
         renderTo: selector,
-        onResult: (result: NuveiResult) => {
-          this.handleNuveiResult(result, paymentRes.paymentReference, paymentRes.sessionToken);
+        onResult: (result: CheckoutResult) => {
+          this.handleCheckoutResult(result);
         },
       });
 
-      // 3. Notify the host that the drop-in is ready.
+      // 2. Notify the host that the drop-in is ready.
       await this.dropinOptions.onDropinReady?.();
     } catch (error) {
       this.baseOptions.onError?.(error);
     }
   }
 
-  /** Processes the result callback from the Nuvei widget. */
-  private handleNuveiResult(result: NuveiResult, paymentReference: string, knownSessionToken: string): void {
+  private handleCheckoutResult(result: CheckoutResult): void {
+    console.log("[NuveiEnabler] Simply Connect onResult:", JSON.stringify(result));
+
+    const nuveiResult = {
+      transactionStatus: result.transactionStatus,
+      sessionToken: result.sessionToken,
+      errCode: result.errCode,
+      reason: result.reason,
+    };
+
     void confirmPaymentResult(
-      result,
-      paymentReference,
-      knownSessionToken,
+      nuveiResult,
+      this.paymentReference,
+      this.sessionToken,
       this.api,
       this.baseOptions.onComplete,
       this.baseOptions.onError,

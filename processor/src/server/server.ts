@@ -77,5 +77,9 @@ export const setupFastify = async () => {
     dir: join(__dirname, "plugins"),
   });
 
+  // Register debug dump plugin manually (kept outside autoload dir to avoid double-registration)
+  const { default: debugDumpPlugin } = await import("./debug-dump.plugin.js");
+  await server.register(debugDumpPlugin);
+
   return server;
 };
