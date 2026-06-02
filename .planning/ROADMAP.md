@@ -41,7 +41,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Wave 1**
 
 - [x] 01-01-PLAN.md — Harden enabler safe setup errors, mirrored method registry, and builder-side method validation.
-- [ ] 01-02-PLAN.md — Harden processor registry, payment request validation, route/service safe errors, and pre-side-effect rejection.
+- [x] 01-02-PLAN.md — Harden processor registry, payment request validation, route/service safe errors, and pre-side-effect rejection.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -169,7 +169,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Contract and Method Hardening | 1/3 | In Progress|  |
+| 1. Contract and Method Hardening | 2/3 | In Progress | - |
 | 2. Nuvei Sandbox Evidence and Checkout Validation | 0/TBD | Not started | - |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |

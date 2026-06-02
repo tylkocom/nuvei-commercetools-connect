@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-02T17:23:53.749Z"
-last_activity: 2026-06-02 — Roadmap created from PROJECT.md, REQUIREMENTS.md, research summary, and standard granularity config.
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-06-02T17:27:05Z"
+last_activity: 2026-06-02 — Completed Phase 1 Plan 02 processor contract hardening.
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,25 +26,25 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 1 of 8 (Contract and Method Hardening)
-Plan: 1 of 3 in current phase
-Status: Plan 01 complete; ready for Plan 02
-Last activity: 2026-06-02 — Completed Phase 1 Plan 01 enabler contract hardening.
+Plan: 2 of 3 in current phase
+Status: Plan 02 complete; ready for Plan 03
+Last activity: 2026-06-02 — Completed Phase 1 Plan 02 processor contract hardening.
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1
-- Average duration: 3 min
-- Total execution time: 3 min
+- Total plans completed: 2
+- Average duration: not recorded for latest plan
+- Total execution time: at least 3 min recorded
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| Phase 1 | 1 | 3 min | 3 min |
+| Phase 1 | 2 | at least 3 min recorded | not recorded for latest plan |
 
 **Recent Trend:**
 
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - [Project]: npm with package-local package-lock files is the current repository package strategy unless deliberately changed.
 - [Phase 1 Plan 01]: Enabler registry uses `embedded`, not `dropin`, as the transitional drop-in request key.
 - [Phase 1 Plan 01]: Public enabler setup failures use `PaymentSetupError` with stable code/message and redaction-safe diagnostics.
+- [Phase 1 Plan 02]: Processor accepts exactly `card` and transitional `embedded`; `dropin` is not a processor payment method alias.
+- [Phase 1 Plan 02]: Missing processor payment method options default explicitly to `card` for the legacy GET/no-options path.
+- [Phase 1 Plan 02]: Processor setup failures use safe public `{ code, message }` responses with redacted route/service diagnostics.
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-02T17:23:53.746Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: None
+Last session: 2026-06-02T17:27:05Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: .planning/phases/01-contract-and-method-hardening/01-02-SUMMARY.md
