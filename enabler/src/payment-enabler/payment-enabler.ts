@@ -6,6 +6,71 @@
  */
 
 /**
+ * Payment method type identifiers recognised by the enabler.
+ *
+ * MUST be kept in sync with `SUPPORTED_PAYMENT_METHODS` in
+ * `processor/src/dtos/operations/payment-components.dto.ts`.
+ */
+export enum PaymentMethod {
+  card = "card",
+  dropin = "dropin",
+}
+
+/**
+ * Ordered list of supported payment methods.
+ *
+ * Derived from the {@link PaymentMethod} enum so the enabler has a single
+ * source of truth that mirrors the processor's `SUPPORTED_PAYMENT_METHODS`.
+ */
+export const SUPPORTED_PAYMENT_METHODS: readonly string[] = Object.values(PaymentMethod);
+
+/**
+ * Validate enabler options at runtime and return an actionable error
+ * describing the first problem found.
+ *
+ * @throws {Error} When any required option is missing or invalid.
+ */
+export function validateEnablerOptions(opts: EnablerOptions): void {
+  if (!opts.processorUrl || typeof opts.processorUrl !== "string") {
+    throw new Error(
+      'Invalid EnablerOptions: "processorUrl" is required and must be a non-empty string URL.',
+    );
+  }
+
+  try {
+    new URL(opts.processorUrl);
+  } catch {
+    throw new Error(
+      `Invalid EnablerOptions: "processorUrl" is not a valid URL – "${opts.processorUrl}".`,
+    );
+  }
+
+  if (!opts.sessionId || typeof opts.sessionId !== "string") {
+    throw new Error(
+      'Invalid EnablerOptions: "sessionId" is required and must be a non-empty string.',
+    );
+  }
+
+  if (!opts.merchantId || typeof opts.merchantId !== "string") {
+    throw new Error(
+      'Invalid EnablerOptions: "merchantId" is required and must be a non-empty string.',
+    );
+  }
+
+  if (!opts.merchantSiteId || typeof opts.merchantSiteId !== "string") {
+    throw new Error(
+      'Invalid EnablerOptions: "merchantSiteId" is required and must be a non-empty string.',
+    );
+  }
+
+  if (opts.env !== "test" && opts.env !== "production") {
+    throw new Error(
+      `Invalid EnablerOptions: "env" must be "test" or "production", received "${opts.env}".`,
+    );
+  }
+}
+
+/**
  * Entry point for creating payment components and drop-in builders.
  *
  * Usage:
@@ -119,12 +184,4 @@ export type DropinOptions = {
  */
 export enum DropinType {
   embedded = "embedded",
-}
-
-/**
- * Payment method type identifiers recognised by the enabler.
- */
-export enum PaymentMethod {
-  card = "card",
-  dropin = "dropin",
 }

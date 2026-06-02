@@ -15,7 +15,11 @@ import {
   ReversePaymentRequest,
   StatusResponse,
 } from "./types/operation.type.js";
-import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-components.dto.js";
+import {
+  SupportedPaymentComponentsSchemaDTO,
+  SUPPORTED_PAYMENT_METHODS,
+  isSupportedPaymentMethod,
+} from "../dtos/operations/payment-components.dto.js";
 import {
   PaymentModificationStatus,
   PaymentTransactions,
@@ -98,6 +102,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
       return "[redacted]";
     }
     return `${token.slice(0, 6)}...[redacted]...${token.slice(-4)}`;
+  }
+
+  private getRequestedPaymentMethod(options?: {
+    paymentMethodOptions?: Record<string, Record<string, unknown>>;
+  }): string | undefined {
+    const methods = Object.keys(options?.paymentMethodOptions ?? {});
+    return methods.length > 0 ? methods[0] : undefined;
   }
 
   private paymentHasInteraction(payment: Payment, interactionId: string): boolean {
@@ -341,11 +352,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
           type: "embedded",
         },
       ],
-      components: [
-        {
-          type: "card",
-        },
-      ],
+      components: SUPPORTED_PAYMENT_METHODS.filter((m) => m !== "dropin").map((m) => ({
+        type: m,
+      })),
       express: [],
     };
   }
@@ -652,7 +661,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
    * @param options - Optional payment method options
    * @returns Promise with cartId, sessionToken, paymentReference, merchantReturnUrl
    */
-  public async createPaymentIntent(_options?: {
+  public async createPaymentIntent(options?: {
     paymentMethodOptions?: Record<string, Record<string, unknown>>;
   }): Promise<{
     cartId: string;
@@ -679,11 +688,19 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
 
       const sessionToken = openOrderResponse.sessionToken;
+      const paymentMethod = this.getRequestedPaymentMethod(options);
+
+      if (paymentMethod && !isSupportedPaymentMethod(paymentMethod)) {
+        throw new Error(
+          `Unsupported payment method "${paymentMethod}". Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
+        );
+      }
 
       const paymentReference = await this.paymentCreationService.handleCtPaymentCreation({
         interactionId: sessionToken,
         amountPlanned,
         cart,
+        paymentMethod,
       });
 
       const config = getConfig();

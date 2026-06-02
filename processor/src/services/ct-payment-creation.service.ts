@@ -13,6 +13,10 @@ export type CtPaymentCreationServiceOptions = {
   ctPaymentService: CommercetoolsPaymentService;
 };
 
+const METHOD_NAMES: Record<string, string> = {
+  card: "Nuvei card",
+};
+
 export class CtPaymentCreationService {
   private ctCartService: CommercetoolsCartService;
   private ctPaymentService: CommercetoolsPaymentService;
@@ -35,14 +39,16 @@ export class CtPaymentCreationService {
     interactionId: string;
     amountPlanned: { centAmount: number; currencyCode: string };
     cart: Cart;
+    paymentMethod?: string;
   }): Promise<string> {
+    const paymentMethod = opts.paymentMethod ?? "nuvei";
     const response = await this.ctPaymentService.createPayment({
       amountPlanned: opts.amountPlanned,
       interfaceId: opts.interactionId,
       paymentMethodInfo: {
         paymentInterface: NUVEI_PAYMENT_INTERFACE,
-        method: "nuvei",
-        name: { en: "Nuvei" },
+        method: paymentMethod,
+        name: { en: METHOD_NAMES[paymentMethod] ?? "Nuvei" },
       },
       ...(opts.cart.customerId
         ? { customer: { typeId: "customer", id: opts.cart.customerId } }
