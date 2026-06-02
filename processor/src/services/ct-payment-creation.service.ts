@@ -7,7 +7,7 @@ import { PaymentTransactions } from "../dtos/operations/payment-intents.dto.js";
 import { getConfig } from "../config/config.js";
 import { log } from "../libs/logger/index.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
-import { METHOD_NAMES } from "../dtos/operations/payment-components.dto.js";
+import { METHOD_NAMES, isSupportedPaymentMethod } from "../dtos/operations/payment-components.dto.js";
 
 export type CtPaymentCreationServiceOptions = {
   ctCartService: CommercetoolsCartService;
@@ -46,7 +46,7 @@ export class CtPaymentCreationService {
       paymentMethodInfo: {
         paymentInterface: NUVEI_PAYMENT_INTERFACE,
         method: paymentMethod,
-        name: { en: METHOD_NAMES[paymentMethod] ?? "Nuvei" },
+        name: { en: isSupportedPaymentMethod(paymentMethod) ? METHOD_NAMES[paymentMethod] : "Nuvei" },
       },
       ...(opts.cart.customerId
         ? { customer: { typeId: "customer", id: opts.cart.customerId } }
