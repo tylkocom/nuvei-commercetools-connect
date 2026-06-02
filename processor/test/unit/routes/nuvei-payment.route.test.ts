@@ -57,14 +57,20 @@ type PaymentRouteRequest = {
   body: unknown;
 };
 
-type MockCreatePaymentIntent = {
+type MockCreatePaymentSession = {
   (options?: unknown): Promise<unknown>;
   mockResolvedValue: (value: unknown) => void;
   mockRejectedValue: (value: unknown) => void;
 };
 
+type MockConfirmPayment = {
+  (paymentReference: string, sessionToken: string): Promise<unknown>;
+  mockResolvedValue: (value: unknown) => void;
+};
+
 type PaymentServiceDouble = {
-  createPaymentIntent: MockCreatePaymentIntent;
+  createPaymentSession: MockCreatePaymentSession;
+  confirmPayment: MockConfirmPayment;
 };
 function buildApp(): BuiltApp {
   const routes: RouteEntry[] = [];
@@ -115,7 +121,8 @@ describe("payment routes", () => {
   beforeEach(async () => {
     vi.mocked(log.warn).mockReset();
     paymentService = {
-      createPaymentIntent: vi.fn(),
+      createPaymentSession: vi.fn(),
+      confirmPayment: vi.fn(),
     };
     app = buildApp();
 
@@ -128,22 +135,44 @@ describe("payment routes", () => {
     );
   });
 
-  it("POST / returns successful payment response", async () => {
-    paymentService.createPaymentIntent.mockResolvedValue({
+
+  it("does not register the removed GET / payment route", () => {
+    expect(app.routes.find((route) => route.method === "GET" && route.url === "/")).toBeUndefined();
+  });
+
+  it("registers POST /confirm/:id and not the legacy camelCase confirm route", async () => {
+    paymentService.confirmPayment.mockResolvedValue({ success: true });
+
+    expect(app.routes.find((route) => route.method === "POST" && route.url === "/confirmPayments/:id")).toBeUndefined();
+    const confirmRoute = app.routes.find((route) => route.method === "POST" && route.url === "/confirm/:id");
+    expect(confirmRoute).toBeDefined();
+
+    const reply = makeReply();
+    await confirmRoute?.handler(
+      { params: { id: "payment-1" }, body: { sessionToken: "session-token-1" } },
+      reply,
+    );
+
+    expect(paymentService.confirmPayment).toHaveBeenCalledWith("payment-1", "session-token-1");
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith({ outcome: "approved" });
+  });
+  it("POST /session returns successful payment response", async () => {
+    paymentService.createPaymentSession.mockResolvedValue({
       cartId: "cart-1",
       sessionToken: "session-token-1",
       paymentReference: "payment-1",
       merchantReturnUrl: "https://example.com/return",
     });
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
     expect(postRoute).toBeDefined();
 
     const body = { paymentMethodOptions: { card: {} } };
     const reply = makeReply();
     await postRoute?.handler({ body } satisfies PaymentRouteRequest, reply);
 
-    expect(paymentService.createPaymentIntent).toHaveBeenCalledWith(body);
+    expect(paymentService.createPaymentSession).toHaveBeenCalledWith(body);
     expect(reply.status).toHaveBeenCalledWith(200);
     expect(reply.send).toHaveBeenCalledWith({
       cartId: "cart-1",
@@ -153,15 +182,15 @@ describe("payment routes", () => {
     });
   });
 
-  it("POST / maps unsupported methods to a safe public error", async () => {
-    paymentService.createPaymentIntent.mockRejectedValue(
+  it("POST /session maps unsupported methods to a safe public error", async () => {
+    paymentService.createPaymentSession.mockRejectedValue(
       new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
         category: "method_unsupported",
         requestedMethod: "wechatpay",
       }),
     );
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
     const reply = makeReply();
     await postRoute?.handler(
       { body: { paymentMethodOptions: { wechatpay: { token: "secret" } } } } satisfies PaymentRouteRequest,
@@ -179,7 +208,7 @@ describe("payment routes", () => {
     });
     expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
     expect(log.warn).toHaveBeenCalledWith("Payment setup request rejected.", {
-      route: "POST /payments",
+      route: "POST /payments/session",
       code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
       category: "method_unsupported",
       requestedMethod: "wechatpay",
@@ -191,8 +220,8 @@ describe("payment routes", () => {
   });
 
 
-  it("POST / unsupported methods reach semantic validation at the Fastify boundary", async () => {
-    paymentService.createPaymentIntent.mockRejectedValue(
+  it("POST /session unsupported methods reach semantic validation at the Fastify boundary", async () => {
+    paymentService.createPaymentSession.mockRejectedValue(
       new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
         category: "method_unsupported",
         requestedMethod: "wechatpay",
@@ -202,7 +231,7 @@ describe("payment routes", () => {
 
     const response = await fastify.inject({
       method: "POST",
-      url: "/",
+      url: "/session",
       payload: {
         paymentMethodOptions: {
           wechatpay: {
@@ -217,7 +246,7 @@ describe("payment routes", () => {
       code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
       message: "Payment method is not supported.",
     });
-    expect(paymentService.createPaymentIntent).toHaveBeenCalledWith({
+    expect(paymentService.createPaymentSession).toHaveBeenCalledWith({
       paymentMethodOptions: {
         wechatpay: {
           token: "secret",
@@ -227,14 +256,14 @@ describe("payment routes", () => {
 
     await fastify.close();
   });
-  it("POST / maps malformed requests to a safe public error", async () => {
-    paymentService.createPaymentIntent.mockRejectedValue(
+  it("POST /session maps malformed requests to a safe public error", async () => {
+    paymentService.createPaymentSession.mockRejectedValue(
       new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
         category: "method_ambiguous",
       }),
     );
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/");
+    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
     const reply = makeReply();
     await postRoute?.handler(
       { body: { paymentMethodOptions: { card: {}, embedded: {} } } } satisfies PaymentRouteRequest,
