@@ -120,5 +120,15 @@ class CardComponent implements PaymentComponent {
       this.baseOptions.onError,
       this.baseOptions.onPending,
     );
+
+    // Cleanup Simply Connect overlay after result is handled (T-01.1.1-12)
+    this.cleanupCheckoutOverlay();
+  }
+
+  private cleanupCheckoutOverlay(): void {
+    const overlays = document.querySelectorAll(
+      '[id*="checkoutOverlay"], [class*="checkoutOverlay"]',
+    );
+    overlays.forEach((el) => el.remove());
   }
 }
