@@ -48,6 +48,11 @@ vi.mock("../../../src/dtos/operations/status.dto", () => ({
   StatusResponseSchemaDTO: {},
 }));
 
+vi.mock("../../../src/dtos/operations/health.dto", () => ({
+  HealthResponseSchema: { type: "object" },
+  HealthCheckItemSchema: { type: "object" },
+}));
+
 vi.mock("../../../src/dtos/operations/transaction.dto", () => ({
   TransactionDraft: { type: "object" },
   TransactionDraftDTO: {},
@@ -145,6 +150,7 @@ describe("operation routes", () => {
       .mockResolvedValue({ dropins: [], components: [], express: [] }),
     modifyPayment: vi.fn(),
     handleTransaction: vi.fn(),
+    health: vi.fn(),
   };
 
   let app: BuiltApp;
@@ -164,6 +170,7 @@ describe("operation routes", () => {
     paymentService.handleTransaction.mockResolvedValue({
       transactionStatus: { state: "Pending", errors: [] },
     });
+    paymentService.health.mockResolvedValue({ status: "ok", checks: [] });
 
     app = buildApp();
 
@@ -214,6 +221,39 @@ describe("operation routes", () => {
     expect(paymentService.status).toHaveBeenCalledOnce();
     expect(reply.send).toHaveBeenCalledWith({ status: "UP" });
     expect(reply.code).toHaveBeenCalledWith(200);
+  });
+
+  it("registers GET /health route with no auth preHandler", async () => {
+    const healthRoute = app.routes.find((r) => r.url === "/health");
+    expect(healthRoute).toBeDefined();
+    expect(healthRoute!.method).toBe("GET");
+  });
+
+  it("GET /health returns 200 with ok status when all checks pass", async () => {
+    const healthRoute = app.routes.find((r) => r.url === "/health");
+    const okChecks = [
+      { name: "CTP_PROJECT_KEY", status: "ok" },
+      { name: "NUVEI_SECRET_KEY", status: "ok" },
+    ];
+    paymentService.health.mockResolvedValueOnce({ status: "ok", checks: okChecks });
+    const reply = makeReply();
+    await healthRoute!.handler({}, reply);
+    expect(paymentService.health).toHaveBeenCalledOnce();
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith({ status: "ok", checks: okChecks });
+  });
+
+  it("GET /health returns 200 with degraded status when a check fails", async () => {
+    const healthRoute = app.routes.find((r) => r.url === "/health");
+    const degradedChecks = [
+      { name: "CTP_PROJECT_KEY", status: "ok" },
+      { name: "NUVEI_SECRET_KEY", status: "failed" },
+    ];
+    paymentService.health.mockResolvedValueOnce({ status: "degraded", checks: degradedChecks });
+    const reply = makeReply();
+    await healthRoute!.handler({}, reply);
+    expect(reply.status).toHaveBeenCalledWith(200);
+    expect(reply.send).toHaveBeenCalledWith({ status: "degraded", checks: degradedChecks });
   });
 
   it("registers /payment-intents/:id route that extracts params and calls modifyPayment()", async () => {
