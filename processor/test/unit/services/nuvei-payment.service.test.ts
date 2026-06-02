@@ -513,9 +513,9 @@ describe("NuveiPaymentService", () => {
   });
 
   // -------------------------------------------------------------------------
-  // createPaymentIntent()
+  // createPaymentSession()
   // -------------------------------------------------------------------------
-  describe("createPaymentIntent()", () => {
+  describe("createPaymentSession()", () => {
     it("formats zero-decimal currencies without forcing cents", async () => {
       const { service } = createService();
 
@@ -527,7 +527,7 @@ describe("NuveiPaymentService", () => {
       });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "session-token-1" });
 
-      await service.createPaymentIntent();
+      await service.createPaymentSession();
 
       expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -544,7 +544,7 @@ describe("NuveiPaymentService", () => {
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-card" });
 
-      await service.createPaymentIntent({ paymentMethodOptions: { card: {} } });
+      await service.createPaymentSession({ paymentMethodOptions: { card: {} } });
 
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -560,7 +560,7 @@ describe("NuveiPaymentService", () => {
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-embedded" });
 
-      await service.createPaymentIntent({ paymentMethodOptions: { embedded: {} } });
+      await service.createPaymentSession({ paymentMethodOptions: { embedded: {} } });
 
       expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledOnce();
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
@@ -577,7 +577,7 @@ describe("NuveiPaymentService", () => {
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-default" });
 
-      await service.createPaymentIntent();
+      await service.createPaymentSession();
 
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -592,7 +592,7 @@ describe("NuveiPaymentService", () => {
         const { service } = createService();
 
         await expect(
-          service.createPaymentIntent({ paymentMethodOptions: { [unsupportedMethod]: {} } }),
+          service.createPaymentSession({ paymentMethodOptions: { [unsupportedMethod]: {} } }),
         ).rejects.toMatchObject({
           code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
           message: "Payment method is not supported.",
@@ -620,7 +620,7 @@ describe("NuveiPaymentService", () => {
     ])("rejects malformed %s before Nuvei or commercetools side effects", async (_, options) => {
       const { service } = createService();
 
-      await expect(service.createPaymentIntent(options)).rejects.toMatchObject({
+      await expect(service.createPaymentSession(options)).rejects.toMatchObject({
         code: PublicPaymentErrorCode.REQUEST_MALFORMED,
       });
 
@@ -634,11 +634,11 @@ describe("NuveiPaymentService", () => {
       const { service } = createService();
 
       await expect(
-        service.createPaymentIntent({ paymentMethodOptions: { wechatpay: { token: "secret" } } }),
+        service.createPaymentSession({ paymentMethodOptions: { wechatpay: { token: "secret" } } }),
       ).rejects.toBeInstanceOf(PaymentSetupError);
 
       expect(log.warn).toHaveBeenCalledWith("Payment setup validation failed.", {
-        route: "POST /payments",
+        route: "POST /payments/session",
         code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
         category: "method_unsupported",
         requestedMethod: "wechatpay",
@@ -656,7 +656,7 @@ describe("NuveiPaymentService", () => {
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "session-token-xyz" });
 
-      const result = await service.createPaymentIntent();
+      const result = await service.createPaymentSession();
 
       expect(result).toEqual({
         cartId: "cart-1",

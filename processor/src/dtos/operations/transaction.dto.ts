@@ -5,7 +5,7 @@ export const TransactionDraft = Type.Object({
   paymentInterface: Type.String({ format: "uuid" }),
   amount: Type.Optional(
     Type.Object({
-      centAmount: Type.Number(),
+      centAmount: Type.Integer(),
       currencyCode: Type.String(),
     }),
   ),
