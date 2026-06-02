@@ -1,0 +1,725 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PaymentModificationStatus } from "../../../src/dtos/operations/payment-intents.dto";
+
+// ---------------------------------------------------------------------------
+// Mock all external modules before importing the class under test.
+// ---------------------------------------------------------------------------
+
+const mockNuveiClientInstance = {
+  settleTransaction: vi.fn(),
+  voidTransaction: vi.fn(),
+  refundTransaction: vi.fn(),
+  openOrder: vi.fn(),
+  getPaymentStatus: vi.fn(),
+  isReachable: vi.fn(),
+  validateDmnChecksum: vi.fn(),
+};
+
+vi.mock("../../../src/clients/nuvei.client", () => ({
+  nuveiClient: () => mockNuveiClientInstance,
+}));
+
+vi.mock("../../../src/config/config", () => ({
+  getConfig: () => ({
+    nuveiEnv: "test",
+    nuveiMerchantId: "merchant-123",
+    nuveiMerchantSiteId: "site-456",
+    nuveiSecretKey: "secret-key",
+    nuveiApiBaseUrl: "https://sandbox.safecharge.com",
+    nuveiDmnChecksumAlgorithm: "sha256",
+    projectKey: "test-project",
+    healthCheckTimeout: 5000,
+    returnUrl: "https://example.com/return",
+  }),
+  config: {},
+}));
+
+vi.mock("../../../src/payment-sdk", () => ({
+  appLogger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  paymentSDK: {},
+}));
+
+vi.mock("../../../src/libs/logger/index", () => ({
+  log: {
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+vi.mock("../../../src/libs/fastify/context/context", () => ({
+  getCartIdFromContext: () => "cart-123",
+  getMerchantReturnUrlFromContext: () => "https://example.com/return",
+}));
+
+const mockHasTransactionInState = vi.fn();
+const mockGetPayment = vi.fn();
+const mockUpdatePayment = vi.fn();
+const mockGetCart = vi.fn();
+const mockGetPaymentAmount = vi.fn();
+
+vi.mock("@commercetools/connect-payments-sdk", () => ({
+  CommercetoolsCartService: class {
+    getCart = mockGetCart;
+    getPaymentAmount = mockGetPaymentAmount;
+  },
+  CommercetoolsOrderService: class {},
+  CommercetoolsPaymentService: class {
+    getPayment = mockGetPayment;
+    updatePayment = mockUpdatePayment;
+    hasTransactionInState = mockHasTransactionInState;
+  },
+  ErrorInvalidOperation: class extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "ErrorInvalidOperation";
+    }
+  },
+  healthCheckCommercetoolsPermissions: vi.fn(),
+  statusHandler: vi.fn(),
+}));
+
+vi.mock("../../../src/services/ct-payment-creation.service", () => ({
+  CtPaymentCreationService: class {
+    handleCtPaymentCreation = vi.fn().mockResolvedValue("payment-ref-1");
+  },
+}));
+
+/**
+ * We mock the converter but allow individual tests to override the return
+ * value via mockImplementation so we can test every fixture type.
+ */
+const mockConvertDmnToPaymentUpdate = vi.fn();
+
+vi.mock("../../../src/services/converters/nuvei-event.converter", () => ({
+  NuveiEventConverter: class {
+    convertDmnToPaymentUpdate = mockConvertDmnToPaymentUpdate;
+  },
+}));
+
+import { NuveiPaymentService } from "../../../src/services/nuvei-payment.service";
+import {
+  dmnAuthOk,
+  dmnAuthFail,
+  dmnSettleOk,
+  dmnCreditOk,
+  dmnVoidOk,
+  dmnDuplicateAuth,
+  dmnMalformed,
+  dmnMerchantMismatch,
+  dmnCurrencyMismatch,
+  dmnAmountMismatch,
+  dmnMissingMerchantUniqueId,
+  makeDmnMockPayment,
+  makePaymentStatusResponse,
+} from "../fixtures/dmn.fixtures";
+import { PaymentTransactions } from "../../../src/dtos/operations/payment-intents.dto";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeMockPayment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "payment-1",
+    interfaceId: "nuvei-tx-100",
+    amountPlanned: { centAmount: 1000, currencyCode: "USD" },
+    transactions: [],
+    ...overrides,
+  } as any;
+}
+
+function createService() {
+  const ctCartService = { getCart: mockGetCart, getPaymentAmount: mockGetPaymentAmount };
+  const ctPaymentService = {
+    getPayment: mockGetPayment,
+    updatePayment: mockUpdatePayment,
+    hasTransactionInState: mockHasTransactionInState,
+  };
+  const ctOrderService = {};
+
+  mockGetCart.mockResolvedValue({
+    id: "cart-123",
+    totalPrice: { centAmount: 1000, currencyCode: "USD" },
+    paymentInfo: { payments: [{ typeId: "payment", id: "payment-1" }] },
+  });
+  mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+  mockGetPayment.mockResolvedValue(makeMockPayment());
+  mockUpdatePayment.mockResolvedValue(undefined);
+
+  const service = new NuveiPaymentService({
+    ctCartService: ctCartService as any,
+    ctPaymentService: ctPaymentService as any,
+    ctOrderService: ctOrderService as any,
+  });
+
+  return { service };
+}
+
+/**
+ * Default converter output for a successful Auth DMN.
+ * Individual tests override as needed.
+ */
+function defaultConverterReturn(
+  overrides: Record<string, unknown> = {},
+): ReturnType<typeof mockConvertDmnToPaymentUpdate> {
+  return {
+    id: "payment-1",
+    pspReference: "tx-auth-001",
+    transactions: [
+      {
+        type: PaymentTransactions.AUTHORIZATION,
+        interactionId: "tx-auth-001",
+        amount: { centAmount: 1000, currencyCode: "USD" },
+        state: "Success",
+      },
+    ],
+    interfaceCode: "authorized",
+    paymentMethod: "Visa",
+    paymentMethodName: { en: "Credit Card" },
+    ...overrides,
+  };
+}
+
+/**
+ * Default Nuvei getPaymentStatus mock response that confirms the transaction.
+ */
+function defaultPaymentStatus(
+  overrides: Record<string, unknown> = {},
+): ReturnType<typeof mockNuveiClientInstance.getPaymentStatus> {
+  return {
+    status: "SUCCESS",
+    transactionStatus: "APPROVED",
+    transactionId: "tx-auth-001",
+    sessionToken: "nuvei-tx-100",
+    amount: "10.00",
+    currency: "USD",
+    clientUniqueId: "cart-123",
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("NuveiPaymentService – DMN processing", () => {
+  beforeEach(() => {
+    mockNuveiClientInstance.settleTransaction.mockReset();
+    mockNuveiClientInstance.voidTransaction.mockReset();
+    mockNuveiClientInstance.refundTransaction.mockReset();
+    mockNuveiClientInstance.openOrder.mockReset();
+    mockNuveiClientInstance.getPaymentStatus.mockReset();
+    mockNuveiClientInstance.isReachable.mockReset();
+    mockNuveiClientInstance.validateDmnChecksum.mockReset();
+    mockHasTransactionInState.mockReset();
+    mockGetPayment.mockReset();
+    mockUpdatePayment.mockReset();
+    mockGetCart.mockReset();
+    mockGetPaymentAmount.mockReset();
+    mockConvertDmnToPaymentUpdate.mockReset();
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – successful fixture types
+  // -------------------------------------------------------------------------
+  describe("successful DMN processing per fixture type", () => {
+    it("processes successful authorization (Auth, OK)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-auth-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+          interfaceCode: "authorized",
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthOk);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+
+    it("processes failed authorization (Auth, FAIL)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token", transactions: [] }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-auth-fail-001",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-auth-fail-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Failure",
+            },
+          ],
+          interfaceCode: "failed",
+        }),
+      );
+
+      await service.processNuveiDmn(dmnAuthFail);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+
+    it("processes successful charge/settle (Settle, OK)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-settle-001",
+          transactions: [
+            {
+              type: PaymentTransactions.CHARGE,
+              interactionId: "tx-settle-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+          interfaceCode: "paid",
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({
+          transactionId: "tx-settle-001",
+          sessionToken: "nuvei-session-token",
+        }),
+      );
+
+      await service.processNuveiDmn(dmnSettleOk);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+
+    it("processes successful refund (Credit, OK)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Charge",
+              state: "Success",
+              interactionId: "tx-settle-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-credit-001",
+          transactions: [
+            {
+              type: PaymentTransactions.REFUND,
+              interactionId: "tx-credit-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+          interfaceCode: "refunded",
+        }),
+      );
+
+      await service.processNuveiDmn(dmnCreditOk);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+
+    it("processes successful void/cancel (Void, OK)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Success",
+              interactionId: "tx-auth-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-void-001",
+          transactions: [
+            {
+              type: PaymentTransactions.CANCEL_AUTHORIZATION,
+              interactionId: "tx-void-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+          interfaceCode: "cancelled",
+        }),
+      );
+
+      await service.processNuveiDmn(dmnVoidOk);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – idempotency (duplicate DMNs)
+  // -------------------------------------------------------------------------
+  describe("duplicate DMN handling", () => {
+    it("skips update when TransactionID already exists on payment (idempotent)", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Success",
+              interactionId: "tx-auth-001", // same TransactionID as dmnDuplicateAuth
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      await service.processNuveiDmn(dmnDuplicateAuth);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("skips update for exact duplicate DMN body", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Success",
+              interactionId: "tx-auth-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      // Send the same DMN body twice
+      await service.processNuveiDmn(dmnDuplicateAuth);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(mockConvertDmnToPaymentUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – invalid checksum
+  // -------------------------------------------------------------------------
+  describe("checksum validation", () => {
+    it("rejects immediately when checksum is invalid", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(false);
+
+      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow("Invalid DMN checksum");
+
+      expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – mismatched merchant ID
+  // -------------------------------------------------------------------------
+  describe("merchant ID validation", () => {
+    it("rejects when merchant_id does not match config", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+
+      await expect(service.processNuveiDmn(dmnMerchantMismatch)).rejects.toThrow(
+        "DMN merchant_id does not match configured merchant",
+      );
+
+      expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – missing merchant_unique_id
+  // -------------------------------------------------------------------------
+  describe("merchant_unique_id validation", () => {
+    it("rejects when merchant_unique_id is missing", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+
+      await expect(service.processNuveiDmn(dmnMissingMerchantUniqueId)).rejects.toThrow(
+        "Missing merchant_unique_id in DMN body",
+      );
+
+      expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – amount mismatch
+  // -------------------------------------------------------------------------
+  describe("amount mismatch validation", () => {
+    it("rejects when DMN amount does not match CT Payment amountPlanned", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-amount-mismatch-001",
+              amount: { centAmount: 9999, currencyCode: "USD" }, // 99.99 USD ≠ 10.00 USD
+              state: "Success",
+            },
+          ],
+        }),
+      );
+
+      await expect(service.processNuveiDmn(dmnAmountMismatch)).rejects.toThrow(
+        "DMN amount does not match payment",
+      );
+
+      // updatePayment should NOT have been called for the transaction
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – currency mismatch
+  // -------------------------------------------------------------------------
+  describe("currency mismatch validation", () => {
+    it("rejects when DMN currency does not match CT Payment currency", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-currency-mismatch-001",
+              amount: { centAmount: 1000, currencyCode: "EUR" }, // EUR ≠ USD
+              state: "Success",
+            },
+          ],
+        }),
+      );
+
+      await expect(service.processNuveiDmn(dmnCurrencyMismatch)).rejects.toThrow(
+        "DMN currency does not match payment",
+      );
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – malformed DMN
+  // -------------------------------------------------------------------------
+  describe("malformed DMN handling", () => {
+    it("converter throws on missing required fields", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockImplementation(() => {
+        throw new Error("Missing required DMN field: TransactionID or TransactionId");
+      });
+
+      await expect(service.processNuveiDmn(dmnMalformed)).rejects.toThrow(
+        "Missing required DMN field: TransactionID or TransactionId",
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – Nuvei status verification
+  // -------------------------------------------------------------------------
+  describe("Nuvei status cross-check", () => {
+    it("rejects when Nuvei getPaymentStatus returns non-SUCCESS status", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-auth-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "ERROR",
+        transactionStatus: "DECLINED",
+        transactionId: "tx-auth-001",
+        sessionToken: "nuvei-session-token",
+      });
+
+      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow(
+        "Nuvei payment status does not confirm successful DMN",
+      );
+    });
+
+    it("rejects when Nuvei status transactionId does not match DMN TransactionID", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-auth-001",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-auth-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({
+          transactionId: "different-tx-id",
+          sessionToken: "nuvei-session-token",
+        }),
+      );
+
+      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow(
+        "Nuvei payment status transaction does not match DMN",
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – updates payment method info
+  // -------------------------------------------------------------------------
+  describe("payment method info updates", () => {
+    it("updates paymentMethod and paymentMethodName when present in converter output", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          paymentMethod: "Visa",
+          paymentMethodName: { en: "Credit Card" },
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthOk);
+
+      // Should call updatePayment for: transaction + paymentMethod + paymentMethodName
+      const calls = mockUpdatePayment.mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+
+      const methodCall = calls.find(
+        (c: any[]) => c[0]?.paymentMethodInfo?.method === "Visa",
+      );
+      expect(methodCall).toBeDefined();
+
+      const nameCall = calls.find(
+        (c: any[]) => c[0]?.paymentMethodInfo?.name?.en === "Credit Card",
+      );
+      expect(nameCall).toBeDefined();
+    });
+
+    it("does not update paymentMethod when absent from converter output", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          paymentMethod: undefined,
+          paymentMethodName: undefined,
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthOk);
+
+      // Only the transaction update should be called, no paymentMethodInfo calls
+      const methodCall = mockUpdatePayment.mock.calls.find(
+        (c: any[]) => c[0]?.paymentMethodInfo?.method !== undefined,
+      );
+      expect(methodCall).toBeUndefined();
+    });
+  });
+});

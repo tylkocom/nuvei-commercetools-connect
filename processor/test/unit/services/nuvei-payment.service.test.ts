@@ -63,6 +63,7 @@ const mockGetPayment = vi.fn();
 const mockUpdatePayment = vi.fn();
 const mockGetCart = vi.fn();
 const mockGetPaymentAmount = vi.fn();
+const mockHandleCtPaymentCreation = vi.fn().mockResolvedValue("payment-ref-1");
 
 vi.mock("@commercetools/connect-payments-sdk", () => ({
   CommercetoolsCartService: class {
@@ -87,7 +88,7 @@ vi.mock("@commercetools/connect-payments-sdk", () => ({
 
 vi.mock("../../../src/services/ct-payment-creation.service", () => ({
   CtPaymentCreationService: class {
-    handleCtPaymentCreation = vi.fn().mockResolvedValue("payment-ref-1");
+    handleCtPaymentCreation = mockHandleCtPaymentCreation;
   },
 }));
 
@@ -112,6 +113,7 @@ vi.mock("../../../src/services/converters/nuvei-event.converter", () => ({
 }));
 
 import { NuveiPaymentService } from "../../../src/services/nuvei-payment.service";
+import { statusHandler } from "@commercetools/connect-payments-sdk";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -172,6 +174,8 @@ describe("NuveiPaymentService", () => {
     mockUpdatePayment.mockReset();
     mockGetCart.mockReset();
     mockGetPaymentAmount.mockReset();
+    mockHandleCtPaymentCreation.mockReset();
+    mockHandleCtPaymentCreation.mockResolvedValue("payment-ref-1");
   });
 
   // -------------------------------------------------------------------------
@@ -186,6 +190,95 @@ describe("NuveiPaymentService", () => {
         merchantId: "merchant-123",
         merchantSiteId: "site-456",
       });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // status()
+  // -------------------------------------------------------------------------
+  describe("status()", () => {
+    it("calls statusHandler and returns its body with Nuvei reachability UP", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.isReachable.mockResolvedValue(undefined);
+
+      let capturedChecks: Array<() => Promise<unknown>> = [];
+
+      (statusHandler as unknown as ReturnType<typeof vi.fn>).mockImplementation((opts: any) => {
+        capturedChecks = opts.checks;
+        return async () => ({
+          body: {
+            status: "OK",
+            timestamp: "2024-07-15T14:00:43.068Z",
+            version: "1.0.0",
+            checks: [
+              { name: "CoCo Permissions", status: "UP" },
+              { name: "Nuvei Status check", status: "UP", message: "Nuvei API is reachable" },
+            ],
+          },
+        });
+      });
+
+      const result = await service.status();
+
+      // Verify statusHandler was called with the right config
+      expect(statusHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timeout: 5000,
+        }),
+      );
+
+      // Execute the Nuvei reachability check and verify it returns UP
+      const nuveiCheck = capturedChecks[1] as () => Promise<{ name: string; status: string; message: string }>;
+      const checkResult = await nuveiCheck();
+      expect(checkResult.name).toBe("Nuvei Status check");
+      expect(checkResult.status).toBe("UP");
+      expect(mockNuveiClientInstance.isReachable).toHaveBeenCalled();
+
+      expect(result.status).toBe("OK");
+    });
+
+    it("Nuvei reachability check returns DOWN when isReachable throws", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.isReachable.mockRejectedValue(new Error("Connection refused"));
+
+      let capturedChecks: Array<() => Promise<unknown>> = [];
+
+      (statusHandler as unknown as ReturnType<typeof vi.fn>).mockImplementation((opts: any) => {
+        capturedChecks = opts.checks;
+        return async () => ({
+          body: {
+            status: "PARTIAL",
+            timestamp: "2024-07-15T14:00:43.068Z",
+            version: "1.0.0",
+            checks: [
+              { name: "CoCo Permissions", status: "UP" },
+              {
+                name: "Nuvei Status check",
+                status: "DOWN",
+                message: "Nuvei API is not reachable. Please check the logs for more details.",
+                details: { error: "Connection refused" },
+              },
+            ],
+          },
+        });
+      });
+
+      await service.status();
+
+      // Execute the Nuvei reachability check and verify it returns DOWN
+      const nuveiCheck = capturedChecks[1] as () => Promise<{
+        name: string;
+        status: string;
+        message: string;
+        details?: { error: string };
+      }>;
+      const checkResult = await nuveiCheck();
+      expect(checkResult.name).toBe("Nuvei Status check");
+      expect(checkResult.status).toBe("DOWN");
+      expect(checkResult.details?.error).toBe("Connection refused");
+      expect(mockNuveiClientInstance.isReachable).toHaveBeenCalled();
     });
   });
 
@@ -367,6 +460,9 @@ describe("NuveiPaymentService", () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // createPaymentIntent()
+  // -------------------------------------------------------------------------
   describe("createPaymentIntent()", () => {
     it("formats zero-decimal currencies without forcing cents", async () => {
       const { service } = createService();
@@ -388,8 +484,90 @@ describe("NuveiPaymentService", () => {
         }),
       );
     });
+
+    it("passes paymentMethod 'card' when paymentMethodOptions contains card", async () => {
+      const { service } = createService();
+
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-card" });
+
+      await service.createPaymentIntent({ paymentMethodOptions: { card: {} } });
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: "card",
+        }),
+      );
+    });
+
+    it("passes paymentMethod 'dropin' when paymentMethodOptions contains dropin", async () => {
+      const { service } = createService();
+
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-dropin" });
+
+      await service.createPaymentIntent({ paymentMethodOptions: { dropin: {} } });
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: "dropin",
+        }),
+      );
+    });
+
+    it("passes paymentMethod undefined when no options provided", async () => {
+      const { service } = createService();
+
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-default" });
+
+      await service.createPaymentIntent();
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: undefined,
+        }),
+      );
+    });
+
+    it("throws for unsupported payment method", async () => {
+      const { service } = createService();
+
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-wechat" });
+
+      await expect(
+        service.createPaymentIntent({ paymentMethodOptions: { wechatpay: { flow: "qrcode" } } }),
+      ).rejects.toThrow('Unsupported payment method "wechatpay"');
+
+      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it("returns cartId, sessionToken, paymentReference, and merchantReturnUrl", async () => {
+      const { service } = createService();
+
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "session-token-xyz" });
+
+      const result = await service.createPaymentIntent();
+
+      expect(result).toEqual({
+        cartId: "cart-1",
+        sessionToken: "session-token-xyz",
+        paymentReference: "payment-ref-1",
+        merchantReturnUrl: "https://example.com/return",
+      });
+    });
   });
 
+  // -------------------------------------------------------------------------
+  // confirmPayment()
+  // -------------------------------------------------------------------------
   describe("confirmPayment()", () => {
     it("stores the Nuvei transactionId for approved payments", async () => {
       const { service } = createService();

@@ -130,7 +130,15 @@ describe("operation routes", () => {
       merchantSiteId: "s1",
     });
     paymentService.status.mockResolvedValue({ status: "UP" });
+    paymentService.getSupportedPaymentComponents.mockResolvedValue({
+      dropins: [{ type: "embedded" }],
+      components: [{ type: "card" }],
+      express: [],
+    });
     paymentService.modifyPayment.mockResolvedValue({ outcome: "approved" });
+    paymentService.handleTransaction.mockResolvedValue({
+      transactionStatus: { state: "Pending", errors: [] },
+    });
 
     app = buildApp();
 
@@ -200,5 +208,114 @@ describe("operation routes", () => {
     });
     expect(reply.status).toHaveBeenCalledWith(200);
     expect(reply.send).toHaveBeenCalledWith({ outcome: "approved" });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /payment-components
+  // -------------------------------------------------------------------------
+  describe("GET /payment-components", () => {
+    it("registers route and returns expected component list", async () => {
+      const componentsRoute = app.routes.find((r) => r.url === "/payment-components");
+      expect(componentsRoute).toBeDefined();
+      expect(componentsRoute!.method).toBe("GET");
+
+      const reply = makeReply();
+      await componentsRoute!.handler({}, reply);
+
+      expect(paymentService.getSupportedPaymentComponents).toHaveBeenCalledOnce();
+      expect(reply.send).toHaveBeenCalledWith({
+        dropins: [{ type: "embedded" }],
+        components: [{ type: "card" }],
+        express: [],
+      });
+      expect(reply.code).toHaveBeenCalledWith(200);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /payment-intents/:id with various actions
+  // -------------------------------------------------------------------------
+  describe("POST /payment-intents/:id with capturePayment action", () => {
+    it("delegates to modifyPayment with capturePayment action data", async () => {
+      const modifyRoute = app.routes.find((r) => r.url === "/payment-intents/:id");
+      expect(modifyRoute).toBeDefined();
+
+      paymentService.modifyPayment.mockResolvedValueOnce({ outcome: "approved" });
+
+      const request = {
+        params: { id: "payment-99" },
+        body: {
+          actions: [
+            {
+              action: "capturePayment",
+              amount: { centAmount: 5000, currencyCode: "EUR" },
+            },
+          ],
+        },
+      };
+      const reply = makeReply();
+      await modifyRoute!.handler(request, reply);
+
+      expect(paymentService.modifyPayment).toHaveBeenCalledWith({
+        paymentId: "payment-99",
+        data: request.body,
+      });
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith({ outcome: "approved" });
+    });
+  });
+
+  describe("POST /payment-intents/:id with cancelPayment action", () => {
+    it("delegates to modifyPayment with cancelPayment action data", async () => {
+      const modifyRoute = app.routes.find((r) => r.url === "/payment-intents/:id");
+      expect(modifyRoute).toBeDefined();
+
+      paymentService.modifyPayment.mockResolvedValueOnce({ outcome: "approved" });
+
+      const request = {
+        params: { id: "payment-88" },
+        body: {
+          actions: [
+            {
+              action: "cancelPayment",
+            },
+          ],
+        },
+      };
+      const reply = makeReply();
+      await modifyRoute!.handler(request, reply);
+
+      expect(paymentService.modifyPayment).toHaveBeenCalledWith({
+        paymentId: "payment-88",
+        data: request.body,
+      });
+      expect(reply.status).toHaveBeenCalledWith(200);
+      expect(reply.send).toHaveBeenCalledWith({ outcome: "approved" });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /transactions
+  // -------------------------------------------------------------------------
+  describe("POST /transactions", () => {
+    it("registers route and delegates to paymentService.handleTransaction", async () => {
+      const txRoute = app.routes.find((r) => r.url === "/transactions");
+      expect(txRoute).toBeDefined();
+      expect(txRoute!.method).toBe("POST");
+
+      const requestBody = {
+        cartId: "cart-abc-123",
+        paymentInterface: "nuvei",
+      };
+
+      const reply = makeReply();
+      await txRoute!.handler({ body: requestBody }, reply);
+
+      expect(paymentService.handleTransaction).toHaveBeenCalledWith(requestBody);
+      expect(reply.status).toHaveBeenCalledWith(201);
+      expect(reply.send).toHaveBeenCalledWith({
+        transactionStatus: { state: "Pending", errors: [] },
+      });
+    });
   });
 });
