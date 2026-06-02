@@ -49,6 +49,21 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **UI hint**: yes
 
+### Phase 01.1: Processor API design cleanup and health endpoint (INSERTED)
+
+**Goal:** Remove Stripe-template naming from the processor HTTP API surface, drop dead routes, and add GET /health for unauthenticated infra probes. All existing commercetools Checkout compatibility is preserved.
+**Requirements**: OPS-04
+**Depends on:** Phase 1
+**Plans:** 2 plans
+
+**Wave 1**
+
+- [ ] 01.1-01-PLAN.md — Processor route renames, GET /health endpoint, DTO fixes, and test updates.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 01.1-02-PLAN.md — Enabler URL updates, Postman collection, and ARCHITECTURE.md documentation.
+
 ### Phase 2: Nuvei Sandbox Evidence and Checkout Validation
 
 **Goal**: Real Nuvei sandbox and commercetools Checkout card behavior is observed, sanitized, and sufficient to choose canonical correlation fields.

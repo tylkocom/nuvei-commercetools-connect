@@ -1,0 +1,20 @@
+{
+  "doc_path": "docs/security-review.md",
+  "claims_checked": 56,
+  "claims_passed": 54,
+  "claims_failed": 2,
+  "failures": [
+    {
+      "line": 60,
+      "claim": "there is no automated drift check or documented source for updating the hash",
+      "expected": "no documented SDK hash update source or rotation procedure in the repository",
+      "actual": "docs/DEPLOYMENT.md:149-166 documents the Nuvei SDK URL and SRI recomputation/update procedure"
+    },
+    {
+      "line": 75,
+      "claim": "Nuvei session tokens are redacted in backend logs",
+      "expected": "backend logs redact Nuvei session tokens before emission",
+      "actual": "processor/src/services/ct-payment-creation.service.ts:78 logs opts.interactionId unredacted; that method documents interactionId as the Nuvei sessionToken / transaction ID"
+    }
+  ]
+}

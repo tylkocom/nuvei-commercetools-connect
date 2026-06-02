@@ -1,0 +1,59 @@
+{
+  "source_path": "docs/TESTING.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Testing Guide",
+  "summary": "Guide for unit, manual, sandbox, and browser testing of the Nuvei commercetools connector.",
+  "scope": [
+    "vitest",
+    "unit tests",
+    "processor",
+    "Nuvei client",
+    "payment converter",
+    "Nuvei event converter",
+    "webhooks",
+    "payments",
+    "test cards",
+    "manual testing checklist",
+    "deployment verification",
+    "payment flow",
+    "capture",
+    "cancel authorization",
+    "refund",
+    "error handling",
+    "browser sandbox testing",
+    "commercetools Payment",
+    "enabler"
+  ],
+  "cross_refs": [
+    "https://vitest.dev/",
+    "https://docs.nuvei.com/integration/testing/testing-cards/"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "",
+  "requirements": [
+    "Use vitest as the unit test runner.",
+    "Run all tests with pnpm test.",
+    "Run processor watch tests with pnpm --filter processor exec vitest --watch.",
+    "Run a specific processor test file with pnpm --filter processor exec vitest src/clients/nuvei.client.test.ts.",
+    "Co-locate unit tests with the source files they test.",
+    "Unit coverage should include Nuvei client checksum calculation, request signing, error handling, and DMN validation.",
+    "Unit coverage should include payment converter transaction type mapping, status mapping, and interfaceCode derivation.",
+    "Unit coverage should include Nuvei event converter DMN body parsing, cent amount conversion, and timestamp parsing.",
+    "Unit coverage should include webhook checksum validation, idempotency, and error responses.",
+    "Unit coverage should include payments openOrder, capture, cancel, and refund flows.",
+    "Sandbox manual verification should cover deployment health, checkout session creation, enabler widget loading, authorization, DMN processing, capture, cancel authorization, refund, declined cards, invalid DMN checksum, duplicate DMNs, and missing or invalid sessions.",
+    "Browser sandbox testing should cover normal, 3DS, declined, and timeout payment flows."
+  ],
+  "constraints": [
+    "Nuvei sandbox test card numbers must be confirmed against Nuvei sandbox documentation because they may change.",
+    "Browser end-to-end testing requires a deployed Connect preview environment and a commercetools Checkout session pointing to it.",
+    "Deployment verification expects GET /health to return {\"status\":\"ok\"} and GET /status to return all checks as UP.",
+    "Invalid DMN checksum handling is expected to return HTTP 400.",
+    "Duplicate DMN handling is expected not to create duplicate transactions.",
+    "Browser DevTools should monitor /payments and /webhooks/nuvei requests during sandbox testing.",
+    "commercetools Payment state should be inspected via ImpEx or Merchant Center after each browser test."
+  ]
+}

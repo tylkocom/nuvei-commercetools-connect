@@ -1,0 +1,20 @@
+{
+  "doc_path": "docs/PAYMENT_CONFIRMATION_POLLING.md",
+  "claims_checked": 15,
+  "claims_passed": 13,
+  "claims_failed": 2,
+  "failures": [
+    {
+      "line": 14,
+      "claim": "anything else/error => onError",
+      "expected": "non-approved processor confirmation outcomes route to onError",
+      "actual": "processor/src/services/nuvei-payment.service.ts records non-approved Nuvei status as a failed Authorization and returns success; processor/src/routes/nuvei-payment.route.ts then returns HTTP 200 with outcome approved, and enabler/src/services/api-service.ts calls onComplete after any successful confirmPayment response"
+    },
+    {
+      "line": 64,
+      "claim": "POST /payments/:paymentId/status",
+      "expected": "route definition in codebase",
+      "actual": "no route definition found for /payments/:paymentId/status; processor payment routes define POST /payments and POST /payments/confirmPayments/:id only"
+    }
+  ]
+}

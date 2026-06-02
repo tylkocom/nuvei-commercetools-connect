@@ -1,0 +1,47 @@
+{
+  "source_path": "docs/security-review.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Security Review Findings",
+  "summary": "Security review findings and positive controls for Nuvei payment processor, browser enabler, webhooks, money-moving operations, and verification results.",
+  "scope": [
+    "DMN webhooks",
+    "Nuvei checksum validation",
+    "DMN replay protection",
+    "capture and refund amounts",
+    "processorUrl",
+    "merchantReturnUrl",
+    "payment creation idempotency",
+    "Nuvei SDK SRI hash",
+    "processor audits",
+    "enabler audits",
+    "processor tests",
+    "enabler tests"
+  ],
+  "cross_refs": [
+    "processor/src/clients/nuvei.client.ts",
+    "processor/src/services/nuvei-payment.service.ts",
+    "processor/src/dtos/operations/payment-intents.dto.ts",
+    "processor/src/dtos/operations/transaction.dto.ts",
+    "enabler/src/payment-enabler/payment-enabler.ts",
+    "enabler/src/services/api-service.ts",
+    "processor/src/libs/fastify/context/context.ts",
+    "processor/src/dtos/nuvei-payment.dto.ts",
+    "enabler/src/services/nuvei-sdk.ts"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": "Manifest declared DOC. Document records security review findings, remediation guidance, positive controls, and verification results; it does not establish locked architectural decisions.",
+  "locked_decisions": [],
+  "requirements": [],
+  "constraints": [
+    "Treat unsigned DMN fields as untrusted and revalidate all transaction types against the Nuvei API before updating commercetools.",
+    "Persist processed webhook identifiers with TTL, reject stale responseTimeStamp values, and dedupe on immutable Nuvei event or transaction identifiers.",
+    "Enforce positive integer money amounts, validate currency format, and compare capture/refund amounts against authorized, captured, and refunded CT payment totals before calling Nuvei.",
+    "Require https: processor URLs, with any localhost HTTP exception limited to explicit development mode.",
+    "Validate merchant return URLs against an explicit origin allowlist before returning or using them.",
+    "Reuse existing pending cart payments or require idempotency keys, and add rate limiting for session-authenticated payment creation.",
+    "Add CI or build-time verification of the Nuvei SDK SRI hash and document the hash rotation procedure."
+  ]
+}
