@@ -79,6 +79,10 @@ describe("DropinEmbeddedBuilder", () => {
     const dropin = builder.build({ showPayButton: true });
 
     dropin.mount("#container");
+
+    expect(mockCreatePayment).toHaveBeenCalledWith({
+      paymentMethodOptions: { embedded: {} },
+    });
     await vi.waitFor(() =>
       expect(mockSfcCreatePayment).toHaveBeenCalledWith(
         expect.objectContaining({

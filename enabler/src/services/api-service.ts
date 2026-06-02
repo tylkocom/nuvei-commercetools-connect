@@ -5,7 +5,12 @@
  * correlate the call with the correct cart / payment.
  */
 
-import type { PaymentResult } from "../payment-enabler/payment-enabler.js";
+import {
+  PaymentSetupError,
+  PublicPaymentErrorCode,
+  type PaymentResult,
+  type PublicPaymentError,
+} from "../payment-enabler/payment-enabler.js";
 import type { NuveiResult } from "./nuvei-sdk.js";
 
 /** Shape of the response returned by `POST /payments`. */
@@ -65,6 +70,18 @@ export async function confirmPaymentResult(
   }
 }
 
+async function readPublicPaymentError(res: Response): Promise<PublicPaymentError | undefined> {
+  try {
+    const body = (await res.json()) as Partial<PublicPaymentError>;
+    if (typeof body.code === "string" && typeof body.message === "string") {
+      return { code: body.code as PublicPaymentErrorCode, message: body.message };
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
 /**
  * Creates an {@link ApiService} bound to a processor URL and session.
  */
@@ -83,7 +100,18 @@ export function apiService(opts: { baseApi: string; sessionId: string }): ApiSer
         body: JSON.stringify(params ?? {}),
       });
       if (!res.ok) {
-        throw new Error(`Failed to create payment: ${res.status} ${res.statusText}`);
+        const publicError = await readPublicPaymentError(res);
+        if (publicError) {
+          throw new PaymentSetupError(publicError.code, publicError.message, {
+            route: "POST /payments",
+            status: res.status,
+          });
+        }
+        throw new PaymentSetupError(
+          PublicPaymentErrorCode.REQUEST_MALFORMED,
+          "Failed to create payment session.",
+          { route: "POST /payments", status: res.status },
+        );
       }
       return res.json();
     },

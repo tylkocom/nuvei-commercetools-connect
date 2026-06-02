@@ -4,6 +4,7 @@ import type {
   PaymentComponent,
   PaymentComponentBuilder,
 } from "../payment-enabler/payment-enabler.js";
+import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";
 import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
 
@@ -55,7 +56,7 @@ class CardComponent implements PaymentComponent {
   private async init(selector: string): Promise<void> {
     const [SafeCharge, paymentRes] = await Promise.all([
       loadNuveiSdk(),
-      this.api.createPayment({ paymentMethodOptions: { card: {} } }),
+      this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.card]: {} } }),
     ]);
 
     const sfc = SafeCharge({

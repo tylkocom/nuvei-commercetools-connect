@@ -5,68 +5,108 @@
  * (or a custom storefront) and the Nuvei payment widget.
  */
 
-/**
- * Payment method type identifiers recognised by the enabler.
- *
- * MUST be kept in sync with `SUPPORTED_PAYMENT_METHODS` in
- * `processor/src/dtos/operations/payment-components.dto.ts`.
- */
-export enum PaymentMethod {
-  card = "card",
-  dropin = "dropin",
+import { SUPPORTED_PAYMENT_METHODS } from "./method-registry.js";
+import type { PaymentMethodKey } from "./method-registry.js";
+export {
+  PaymentMethod,
+  PAYMENT_METHOD_REGISTRY,
+  SUPPORTED_PAYMENT_METHODS,
+  getComponentPaymentMethods,
+  getDropinPaymentMethods,
+  getPaymentMethodRegistryEntry,
+  isSupportedPaymentMethod,
+} from "./method-registry.js";
+export type {
+  PaymentMethodKey,
+  PaymentMethodKind,
+  PaymentMethodRegistryEntry,
+} from "./method-registry.js";
+
+export const PublicPaymentErrorCode = {
+  CONFIG_INVALID: "CONFIG_INVALID",
+  METHOD_UNSUPPORTED: "METHOD_UNSUPPORTED",
+  REQUEST_MALFORMED: "REQUEST_MALFORMED",
+  AUTH_SESSION_INVALID: "AUTH_SESSION_INVALID",
+} as const;
+
+export type PublicPaymentErrorCode =
+  (typeof PublicPaymentErrorCode)[keyof typeof PublicPaymentErrorCode];
+
+export type PublicPaymentError = {
+  code: PublicPaymentErrorCode;
+  message: string;
+};
+
+export class PaymentSetupError extends Error implements PublicPaymentError {
+  constructor(
+    public readonly code: PublicPaymentErrorCode,
+    message: string,
+    public readonly diagnostics: Record<string, unknown> = {},
+  ) {
+    super(message);
+    this.name = "PaymentSetupError";
+  }
+
+  toPublicError(): PublicPaymentError {
+    return { code: this.code, message: this.message };
+  }
 }
 
-/**
- * Ordered list of supported payment methods.
- *
- * Derived from the {@link PaymentMethod} enum so the enabler has a single
- * source of truth that mirrors the processor's `SUPPORTED_PAYMENT_METHODS`.
- */
-export const SUPPORTED_PAYMENT_METHODS: readonly string[] = Object.values(PaymentMethod);
+function configInvalid(field: string, expectation: string): PaymentSetupError {
+  return new PaymentSetupError(
+    PublicPaymentErrorCode.CONFIG_INVALID,
+    `Invalid enabler configuration: ${field} ${expectation}.`,
+    { field, reason: expectation },
+  );
+}
+
+export function methodUnsupported(method: string, kind: "component" | "dropin"): PaymentSetupError {
+  return new PaymentSetupError(
+    PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+    `Unsupported ${kind} payment method. Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
+    { method, kind },
+  );
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+type EnablerOptionsInput = Partial<Record<keyof EnablerOptions, unknown>>;
 
 /**
- * Validate enabler options at runtime and return an actionable error
+ * Validate enabler options at runtime and return an actionable safe error
  * describing the first problem found.
  *
- * @throws {Error} When any required option is missing or invalid.
+ * @throws {PaymentSetupError} When any required option is missing or invalid.
  */
 export function validateEnablerOptions(opts: EnablerOptions): void {
-  if (!opts.processorUrl || typeof opts.processorUrl !== "string") {
-    throw new Error(
-      'Invalid EnablerOptions: "processorUrl" is required and must be a non-empty string URL.',
-    );
+  const candidate = opts as EnablerOptionsInput;
+
+  if (!isNonEmptyString(candidate.processorUrl)) {
+    throw configInvalid("processorUrl", "must be a non-empty URL string");
   }
 
   try {
-    new URL(opts.processorUrl);
+    new URL(candidate.processorUrl);
   } catch {
-    throw new Error(
-      `Invalid EnablerOptions: "processorUrl" is not a valid URL – "${opts.processorUrl}".`,
-    );
+    throw configInvalid("processorUrl", "must be a valid URL");
   }
 
-  if (!opts.sessionId || typeof opts.sessionId !== "string") {
-    throw new Error(
-      'Invalid EnablerOptions: "sessionId" is required and must be a non-empty string.',
-    );
+  if (!isNonEmptyString(candidate.sessionId)) {
+    throw configInvalid("sessionId", "must be a non-empty string");
   }
 
-  if (!opts.merchantId || typeof opts.merchantId !== "string") {
-    throw new Error(
-      'Invalid EnablerOptions: "merchantId" is required and must be a non-empty string.',
-    );
+  if (!isNonEmptyString(candidate.merchantId)) {
+    throw configInvalid("merchantId", "must be a non-empty string");
   }
 
-  if (!opts.merchantSiteId || typeof opts.merchantSiteId !== "string") {
-    throw new Error(
-      'Invalid EnablerOptions: "merchantSiteId" is required and must be a non-empty string.',
-    );
+  if (!isNonEmptyString(candidate.merchantSiteId)) {
+    throw configInvalid("merchantSiteId", "must be a non-empty string");
   }
 
-  if (opts.env !== "test" && opts.env !== "production") {
-    throw new Error(
-      `Invalid EnablerOptions: "env" must be "test" or "production", received "${opts.env}".`,
-    );
+  if (candidate.env !== "test" && candidate.env !== "production") {
+    throw configInvalid("env", 'must be "test" or "production"');
   }
 }
 
@@ -88,8 +128,8 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
  *   dropin.mount('#payment-container');
  */
 export interface PaymentEnabler {
-  createComponentBuilder(type: string): Promise<PaymentComponentBuilder>;
-  createDropinBuilder(type: DropinType): Promise<PaymentDropinBuilder>;
+  createComponentBuilder(type: PaymentMethodKey | string): Promise<PaymentComponentBuilder>;
+  createDropinBuilder(type: DropinType | string): Promise<PaymentDropinBuilder>;
 }
 
 /**

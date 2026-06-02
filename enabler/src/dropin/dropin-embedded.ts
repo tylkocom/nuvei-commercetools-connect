@@ -12,6 +12,7 @@ import type {
   EnablerOptions,
   PaymentDropinBuilder,
 } from "../payment-enabler/payment-enabler.js";
+import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";
 import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
 
@@ -71,7 +72,7 @@ class DropinComponents implements DropinComponent {
     try {
       // 1. Obtain session token and load SDK in parallel.
       const [paymentRes, SafeCharge] = await Promise.all([
-        this.api.createPayment({ paymentMethodOptions: { dropin: {} } }),
+        this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.embedded]: {} } }),
         loadNuveiSdk(),
       ]);
 
