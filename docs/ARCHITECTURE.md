@@ -178,3 +178,13 @@ The frontend enabler receives runtime configuration from its host application ra
 - Fastify sets defensive response headers (`x-content-type-options`, `referrer-policy`, `x-frame-options`, and `permissions-policy`) for all responses.
 - CORS allows requests with no `Origin`, the configured commercetools Checkout URL, and any explicitly configured `CORS_ALLOWED_ORIGINS`.
 - The Nuvei SDK script is loaded with a fixed subresource integrity hash from `enabler/src/services/nuvei-sdk.ts`.
+
+> **SECURITY GAP — requires follow-up:** Nuvei does not publish versioned CDN URLs for `safecharge.js`. The script is served from a mutable path (`/v1/websdk/safecharge.js`) that Nuvei can update at any time without notice. This means:
+> - The pinned SRI hash in `NUVEI_SDK_INTEGRITY` will silently break when Nuvei pushes a CDN update, blocking all payment widget rendering.
+> - There is no way to audit what changed between the version we pinned and the version now live — Nuvei does not publish changelogs tied to CDN deploys.
+> - In the worst case, a supply-chain compromise of the Nuvei CDN would go undetected until the next time someone checks the hash manually.
+>
+> **Mitigations still required:**
+> 1. Add a CI step that fetches `safecharge.js`, computes its SHA-384 hash, and fails the build (or opens an alert) when it diverges from `NUVEI_SDK_INTEGRITY`. This converts a silent production break into a detected drift.
+> 2. Raise a support request with Nuvei asking for an immutable, versioned CDN URL or an official SRI hash publication channel.
+> 3. Evaluate self-hosting a pinned copy of the script (noting PCI-DSS implications of serving payment JS from merchant infrastructure).
