@@ -9,7 +9,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 
 ### Contract
 
-- [ ] **CONT-01**: Enabler validates required constructor options before loading Nuvei SDK or calling the processor.
+- [x] **CONT-01**: Enabler validates required constructor options before loading Nuvei SDK or calling the processor.
 - [ ] **CONT-02**: Processor validates payment creation requests before creating Nuvei orders or commercetools Payments.
 - [ ] **CONT-03**: Processor and enabler use one shared supported-method contract for `card` and any retained `embedded` drop-in mode.
 - [ ] **CONT-04**: `GET /payment-components` advertises only methods the enabler can actually build and the processor can actually process.
@@ -107,7 +107,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONT-01 | Phase 1 | Pending |
+| CONT-01 | Phase 1 | Complete |
 | CONT-02 | Phase 1 | Pending |
 | CONT-03 | Phase 1 | Pending |
 | CONT-04 | Phase 1 | Pending |
@@ -157,6 +157,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | OPS-06 | Phase 7 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 48 total
 - Mapped to phases: 48
 - Unmapped: 0 ✓
