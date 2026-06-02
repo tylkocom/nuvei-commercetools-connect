@@ -45,9 +45,9 @@ function makeEnablerOptions(): EnablerOptions {
 // ---------------------------------------------------------------------------
 
 describe("CardComponentBuilder", () => {
-  it("creates a builder with componentHasSubmit = true", () => {
+  it("creates a builder with componentHasSubmit = false", () => {
     const builder = new CardComponentBuilder(makeEnablerOptions());
-    expect(builder.componentHasSubmit).toBe(true);
+    expect(builder.componentHasSubmit).toBe(false);
   });
 
   it("build() returns a PaymentComponent with mount and submit methods", () => {
@@ -142,17 +142,19 @@ describe("CardComponent", () => {
     const component = builder.build({ showPayButton: false });
 
     expect(() => component.submit()).toThrow(
-      "External submit is not supported. Use showPayButton: true.",
+      "External submit is not supported by the Nuvei card component.",
     );
   });
 
-  it("submit() invokes onPayButtonClick when showPayButton is true", () => {
+  it("submit() throws when showPayButton is true", () => {
     const onPayButtonClick = vi.fn().mockResolvedValue(undefined);
     const builder = new CardComponentBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true, onPayButtonClick });
 
-    expect(() => component.submit()).not.toThrow();
-    expect(onPayButtonClick).toHaveBeenCalled();
+    expect(() => component.submit()).toThrow(
+      "External submit is not supported by the Nuvei card component.",
+    );
+    expect(onPayButtonClick).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------

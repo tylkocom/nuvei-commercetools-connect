@@ -8,7 +8,7 @@ import { apiService, confirmPaymentResult } from "../services/api-service.js";
 import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
 
 export class CardComponentBuilder implements PaymentComponentBuilder {
-  public componentHasSubmit = true;
+  public componentHasSubmit = false;
 
   constructor(private readonly opts: EnablerOptions) {}
 
@@ -36,10 +36,7 @@ class CardComponent implements PaymentComponent {
   }
 
   submit(): void {
-    if (!this.componentOptions.showPayButton) {
-      throw new Error("External submit is not supported. Use showPayButton: true.");
-    }
-    void this.componentOptions.onPayButtonClick?.();
+    throw new Error("External submit is not supported by the Nuvei card component.");
   }
 
   isValid(): boolean {

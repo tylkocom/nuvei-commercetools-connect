@@ -50,9 +50,18 @@ describe("DropinEmbeddedBuilder", () => {
     expect(typeof dropin.submit).toBe("function");
   });
 
-  it("dropinHasSubmit is true", () => {
+  it("dropinHasSubmit is false", () => {
     const builder = new DropinEmbeddedBuilder(makeEnablerOptions());
-    expect(builder.dropinHasSubmit).toBe(true);
+    expect(builder.dropinHasSubmit).toBe(false);
+  });
+
+  it("submit() throws for unsupported external submit", () => {
+    const builder = new DropinEmbeddedBuilder(makeEnablerOptions());
+    const dropin = builder.build({ showPayButton: true });
+
+    expect(() => dropin.submit()).toThrow(
+      "External submit is not supported by the Nuvei drop-in.",
+    );
   });
 
   it("passes merchant_unique_id to Nuvei createPayment", async () => {

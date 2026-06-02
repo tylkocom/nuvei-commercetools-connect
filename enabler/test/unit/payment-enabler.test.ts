@@ -104,7 +104,7 @@ describe("NuveiEnabler", () => {
 
     const builder = await enabler.createComponentBuilder("card");
 
-    expect(builder.componentHasSubmit).toBe(true);
+    expect(builder.componentHasSubmit).toBe(false);
     expect(typeof builder.build).toBe("function");
   });
 

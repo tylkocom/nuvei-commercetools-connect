@@ -20,7 +20,7 @@ import { loadNuveiSdk, type NuveiResult } from "../services/nuvei-sdk.js";
 // ---------------------------------------------------------------------------
 
 export class DropinEmbeddedBuilder implements PaymentDropinBuilder {
-  public dropinHasSubmit = true;
+  public dropinHasSubmit = false;
 
   private opts: EnablerOptions;
 
@@ -61,8 +61,7 @@ class DropinComponents implements DropinComponent {
   }
 
   submit(): void {
-    // The Nuvei Simply Connect widget handles its own submit flow
-    // (card form → 3DS → result). There is no external submit trigger.
+    throw new Error("External submit is not supported by the Nuvei drop-in.");
   }
 
   // -- private helpers ------------------------------------------------------
