@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PaymentSetupError, PublicPaymentErrorCode } from "../../../src/dtos/operations/payment-errors.dto";
+import Fastify from "fastify";
 
 vi.mock("@commercetools/connect-payments-sdk", () => ({
   SessionHeaderAuthenticationHook: class {
@@ -97,6 +98,16 @@ function makeReply(): ReplyDouble & { sent: unknown[]; statuses: number[] } {
   return reply;
 }
 
+async function buildFastifyApp(paymentService: PaymentServiceDouble) {
+  const fastify = Fastify();
+  await fastify.register(paymentRoutes, {
+    paymentService,
+    sessionHeaderAuthHook: new SessionHeaderAuthenticationHook(),
+  } as unknown as Parameters<typeof paymentRoutes>[1]);
+  await fastify.ready();
+  return fastify;
+}
+
 describe("payment routes", () => {
   let app: BuiltApp;
   let paymentService: PaymentServiceDouble;
@@ -179,6 +190,43 @@ describe("payment routes", () => {
     );
   });
 
+
+  it("POST / unsupported methods reach semantic validation at the Fastify boundary", async () => {
+    paymentService.createPaymentIntent.mockRejectedValue(
+      new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
+        category: "method_unsupported",
+        requestedMethod: "wechatpay",
+      }),
+    );
+    const fastify = await buildFastifyApp(paymentService);
+
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/",
+      payload: {
+        paymentMethodOptions: {
+          wechatpay: {
+            token: "secret",
+          },
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(JSON.parse(response.body)).toEqual({
+      code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      message: "Payment method is not supported.",
+    });
+    expect(paymentService.createPaymentIntent).toHaveBeenCalledWith({
+      paymentMethodOptions: {
+        wechatpay: {
+          token: "secret",
+        },
+      },
+    });
+
+    await fastify.close();
+  });
   it("POST / maps malformed requests to a safe public error", async () => {
     paymentService.createPaymentIntent.mockRejectedValue(
       new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
