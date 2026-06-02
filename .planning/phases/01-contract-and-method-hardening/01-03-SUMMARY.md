@@ -67,7 +67,7 @@ completed: 2026-06-02
 2. **Task 2: Advertised methods bound to enabler builders** - `ef30349` (test)
 3. **Task 3: Unsupported-method no-side-effect regressions** - `606ea4e` (test)
 
-**Plan metadata:** pending final docs commit
+**Plan metadata:** `c708ffa` (docs)
 
 ## Files Created/Modified
 
