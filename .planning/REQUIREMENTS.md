@@ -38,6 +38,10 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **RECON-08**: Cancel authorization uses the correct Nuvei authorization transaction identifier and records a `CancelAuthorization` transaction.
 - [ ] **RECON-09**: Refund uses the correct Nuvei charge transaction identifier and records a `Refund` transaction.
 - [ ] **RECON-10**: Partial capture and partial refund are either implemented with amount bounds or explicitly rejected with safe errors.
+- [ ] **RECON-11**: DMN handling treats checksum-valid but unsigned fields as untrusted and revalidates `merchant_unique_id`, `TransactionID`, `transactionType`, `ppp_status`, and `clientUniqueId` against Nuvei/API/payment state before any mutation.
+- [ ] **RECON-12**: DMN replay protection rejects stale notifications and deduplicates using persistent Nuvei event or checksum-relevant immutable identifiers, not only commercetools transaction `interactionId`.
+- [ ] **RECON-13**: Session-authenticated payment creation is idempotent per cart/session through reuse of a pending Payment or a validated idempotency key.
+- [ ] **RECON-14**: Capture and refund payloads enforce positive integer cent amounts, valid currency format, and remaining capturable/refundable balance before Nuvei calls.
 
 ### Checkout Data and Metadata
 
@@ -46,6 +50,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **DATA-03**: 3DS flows use billing/shopper data sufficient for Nuvei sandbox approval and challenge handling.
 - [ ] **DATA-04**: Payment metadata stored in commercetools uses only native Payment fields and contains no PAN or sensitive card data.
 - [ ] **DATA-05**: Merchant Center-visible payment method labels and transaction identifiers are useful for support and reconciliation.
+- [ ] **DATA-06**: Merchant return URLs are validated against an explicit origin allowlist before being returned to the browser or used for redirects.
 
 ### Frontend and Security
 
@@ -57,6 +62,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **SEC-06**: Shopper-facing errors are safe while operational logs retain enough redacted context for diagnosis.
 - [ ] **SEC-07**: Frontend and webhook routes reject malformed or oversized input predictably.
 - [ ] **SEC-08**: CORS and session/JWT/OAuth authentication behavior is validated in local and deployed environments.
+- [ ] **SEC-09**: Enabler `processorUrl` requires HTTPS, with any `http://localhost` exception restricted to explicit development mode.
 
 ### Testing and CI
 
@@ -75,6 +81,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **OPS-04**: `/health` and `/status` checks give operators actionable visibility into processor, commercetools, and Nuvei reachability.
 - [ ] **OPS-05**: Runbooks exist for failed authorization, missing DMN, invalid checksum, failed capture, failed refund, auth-scope failure, CORS/session failure, and Nuvei outage.
 - [ ] **OPS-06**: Public readiness claims are updated to match observed sandbox evidence and known limitations.
+- [ ] **OPS-07**: Nuvei DMN checksum algorithm policy is resolved to one documented behavior and conflicting MD5/SHA-256 guidance is removed from public docs.
 
 ## v2 Requirements
 
@@ -87,6 +94,10 @@ Deferred to future releases after card reconciliation is proven.
 - **PMTH-03**: Connector can add Nuvei APMs one method at a time through the same registry, validation, reconciliation, tests, and runbooks as card.
 - **PMTH-04**: Connector can support stored payment methods or tokenized repeat payments after data retention and security requirements are agreed.
 - **PMTH-05**: Connector can support advanced chargeback handling beyond basic mapping after operational requirements are defined.
+
+### Custom Storefront Usage
+
+- **CUST-01**: Connector can support custom storefront direct usage with the same enabler/processor only after hosted Checkout and Payment Only card reconciliation are proven.
 
 ## Out of Scope
 
@@ -130,11 +141,16 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | RECON-08 | Phase 3 | Pending |
 | RECON-09 | Phase 3 | Pending |
 | RECON-10 | Phase 3 | Pending |
+| RECON-11 | Phase 3 | Pending |
+| RECON-12 | Phase 3 | Pending |
+| RECON-13 | Phase 3 | Pending |
+| RECON-14 | Phase 3 | Pending |
 | DATA-01 | Phase 4 | Pending |
 | DATA-02 | Phase 4 | Pending |
 | DATA-03 | Phase 4 | Pending |
 | DATA-04 | Phase 4 | Pending |
 | DATA-05 | Phase 4 | Pending |
+| DATA-06 | Phase 4 | Pending |
 | SEC-01 | Phase 5 | Pending |
 | SEC-02 | Phase 5 | Pending |
 | SEC-03 | Phase 5 | Pending |
@@ -143,6 +159,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | SEC-06 | Phase 5 | Pending |
 | SEC-07 | Phase 5 | Pending |
 | SEC-08 | Phase 5 | Pending |
+| SEC-09 | Phase 5 | Pending |
 | TEST-01 | Phase 6 | Pending |
 | TEST-02 | Phase 6 | Pending |
 | TEST-03 | Phase 6 | Pending |
@@ -155,13 +172,14 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | OPS-04 | Phase 7 | Pending |
 | OPS-05 | Phase 7 | Pending |
 | OPS-06 | Phase 7 | Pending |
+| OPS-07 | Phase 7 | Pending |
 
 **Coverage:**
 
-- v1 requirements: 48 total
-- Mapped to phases: 48
+- v1 requirements: 55 total
+- Mapped to phases: 55
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-02*
-*Last updated: 2026-06-02 during roadmap creation*
+*Last updated: 2026-06-02 after docs ingest merge*

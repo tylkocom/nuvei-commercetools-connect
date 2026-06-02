@@ -70,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 1 Plan 02]: Missing processor payment method options default explicitly to `card` for the legacy GET/no-options path.
 - [Phase 1 Plan 02]: Processor setup failures use safe public `{ code, message }` responses with redacted route/service diagnostics.
 - [Phase 1 Plan 03]: Cross-package parity tests compare actual processor and enabler registries and keep `embedded` explicitly transitional with empty PSP metadata.
+- [Ingest docs]: Existing `.planning` remains canonical over stale docs for npm/package-local commands, current endpoint names, and `embedded` vs `dropin` terminology.
+- [Ingest docs]: Custom storefront direct usage is deferred to v2 unless explicitly promoted after hosted Checkout and Payment Only card reconciliation are proven.
 
 ### Pending Todos
 
@@ -79,6 +81,8 @@ None yet.
 
 - Phase 2 depends on real Nuvei sandbox and commercetools Checkout evidence for DMN correlation, 3DS behavior, and operation payloads.
 - Production rollout remains out of scope until sandbox E2E, reconciliation, fixtures, CI, and operational runbooks are complete.
+- Docs ingest found warnings that must be resolved before pruning: checksum algorithm policy, stale endpoint names, stale package-manager commands, and readiness claim drift.
+- Security-review findings were imported as planning refinements: unsigned DMN field revalidation, replay protection, HTTPS processorUrl, return URL allowlist, payment creation idempotency, and money-moving amount bounds.
 
 ## Deferred Items
 

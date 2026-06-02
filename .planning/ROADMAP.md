@@ -70,14 +70,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: The processor mutates commercetools Payments only when Nuvei events and operations are correctly correlated, validated, idempotent, and safe.
 **Mode:** mvp
 **Depends on**: Phase 2
-**Requirements**: RECON-01, RECON-02, RECON-03, RECON-04, RECON-05, RECON-06, RECON-07, RECON-08, RECON-09, RECON-10
+**Requirements**: RECON-01, RECON-02, RECON-03, RECON-04, RECON-05, RECON-06, RECON-07, RECON-08, RECON-09, RECON-10, RECON-11, RECON-12, RECON-13, RECON-14
 **Success Criteria** (what must be TRUE):
 
   1. Operator can trace Nuvei session tokens, Nuvei transaction IDs, cart IDs, and commercetools Payment IDs without ambiguous identity.
-  2. Duplicate, out-of-order, mismatched, malformed, or unsafe DMNs do not create duplicate transactions or update unrelated Payments.
+  2. Duplicate, out-of-order, replayed, stale, mismatched, malformed, checksum-valid-but-unsafe, or ambiguous DMNs do not create duplicate transactions or update unrelated Payments.
   3. User-visible frontend confirmation and later DMN reconciliation agree on the same transaction identity or fail safely.
   4. Operator can capture, cancel authorization, and refund using the correct prior Nuvei transaction identifiers and see the correct commercetools transaction types recorded.
-  5. Partial capture and partial refund either work within validated amount bounds or are rejected with safe actionable errors.
+  5. Capture and refund amounts are positive, currency-valid, and bounded by remaining authorized/captured/refundable totals, or are rejected with safe actionable errors.
+  6. Session-authenticated payment creation is idempotent per cart/session and cannot create unbounded Nuvei orders or CT Payments through retries.
 
 **Plans**: TBD
 
@@ -86,13 +87,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: Card payment creation uses validated Checkout, cart, shopper, and enabler data and stores only safe native commercetools Payment metadata.
 **Mode:** mvp
 **Depends on**: Phase 3
-**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DATA-05
+**Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DATA-05, DATA-06
 **Success Criteria** (what must be TRUE):
 
   1. User no longer sends hardcoded billing country or empty email when Checkout, cart, shopper, or validated enabler data is available.
   2. User cannot create a Nuvei payment without required shopper, billing, return URL, locale, and origin inputs.
   3. User can complete 3DS sandbox flows with sufficient billing and shopper data for approval or challenge handling.
   4. Operator can inspect Merchant Center payment method labels and transaction identifiers that support reconciliation without exposing PAN or sensitive card data.
+  5. Merchant return URLs are allowlisted before browser exposure or redirect use.
 
 **Plans**: TBD
 **UI hint**: yes
@@ -102,14 +104,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: Browser and processor payment paths handle delayed states, SDK failures, unsafe input, and sensitive data without leaking secrets or misleading shoppers.
 **Mode:** mvp
 **Depends on**: Phase 4
-**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09
 **Success Criteria** (what must be TRUE):
 
   1. User receives distinct approved, rejected, and pending or inconclusive browser confirmation outcomes.
   2. User sees bounded polling or clear fallback behavior when payment confirmation is pending instead of an immediate hard failure.
   3. User can recover from a failed Nuvei SDK script load without duplicate script injection.
   4. Operator can diagnose failures from redacted logs while secrets, checksums, session tokens, PAN-adjacent values, and sensitive raw payload fields remain protected.
-  5. Malformed, oversized, unauthenticated, or disallowed-origin frontend and webhook requests are rejected predictably.
+  5. Malformed, oversized, unauthenticated, non-HTTPS processor URL, or disallowed-origin frontend and webhook requests are rejected predictably.
 
 **Plans**: TBD
 **UI hint**: yes
@@ -135,14 +137,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: Operators can deploy, verify, observe, and recover the card connector using instructions and runbooks that match the repository and sandbox evidence.
 **Mode:** mvp
 **Depends on**: Phase 6
-**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06
+**Requirements**: OPS-01, OPS-02, OPS-03, OPS-04, OPS-05, OPS-06, OPS-07
 **Success Criteria** (what must be TRUE):
 
   1. Operator can follow README, deployment, testing, and operations docs whose commands match the actual npm/package-lock repository layout.
   2. Operator can verify Connect deployment configuration, post-deploy, and pre-undeploy behavior in a real environment.
   3. Operator can configure Nuvei DMN URL, environment, checksum policy, and sandbox credentials using documented verification steps.
-  4. Operator can use health/status checks and runbooks to diagnose failed authorization, missing DMN, invalid checksum, failed capture, failed refund, auth-scope failure, CORS/session failure, and Nuvei outage.
+  4. Operator can use health/status checks and runbooks to diagnose failed authorization, missing DMN, invalid checksum, failed capture, failed refund, auth-scope failure, CORS/session failure, Nuvei outage, and checksum algorithm mismatch.
   5. User and operator-facing readiness claims match observed sandbox evidence and known limitations.
+  6. Public docs contain one checksum algorithm policy and one package-manager command strategy.
 
 **Plans**: TBD
 
@@ -151,13 +154,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: Future payment methods are introduced only when each method has its own setup, browser flow, reconciliation mapping, fixtures, observability, and runbooks.
 **Mode:** mvp
 **Depends on**: Phase 7
-**Requirements**: PMTH-01, PMTH-02, PMTH-03, PMTH-04, PMTH-05
+**Requirements**: PMTH-01, PMTH-02, PMTH-03, PMTH-04, PMTH-05, CUST-01
 **Success Criteria** (what must be TRUE):
 
   1. Operator can decide whether Apple Pay, Google Pay, an APM, stored payments, or chargeback handling is ready based on method-specific Nuvei setup and evidence.
   2. User only sees a newly enabled payment method after its browser flow, Nuvei parameters, DMN mapping, operations support, fixtures, and runbook are complete.
   3. Developer can add one payment method through the shared registry without weakening card reconciliation guarantees.
   4. Operator can observe and recover method-specific failures with the same safety bar as card payments.
+  5. Developer can enable custom storefront direct usage only after hosted Checkout and Payment Only card reconciliation are proven and protected by the same auth, session, fixture, and runbook guarantees.
 
 **Plans**: TBD
 **UI hint**: yes

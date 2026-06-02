@@ -1,0 +1,36 @@
+{
+  "source_path": "docs/ARCHITECTURE.md",
+  "type": "DOC",
+  "confidence": "high",
+  "manifest_override": true,
+  "title": "Architecture",
+  "summary": "Describes the Nuvei commercetools Connector architecture, payment flow, endpoint authentication, transaction mapping, Nuvei API surface, and file structure.",
+  "scope": [
+    "Nuvei commercetools Connector",
+    "enabler assets application",
+    "processor service application",
+    "Nuvei Simply Connect widget",
+    "commercetools Payment records",
+    "DMN webhooks",
+    "endpoint authentication models",
+    "transaction type mapping",
+    "transaction state mapping",
+    "Nuvei API operations",
+    "SHA-256 checksums",
+    "Custom Types policy",
+    "project file structure"
+  ],
+  "cross_refs": [
+    "https://www.nuvei.com/",
+    "https://www.commercetools.com/",
+    "https://docs.commercetools.com/connect/templates/payment-integration",
+    "PLAN.md",
+    "docs/DEPLOYMENT.md",
+    "docs/NUVEI_SETUP.md",
+    "docs/OPERATIONS.md",
+    "docs/TESTING.md"
+  ],
+  "locked": false,
+  "precedence": null,
+  "notes": ""
+}

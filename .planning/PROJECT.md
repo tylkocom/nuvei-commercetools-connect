@@ -24,11 +24,15 @@ Card-first Nuvei payments must reconcile correctly and safely between browser Ch
 
 - [ ] Prove Nuvei sandbox DMN payload correlation for real authorization, decline, 3DS, capture, cancel, refund, duplicate, and mismatch events.
 - [ ] Harden DMN processing so events map to exactly one commercetools Payment, reject unsafe mismatches, and remain idempotent.
+- [ ] Add replay-safe DMN handling that treats checksum-valid unsigned fields as untrusted until revalidated against Nuvei/API/payment state.
+- [ ] Make session-authenticated payment creation idempotent per cart/session so retries cannot create unbounded Nuvei orders or CT Payments.
 - [ ] Make Checkout-facing enabler and processor contracts explicit, validated, and aligned for supported payment methods.
 - [ ] Replace hardcoded browser billing data with correct Checkout/session/cart/shopper-derived data or explicit validated enabler options.
+- [ ] Require allowlisted merchant return URLs and HTTPS processor URLs, with local HTTP allowed only in explicit development mode.
 - [ ] Improve frontend resilience for Nuvei SDK loading and delayed/inconclusive confirmation states.
 - [ ] Validate Complete Checkout and Payment Only flows end to end in a commercetools sandbox.
 - [ ] Standardize package manager/build/deployment documentation against the actual repository layout.
+- [ ] Resolve Nuvei DMN checksum algorithm policy to one public behavior and remove conflicting MD5/SHA-256 guidance.
 - [ ] Add CI quality gates for processor and enabler installs, builds, and tests.
 - [ ] Update public docs so readiness claims match observed sandbox and operational evidence.
 
