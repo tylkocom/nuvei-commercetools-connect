@@ -69,7 +69,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **TEST-01**: Local mock commercetools scenarios cover payment creation, confirmation, DMN, capture, cancel, refund, and ledger inspection.
 - [ ] **TEST-02**: Sanitized Nuvei fixtures cover success, failure, duplicate, malformed, amount mismatch, currency mismatch, missing correlation, 3DS, capture, cancel, and refund cases.
 - [x] **TEST-03**: Processor route-level tests cover `/payments`, `/payments/confirmPayments/:id`, `/payment-components`, `/payment-intents/:id`, and `/webhooks/nuvei`.
-- [ ] **TEST-04**: Enabler tests cover card mount, SDK load success/failure/retry, processor errors, declined payment results, and confirmation pending/failure states.
+- [x] **TEST-04**: Enabler tests cover card mount, SDK load success/failure/retry, processor errors, declined payment results, and confirmation pending/failure states.
 - [ ] **TEST-05**: CI installs dependencies, builds, and runs tests for both `processor` and `enabler` using the chosen package strategy.
 - [ ] **TEST-06**: CI or documented release checks prevent README/deployment command drift from recurring.
 
@@ -163,7 +163,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | TEST-01 | Phase 6 | Pending |
 | TEST-02 | Phase 6 | Pending |
 | TEST-03 | Phase 6 | Complete |
-| TEST-04 | Phase 6 | Pending |
+| TEST-04 | Phase 6 | Complete |
 | TEST-05 | Phase 6 | Pending |
 | TEST-06 | Phase 6 | Pending |
 | OPS-01 | Phase 7 | Pending |
