@@ -48,15 +48,15 @@ The current codebase is a working first-pass implementation, but the project is 
 
 | Technology | Version / Policy | Purpose | Why |
 |------------|------------------|---------|-----|
-| npm | Recommended: npm workspaces with one root `package.json` and one root `package-lock.json`; interim: continue package-local `npm ci` in `processor/` and `enabler/` | Deterministic installs and CI/deployment parity | Current evidence says the repository has `processor/package-lock.json` and `enabler/package-lock.json`, no root manifest, and docs that incorrectly advertise root `pnpm` commands. npm workspaces are built into npm and support running scripts across workspaces without adding a second toolchain. |
-| package-lock.json | Commit lockfiles; use `npm ci` in CI and Connect builds | Reproducible dependency graph | Payment connectors should not float transitive dependencies during deploy. Keep package locks aligned with the package manager actually used by Connect scripts. |
+| npm | Current policy: package-local npm commands with `processor/package-lock.json`, `enabler/package-lock.json`, and `testing/package-lock.json`; no root workspace manifest | Deterministic installs and CI/deployment parity | Current repository evidence shows no root `package.json` and no `pnpm-lock.yaml`. Use `npm --prefix <package>` or change into the package directory unless a deliberate workspace migration updates scripts, CI, and docs in the same phase. |
+| package-local lockfiles | Commit lockfiles; use `npm ci --prefix <package>` in CI and repeatable local checks | Reproducible dependency graph | Payment connectors should not float transitive dependencies during deploy. Keep package locks aligned with the package manager actually used by Connect scripts. |
 
 ### Backend Processor
 
 | Technology | Version / Policy | Purpose | Why |
 |------------|------------------|---------|-----|
 | Fastify | Keep Fastify 5.x; repo currently uses `fastify ^5.8.5` | HTTP service framework | Fastify current docs identify latest as v5.8.x. It is a good fit for small, schema-first Connect services, raw webhook bodies, request context, and low-overhead route handling. |
-| `@sinclair/typebox` + `@fastify/type-provider-typebox` | Keep; repo currently uses TypeBox `^0.34.49` and provider `^6.1.0` | Runtime request/response schemas with TypeScript inference | Use schemas for `/payments`, `/payments/confirm`, `/payment-intents/:id`, `/payment-components`, and webhook parse boundaries. Financial state changes must reject malformed input before business logic. |
+| `@sinclair/typebox` + `@fastify/type-provider-typebox` | Keep; repo currently uses TypeBox `^0.34.49` and provider `^6.1.0` | Runtime request/response schemas with TypeScript inference | Use schemas for `/payments`, `/payments/confirmPayments/:id`, `/payment-intents/:id`, `/payment-components`, and webhook parse boundaries. Financial state changes must reject malformed input before business logic. |
 | `fastify-raw-body` | Keep only for Nuvei DMN routes that require exact body verification | Webhook checksum validation | Nuvei checksum verification may depend on exact payload bytes/fields. Scope raw body capture narrowly; do not enable broad raw body handling for ordinary JSON routes. |
 | `@fastify/cors`, `@fastify/formbody`, `@fastify/request-context` | Keep where used | Browser calls, webhook/form payload support, request-scoped diagnostics | These fit the documented route model. CORS must be explicit for Checkout/Connect origins, not permissive by default. |
 | commercetools SDKs | Keep `@commercetools/connect-payments-sdk`, `@commercetools/platform-sdk`, and `@commercetools/sdk-client-v2` current within a tested lockfile | Connect auth, Payments, Payment Intents, and platform API calls | Use official SDKs rather than hand-rolled API clients for commercetools. Hand-roll only Nuvei calls where Nuvei has no fit-for-purpose package in this repo. |
@@ -66,7 +66,7 @@ The current codebase is a working first-pass implementation, but the project is 
 
 | Technology | Version / Policy | Purpose | Why |
 |------------|------------------|---------|-----|
-| Vite | Keep Vite library build; repo currently uses `vite ^8.0.10` | Build `connector-enabler.es.js` browser asset | Vite official docs support library mode for browser-oriented libraries and produce ESM output suitable for static asset hosting. The enabler is a thin browser library, not an app shell. |
+| Vite | Keep Vite library build; repo currently uses `vite ^8.0.10` | Build `enabler/public/connector-enabler.es.js` and `enabler/public/connector-enabler.umd.js` browser assets | Vite official docs support library mode for browser-oriented libraries and produce ESM/UMD output suitable for static asset hosting. The enabler is a thin browser library, not an app shell. |
 | TypeScript | Same major as processor | Public enabler contract and DTOs | Keep API types explicit for `NuveiEnabler` options, callbacks, component builders, and processor responses. Runtime validation is still required for shopper/session-provided values. |
 | Nuvei Web SDK script loader | Custom, small, tested loader | Load PSP-hosted browser components | Keep the loader small and deterministic: single insertion, concurrent caller sharing, retry after failed load, pinned URL/SRI process, no shopper secrets in DOM-visible config. |
 | `serve` | Dev/local preview only | Serve built static asset locally | OK as a local utility. Do not make `serve` part of production runtime; Connect serves assets. |
@@ -84,10 +84,10 @@ The current codebase is a working first-pass implementation, but the project is 
 
 | Technology | Version / Policy | Purpose | Why |
 |------------|------------------|---------|-----|
-| GitHub Actions | Recommended | Pull request and release validation | Repository currently has no CI according to project context. Add separate jobs for processor and enabler install, typecheck/build, and tests. Add Connect validation if the commercetools CLI is available in the release workflow. |
-| npm cache + `npm ci` | Required | Deterministic CI installs | CI must install exactly from lockfiles. Do not use `npm install` in CI because it may rewrite lockfiles. |
-| commercetools Connect validation | Required for release branches/tags | Catch descriptor/deployment issues before preview/publish | README claims CI validates Connect, but current project context says no CI exists. Make this real before relying on it. |
-| Release tags | Required | ConnectorStaged source versioning | Connect deployment flow uses repository releases/tags. CI should block tag/release creation or connector preview when package tests/builds fail. |
+| GitHub Actions | Existing Connect validation only | Pull request and release validation | `.github/workflows/connect-validate.yml` installs enabler and processor dependencies with Node.js 20, installs `@commercetools/cli@0.0.17`, and runs `commercetools connect validate .`. It does not currently run builds or Vitest suites. |
+| npm cache + `npm ci` | Required | Deterministic CI installs | CI must install exactly from lockfiles. Do not use `npm install` in CI validation jobs because it may rewrite lockfiles. |
+| commercetools Connect validation | Existing release/PR guard | Catch descriptor/deployment issues before preview/publish | Keep Connect descriptor validation, but add package builds and tests before relying on CI as a complete quality gate. |
+| Release tags | Required before connector publishing | ConnectorStaged source versioning | Connect deployment flow uses repository source versions. Release automation should block tag/release creation or connector preview when package tests/builds fail. |
 
 ### Observability And Operations
 
@@ -103,10 +103,10 @@ The current codebase is a working first-pass implementation, but the project is 
 
 | Area | Evidence | Recommendation |
 |------|----------|----------------|
-| Package layout | `processor/package.json` and `enabler/package.json` exist with separate lockfiles; project context says no root package manifest or `pnpm-lock.yaml`. README shows root `pnpm` commands. | Correct docs and CI to npm. Add root npm workspaces only as a deliberate cutover; otherwise document package-local npm commands. |
-| Processor stack | `processor` uses ESM, TypeScript, Fastify 5, TypeBox, commercetools SDKs, raw body, request context, Vitest. | Keep this stack. Invest in route schemas, idempotency, redacted logs, and sandbox fixture coverage rather than switching frameworks. |
-| Enabler stack | `enabler` uses ESM, TypeScript, Vite, Vitest, and `serve`; output is `public/connector-enabler.es.js`. | Keep Vite library build. Make SDK loading resilient and contract validation explicit before expanding payment methods. |
-| Documentation drift | README claims production-ready/MVP-complete and CI validation; project docs say production-critical gaps remain and no CI exists. | Treat docs as aspirational until sandbox E2E and CI exist. Roadmap should include documentation correction as production-readiness work. |
+| Package layout | `processor/package.json`, `enabler/package.json`, and `testing/package.json` exist with separate lockfiles; there is no root package manifest or `pnpm-lock.yaml`. | Keep docs and CI on package-local npm commands. Add root npm workspaces only as a deliberate cutover. |
+| Processor stack | `processor` uses ESM, TypeScript, Fastify 5, TypeBox, commercetools SDKs, raw body, request context, and Vitest. | Keep this stack. Invest in route schemas, idempotency, redacted logs, and sandbox fixture coverage rather than switching frameworks. |
+| Enabler stack | `enabler` uses ESM, TypeScript, Vite, Vitest, and `serve`; built output is `enabler/public/connector-enabler.es.js` and `enabler/public/connector-enabler.umd.js`. | Keep Vite library build. Make SDK loading resilient and contract validation explicit before expanding payment methods. |
+| Documentation drift | Regenerated docs now use package-local npm commands and avoid production-ready claims; `.planning/INGEST-CONFLICTS.md` records stale source-doc conflicts that were pruned or deferred. | Treat `.planning/` and generated canonical docs as source of truth. |
 | Core risk | Project context names card-first reconciliation correctness as core value. | Stack choices must optimize correctness, not payment-method breadth or framework novelty. |
 
 ## What Not To Use
@@ -137,7 +137,7 @@ The current codebase is a working first-pass implementation, but the project is 
 
 ## Sources
 
-- Repository evidence: `.planning/PROJECT.md`, `docs/ARCHITECTURE.md`, `docs/PLAN.md`, `docs/NEXT_STEPS_PLAN.md`, `README.md`, `processor/package.json`, `enabler/package.json`.
+- Repository evidence: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/INGEST-CONFLICTS.md`, `docs/ARCHITECTURE.md`, `README.md`, `processor/package.json`, `enabler/package.json`, and `testing/package.json`.
 - commercetools documentation: Payment integration template, including enabler/processor architecture and best practices for idempotency, fault tolerance, PCI compliance, request validation, duplicates, webhooks, retries, and testing (`https://docs.commercetools.com/connect/templates/payment-integration`).
 - commercetools documentation: Checkout connector/application model and Checkout modes (`https://docs.commercetools.com/checkout/connectors-and-applications`, `https://docs.commercetools.com/learning-implement-checkout/implement-commercetools-checkout/intro-to-commercetools-checkout`).
 - npm documentation: npm workspaces and workspace script execution (`https://docs.npmjs.com/cli/v11/using-npm/workspaces/`).
@@ -164,7 +164,7 @@ Architecture not yet mapped. Follow existing patterns found in the codebase.
 
 ## Project Skills
 
-No project skills found. Add skills to any of: `.claude/skills/`, `.agents/skills/`, `.cursor/skills/`, `.github/skills/`, or `.codex/skills/` with a `SKILL.md` index file.
+No project-specific skill directory is configured in this repository. If project-local skills are added later, put them under a documented agent-specific skills directory with the required index file for that agent runtime.
 <!-- GSD:skills-end -->
 
 <!-- GSD:workflow-start source:GSD defaults -->

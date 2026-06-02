@@ -674,7 +674,7 @@ Steps:
 2. Compare `connect.yaml` package manager assumptions with lockfiles.
 3. Confirm `docs/DEPLOYMENT.md` references only implemented endpoints.
 4. Confirm `docs/TESTING.md` points to actual test locations.
-5. Confirm `PLAN.md` open gaps are either resolved or explicitly accepted.
+5. Confirm `.planning/PROJECT.md`, `.planning/REQUIREMENTS.md`, `.planning/ROADMAP.md`, and `.planning/INGEST-CONFLICTS.md` capture or explicitly defer previously documented gaps.
 
 Expected result:
 

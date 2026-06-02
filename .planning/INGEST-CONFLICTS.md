@@ -94,3 +94,31 @@ None.
 - Custom storefront direct usage: deferred to v2 as `CUST-01` unless explicitly promoted after hosted Checkout and Payment Only card reconciliation are proven.
 - Readiness claim drift: remains assigned to `OPS-06`; public docs must not claim production-ready status before sandbox E2E, reconciliation, fixtures, CI, and operations evidence exist.
 - Security-review refinements imported into requirements: `RECON-11`, `RECON-12`, `RECON-13`, `RECON-14`, `DATA-06`, and `SEC-09`.
+
+## Docs Prune Applied 2026-06-02
+
+Regenerated and verified canonical docs:
+
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CONFIGURATION.md`
+- `docs/GETTING-STARTED.md`
+- `docs/DEVELOPMENT.md`
+- `docs/TESTING.md`
+- `docs/DEPLOYMENT.md`
+
+Kept verified scenario catalog:
+
+- `docs/TEST_SCENARIOS.md`
+
+Pruned as migrated into `.planning/`, replaced by generated docs, or stale against current source:
+
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/NEXT_STEPS_PLAN.md`
+- `docs/NUVEI_SETUP.md`
+- `docs/OPERATIONS.md`
+- `docs/PAYMENT_CONFIRMATION_POLLING.md`
+- `docs/PLAN.md`
+- `docs/security-review.md`
+
+`AGENTS.md` was corrected and verified because it remains the canonical agent instruction file; `CLAUDE.md` remains a symlink to `AGENTS.md`.

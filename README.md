@@ -1,85 +1,264 @@
-# Nuvei Commercetools Connector
+<!-- generated-by: gsd-doc-writer -->
+# Nuvei commercetools Connector
 
-!!WIP
+A private commercetools Connect payment Connector that integrates Nuvei payments with commercetools Checkout and custom storefronts.
 
-A production-ready [commercetools Connect](https://docs.commercetools.com/connect) payment Connector for [Nuvei](https://www.nuvei.com/), designed to work natively with **commercetools Checkout** (Complete Checkout and Payment Only modes).
+## Installation
 
-## Architecture
+This repository contains two Connect applications and a local testing harness. Install dependencies per package from the repository root:
 
-This Connector follows the official commercetools [Payment Integration Template](https://docs.commercetools.com/connect/templates/payment-integration) architecture:
+```bash
+npm ci --prefix enabler
+npm ci --prefix processor
+npm ci --prefix testing
+```
 
-| Application | Type      | Purpose                                                                                              |
-| ----------- | --------- | ---------------------------------------------------------------------------------------------------- |
-| `enabler`   | `assets`  | Frontend library wrapping Nuvei Simply Connect widget. Served as static JS.                          |
-| `processor` | `service` | Backend orchestrating payment operations with Nuvei and updating commercetools Payment transactions. |
+The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there is no root-level `package.json` or workspace install command in this repository.
 
-## How it differs from the old Nuvei integration
+## Quick start
 
-- **No API Extensions.** The modern Connector does not block Payment creation via API Extensions. It uses Checkout sessions and direct Processor calls.
-- **No separate DMN service.** Webhook handling is built into the Processor app.
-- **Checkout compatible.** Works with Complete Checkout and Payment Only modes.
-- **Hosted by commercetools Connect.** No custom Docker/Kubernetes hosting.
-- **Session-based auth.** Uses JWT sessions instead of custom Basic Auth.
+1. Install package dependencies:
 
-## Deployment
+   ```bash
+   npm ci --prefix enabler
+   npm ci --prefix processor
+   ```
 
-1. Create a GitHub release (tag) from this repository.
-2. Create a **ConnectorStaged** in commercetools Connect pointing to this repo and tag.
-3. Request preview → test → publish as **private Connector**.
-4. Deploy to your project via Merchant Center or Connect API.
-5. Configure the DMN URL in your **Nuvei dashboard** using the URL printed by the `postDeploy` script.
+2. Build the frontend enabler and backend processor:
+
+   ```bash
+   npm run build --prefix enabler
+   npm run build --prefix processor
+   ```
+
+3. Validate the Connect descriptor with the same CLI version used by CI:
+
+   ```bash
+   npm install --global @commercetools/cli@0.0.17
+   commercetools connect validate .
+   ```
+
+4. Optional: run the local mocked commercetools harness:
+
+   ```bash
+   npm ci --prefix testing
+   npm start --prefix testing
+   ```
+
+   The mock server listens on `http://localhost:8089` by default and exposes `/ledger`, `/config`, `/payment-components`, `/payments`, `/payments/confirmPayments/payment-local-001`, `/webhooks/nuvei`, and `/payment-intents/payment-local-001`.
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `connect.yaml` | commercetools Connect deployment descriptor. Defines the `enabler` assets application, the `processor` service application, deployment scripts, and required configuration keys. |
+| `enabler/` | Browser-side Nuvei Simply Connect wrapper built with TypeScript and Vite. It exports `NuveiEnabler`, card component support, and embedded drop-in support. |
+| `processor/` | Fastify service that creates Nuvei payment sessions, confirms widget results, handles commercetools payment operations, and processes Nuvei DMN webhooks. |
+| `testing/` | Local Express mock server, Postman collection, environment file, and HTML test page for exercising connector flows with mocked commercetools state. |
+| `docs/` | Operational, deployment, architecture, testing, and Nuvei setup documentation. |
+
+## Usage examples
+
+### Mount the embedded Nuvei drop-in
+
+`enabler/src/index.ts` exports `NuveiEnabler`, `DropinType`, `PaymentMethod`, `CardComponentBuilder`, and `DropinEmbeddedBuilder`.
+
+```ts
+import { DropinType, NuveiEnabler } from "@nuvei-commercetools/enabler";
+
+const enabler = new NuveiEnabler({
+  processorUrl: "https://service-<id>.<region>.gcp.commercetools.app",
+  sessionId: "<checkout-session-id>",
+  merchantId: "<nuvei-merchant-id>",
+  merchantSiteId: "<nuvei-merchant-site-id>",
+  env: "test",
+  locale: "en",
+  onComplete: (result) => {
+    if (result.isSuccess) {
+      console.log(result.paymentReference, result.sessionToken);
+    }
+  },
+  onError: console.error,
+});
+
+const builder = await enabler.createDropinBuilder(DropinType.embedded);
+const dropin = builder.build({ showPayButton: true });
+dropin.mount("#payment-container");
+```
+
+Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments` endpoint to create a payment session, renders the embedded Nuvei widget into `#payment-container`, and calls `onComplete` after an approved widget result is confirmed through `POST /payments/confirmPayments/:id`.
+
+<!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
+
+### Create a payment session through the processor
+
+The processor registers payment routes under `/payments` in `processor/src/server/plugins/nuvei-payment.plugin.ts`.
+
+```bash
+curl -X POST "https://service-<id>.<region>.gcp.commercetools.app/payments" \
+  -H "Content-Type: application/json" \
+  -H "X-Session-ID: <checkout-session-id>" \
+  -d '{
+    "paymentMethodOptions": {
+      "card": {}
+    }
+  }'
+```
+
+Expected response shape:
+
+```json
+{
+  "cartId": "<cart-id>",
+  "sessionToken": "<nuvei-session-token>",
+  "paymentReference": "<commercetools-payment-id>",
+  "merchantReturnUrl": "<return-url>"
+}
+```
+
+Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The local testing guide also exercises an embedded drop-in body against the mock server.
+
+<!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
+
+### Inspect supported payment UI methods
+
+`enabler/src/payment-enabler/method-registry.ts` and the processor payment-components DTO advertise:
+
+```ts
+import {
+  getComponentPaymentMethods,
+  getDropinPaymentMethods,
+  PaymentMethod,
+} from "@nuvei-commercetools/enabler";
+
+console.log(getComponentPaymentMethods().map((method) => method.key));
+// ["card"]
+
+console.log(getDropinPaymentMethods().map((method) => method.key));
+// ["embedded"]
+
+console.log(PaymentMethod.card, PaymentMethod.embedded);
+// "card" "embedded"
+```
+
+Expected result: custom storefront or Checkout integration code can distinguish the card component from the transitional embedded drop-in without hard-coding display metadata.
+
+## Runtime behavior
+
+The connector follows the commercetools payment integration split defined in `connect.yaml`:
+
+- `enabler` is deployed as a Connect `assets` application and serves the browser bundle generated by Vite.
+- `processor` is deployed as a Connect `service` application on `/` and starts `node dist/index.js` after `npm run build --prefix processor`.
+- `processor` validates required configuration at startup in `processor/src/config/config.ts`.
+- `processor` exposes:
+  - `GET /payments` and `POST /payments` for payment session creation.
+  - `POST /payments/confirmPayments/:id` for confirming successful Nuvei widget results.
+  - `POST /webhooks/nuvei` for Nuvei DMN webhook processing with raw-body checksum validation.
+  - `GET /config`, `GET /status`, `GET /payment-components`, `POST /payment-intents/:id`, and `POST /transactions` for Connect payment operations.
+- `processor/src/services/nuvei-payment.service.ts` implements authorization, capture, cancel, refund, reverse, transaction creation, payment confirmation, and DMN reconciliation.
 
 ## Configuration
 
-See `connect.yaml` for all required environment variables. Key ones:
+Deployment configuration is declared in `connect.yaml`; runtime validation is implemented in `processor/src/config/config.ts`.
 
-| Variable                              | Description                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------------- |
-| `CTP_PROJECT_KEY`                     | commercetools project key                                                             |
-| `CTP_CLIENT_ID` / `CTP_CLIENT_SECRET` | API Client with `manage_payments`, `manage_checkout_payment_intents`, `view_sessions` |
-| `NUVEI_MERCHANT_ID`                   | From Nuvei dashboard                                                                  |
-| `NUVEI_MERCHANT_SITE_ID`              | From Nuvei dashboard                                                                  |
-| `NUVEI_SECRET_KEY`                    | From Nuvei dashboard                                                                  |
-| `NUVEI_API_BASE_URL`                  | Nuvei REST API endpoint                                                               |
+Required standard configuration:
 
-## DMN Setup
+| Variable | Description |
+| --- | --- |
+| `CTP_PROJECT_KEY` | commercetools project key. |
+| `CTP_AUTH_URL` | commercetools OAuth URL. Defaults to `https://auth.europe-west1.gcp.commercetools.com`. |
+| `CTP_API_URL` | commercetools API URL. Defaults to `https://api.europe-west1.gcp.commercetools.com`. |
+| `CTP_SESSION_URL` | Session API URL. Defaults to `https://session.europe-west1.gcp.commercetools.com`. |
+| `CTP_JWKS_URL` | JWKS URL for JWT validation. Defaults to `https://mc-api.europe-west1.gcp.commercetools.com/.well-known/jwks.json`. |
+| `CTP_JWT_ISSUER` | JWT issuer. Defaults to `https://mc-api.europe-west1.gcp.commercetools.com`. |
+| `CTP_CHECKOUT_URL` | Checkout API URL. Defaults to `https://checkout.europe-west1.gcp.commercetools.com`. |
+| `NUVEI_ENV` | Nuvei environment, `test` or `production`. Defaults to `test`. |
+| `NUVEI_MERCHANT_ID` | Nuvei merchant ID. |
+| `NUVEI_MERCHANT_SITE_ID` | Nuvei merchant site ID. |
+| `NUVEI_API_BASE_URL` | Nuvei API base URL. |
 
-After deploying the Connector, the `postDeploy` script logs the public webhook URL. You must manually paste this into:
+Required secured configuration:
 
-**Nuvei Dashboard → Settings → My Integration Settings → DMN URL**
+| Variable | Description |
+| --- | --- |
+| `CTP_CLIENT_ID` | commercetools API client ID. `connect.yaml` documents the required scopes. |
+| `CTP_CLIENT_SECRET` | commercetools API client secret. |
+| `NUVEI_SECRET_KEY` | Nuvei secret key used for signing API requests and validating DMN checksums. |
 
-Example: `https://service-xxx.europe-west1.gcp.commercetools.app/webhooks/nuvei`
+Optional configuration:
 
-## Development
+| Variable | Default | Description |
+| --- | --- | --- |
+| `NUVEI_DMN_CHECKSUM_ALGORITHM` | `sha256` | DMN checksum algorithm. Startup validation only accepts `sha256`. |
+| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated extra browser origins accepted by the processor CORS policy. |
+| `HEALTH_CHECK_TIMEOUT` | `5000` | Timeout used by processor status checks. |
+| `LOGGER_LEVEL` | `info` | Fastify logger level. |
+| `CONNECT_SERVICE_URL` | empty | Service URL used by connector deployment scripts and runtime integrations. |
+| `PORT` | `8080` | Processor listening port. |
+| `RETURN_URL` | empty | Optional merchant return URL. Must use HTTPS when set. |
+
+## Development commands
+
+Run commands from the repository root with `--prefix`:
+
+| Command | Description |
+| --- | --- |
+| `npm run dev --prefix enabler` | Start the Vite development server for the frontend enabler. |
+| `npm run build --prefix enabler` | Type-check and build the enabler bundle into `enabler/public/`. |
+| `npm run start --prefix enabler` | Serve `enabler/public` on port 8080 with CORS enabled. |
+| `npm run serve --prefix enabler` | Build the enabler, then serve `enabler/public` on port 3000 with CORS enabled. |
+| `npm run test --prefix enabler` | Run enabler Vitest tests through `enabler/scripts/run-vitest.mjs`. |
+| `npm run dev --prefix processor` | Start the Fastify processor from `processor/src/index.ts` using `tsx`. |
+| `npm run build --prefix processor` | Remove `processor/dist` and compile TypeScript. |
+| `npm start --prefix processor` | Start the built processor with `node dist/index.js`. |
+| `npm run test --prefix processor` | Run processor Vitest tests through `processor/scripts/run-vitest.mjs`. |
+| `npm start --prefix testing` | Start the local mocked commercetools test server. |
+
+## Testing
+
+Run both package test suites:
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build both packages
-pnpm run build
-
-# Type-check
-pnpm run typecheck
-
-# Run tests
-pnpm run test
-
-# Lint
-pnpm run lint
+npm run test --prefix enabler
+npm run test --prefix processor
 ```
+
+For manual local flow testing, use the files in `testing/`:
+
+- `testing/mock-commercetools-server.mjs` starts the local mock server.
+- `testing/nuvei-local-mock-ct-test.html` provides a browser test page.
+- `testing/postman-nuvei-connector-local-testing.collection.json` and `testing/postman-local-mock-ct.environment.json` provide Postman coverage for the local mock flow.
+- `testing/nuvei-local-mock-ct-test.md` documents the local test scenarios, expected state transitions, and visibility points.
+
+## Deployment
+
+The Connect descriptor deploys:
+
+| Application | Connect type | Build artifact / entry point |
+| --- | --- | --- |
+| `enabler` | `assets` | Vite bundle served from `enabler/public/connector-enabler.es.js`. |
+| `processor` | `service` | `processor/dist/index.js` started by `npm start --prefix processor`. |
+
+`connect.yaml` configures processor deployment scripts:
+
+- `postDeploy`: `npm install && npm run connector:post-deploy`
+- `preUndeploy`: `npm install && npm run connector:pre-undeploy`
+
+After deployment, configure the Nuvei DMN URL in the Nuvei dashboard so Nuvei can call `POST /webhooks/nuvei` on the deployed processor.
+
+<!-- VERIFY: Confirm the deployed processor URL shown by the Connect deployment logs before configuring the Nuvei dashboard. -->
 
 ## CI validation
 
-Pull requests and pushes to `main` run `commercetools connect validate .` through the commercetools CLI. This catches Connect validation failures before Connector preview or publish.
+`.github/workflows/connect-validate.yml` runs on pull requests, pushes to `main`, and manual dispatch. The workflow:
 
-## Project Status
+1. Checks out the repository.
+2. Sets up Node.js 20 with npm cache entries for `enabler/package-lock.json` and `processor/package-lock.json`.
+3. Runs `npm ci --prefix enabler`.
+4. Runs `npm ci --prefix processor`.
+5. Installs `@commercetools/cli@0.0.17` globally.
+6. Runs `commercetools connect validate .`.
 
-MVP implementation complete. Supports:
+## License
 
-- Card payments via Nuvei Simply Connect (embedded drop-in)
-- Authorization-first flow with delayed capture for physical goods
-- Capture, cancel, and refund via Payment Intents API
-- DMN webhook processing with SHA-256 checksum validation
-- Complete Checkout and Payment Only modes
-- Custom checkout storefront direct usage
+No `LICENSE` file and no package-level `license` field were found in this repository. Treat usage and distribution terms as unspecified until a license is added.

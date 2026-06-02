@@ -1,185 +1,248 @@
+<!-- generated-by: gsd-doc-writer -->
 # Testing Guide
 
-## Unit Tests
+This repository has separate test suites for the browser enabler, the backend processor, and a local mocked commercetools harness for exercising connector flows without a real commercetools project.
 
-### Test Framework
+## Test framework and setup
 
-The project uses [vitest](https://vitest.dev/) as the test runner, which is already configured in the workspace.
+Both application packages use Vitest with TypeScript:
 
-### Running Tests
+| Package | Framework | Version | Config | Environment | Test include pattern |
+| --- | --- | --- | --- | --- | --- |
+| `enabler/` | Vitest | `^4.1.5` | `enabler/vitest.config.ts` | `node` | `test/**/*.test.ts` |
+| `processor/` | Vitest | `^4.1.5` | `processor/vitest.config.ts` | `node` | `test/**/*.test.ts` |
+
+Both packages also include `@vitest/coverage-v8` `^4.1.5`, but coverage thresholds are not configured.
+
+Install dependencies before running tests:
 
 ```bash
-# Run all tests
-pnpm test
-
-# Run tests in watch mode during development
-pnpm --filter processor exec vitest --watch
-
-# Run a specific test file
-pnpm --filter processor exec vitest src/clients/nuvei.client.test.ts
+npm ci --prefix enabler
+npm ci --prefix processor
 ```
 
-### Writing Unit Tests
+The GitHub validation workflow uses Node.js 20. No root-level `package.json` or workspace test command exists, so run package commands with `--prefix` from the repository root.
 
-Tests should be co-located with the source files they test:
+## Running tests
 
-```
-processor/src/
-├── clients/
-│   ├── nuvei.client.ts
-│   └── nuvei.client.test.ts        ← Unit tests for Nuvei client
-├── services/
-│   ├── payment-converter.ts
-│   ├── payment-converter.test.ts   ← Unit tests for payment converter
-│   └── converters/
-│       ├── nuvei-event.converter.ts
-│       └── nuvei-event.converter.test.ts  ← Unit tests for DMN converter
-└── routes/
-    ├── webhooks.ts
-    └── webhooks.test.ts            ← Route handler tests
+Run the full enabler suite:
+
+```bash
+npm run test --prefix enabler
 ```
 
-### Example Test
+Run the full processor suite:
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { mapNuveiTransactionType, mapNuveiStatus } from "./payment-converter";
-
-describe("mapNuveiTransactionType", () => {
-  it("maps Auth to Authorization", () => {
-    expect(mapNuveiTransactionType("Auth")).toBe("Authorization");
-  });
-
-  it("maps Sale to Charge", () => {
-    expect(mapNuveiTransactionType("Sale")).toBe("Charge");
-  });
-
-  it("maps Credit to Refund", () => {
-    expect(mapNuveiTransactionType("Credit")).toBe("Refund");
-  });
-
-  it("maps Void to CancelAuthorization", () => {
-    expect(mapNuveiTransactionType("Void")).toBe("CancelAuthorization");
-  });
-});
-
-describe("mapNuveiStatus", () => {
-  it("maps OK to Success", () => {
-    expect(mapNuveiStatus("OK")).toBe("Success");
-  });
-
-  it("maps FAIL to Failure", () => {
-    expect(mapNuveiStatus("FAIL")).toBe("Failure");
-  });
-
-  it("maps unknown to Pending", () => {
-    expect(mapNuveiStatus("PENDING")).toBe("Pending");
-  });
-});
+```bash
+npm run test --prefix processor
 ```
 
-### Key Areas to Test
+Run both package suites from the repository root:
 
-| Module                     | What to Test                                                          |
-| -------------------------- | --------------------------------------------------------------------- |
-| `nuvei.client.ts`          | Checksum calculation, request signing, error handling, DMN validation |
-| `payment-converter.ts`     | Transaction type mapping, status mapping, interfaceCode derivation    |
-| `nuvei-event.converter.ts` | DMN body parsing, cent amount conversion, timestamp parsing           |
-| `webhooks.ts`              | Checksum validation, idempotency, error responses                     |
-| `payments.ts`              | openOrder flow, capture/cancel/refund flows                           |
+```bash
+npm run test --prefix enabler
+npm run test --prefix processor
+```
 
-## Test Cards
+Run one processor test file:
 
-### Successful Transactions
+```bash
+npm run test --prefix processor -- test/unit/routes/nuvei-payment.route.test.ts
+```
 
-| Card Number        | Brand      | 3DS | Scenario              |
-| ------------------ | ---------- | --- | --------------------- |
-| `4000027891380961` | Visa       | No  | Standard approval     |
-| `4000023104448253` | Visa       | Yes | 3DS enrolled approval |
-| `5111168888888888` | Mastercard | No  | MC standard approval  |
+Run one enabler test file:
 
-### Failed Transactions
+```bash
+npm run test --prefix enabler -- test/unit/payment-enabler.test.ts
+```
 
-| Card Number        | Scenario           |
-| ------------------ | ------------------ |
-| `4000020000000002` | Declined           |
-| `4000020000000051` | Insufficient funds |
-| `4000020000000069` | Expired card       |
-| `4000020000000119` | Lost card          |
+Run a processor test subset by directory:
 
-### 3DS Scenarios
+```bash
+npm run test --prefix processor -- test/unit/services
+```
 
-| Card Number        | Scenario              |
-| ------------------ | --------------------- |
-| `4000020000005376` | 3DS frictionless      |
-| `4000020000003222` | 3DS step-up challenge |
+Run a Vitest watch session for a package:
 
-> Always confirm with [Nuvei sandbox docs](https://docs.nuvei.com/integration/testing/testing-cards/) — test card numbers may change.
+```bash
+npm exec --prefix processor -- vitest --watch
+npm exec --prefix enabler -- vitest --watch
+```
 
-## Manual Testing Checklist
+Generate a local coverage report:
 
-Use this checklist for end-to-end verification in the sandbox:
+```bash
+npm run test --prefix processor -- --coverage
+npm run test --prefix enabler -- --coverage
+```
 
-### Deployment Verification
+`enabler/scripts/run-vitest.mjs` and `processor/scripts/run-vitest.mjs` wrap `vitest run` and forward most CLI arguments. They also translate legacy `--coverageReporters` arguments to Vitest's `--coverage.reporter` form.
 
-- [ ] Connector deploys without errors
-- [ ] `GET /health` returns `{"status":"ok"}`
-- [ ] `GET /status` returns all checks as `UP`
-- [ ] Post-deploy script logs the DMN URL
+## Writing new tests
 
-### Payment Flow
+Use `*.test.ts` files under each package's `test/` directory. The Vitest configs do not include source co-located tests, so new test files should stay under `enabler/test/` or `processor/test/` unless the config is intentionally changed.
 
-- [ ] Create a Checkout session in commercetools
-- [ ] Nuvei widget loads in the browser (enabler)
-- [ ] Complete a test card payment (card: `4000027891380961`)
-- [ ] commercetools Payment has an `Authorization` transaction (Success)
-- [ ] `paymentStatus.interfaceCode` is `authorized`
-- [ ] DMN was received and processed (check logs)
+Current test layout:
 
-### Capture
+```text
+enabler/test/unit/
+  api-service.test.ts
+  card.test.ts
+  dropin.test.ts
+  nuvei-sdk.test.ts
+  payment-enabler.test.ts
 
-- [ ] Trigger capture via Payment Intents API (`capturePayment` action)
-- [ ] commercetools Payment has a `Charge` transaction (Success)
-- [ ] `paymentStatus.interfaceCode` is `paid`
+processor/test/unit/
+  clients/nuvei.client.test.ts
+  contract/payment-method-contract.test.ts
+  fixtures/dmn.fixtures.ts
+  routes/dmn-webhook.route.test.ts
+  routes/nuvei-payment.route.test.ts
+  routes/operation.route.test.ts
+  routes/webhook.route.test.ts
+  services/ct-payment-creation.service.test.ts
+  services/dmn-processing.service.test.ts
+  services/nuvei-event.converter.test.ts
+  services/nuvei-payment.service.test.ts
+```
 
-### Cancel Authorization
+Recommended patterns from the existing suites:
 
-- [ ] Trigger cancel via Payment Intents API (`cancelPayment` action)
-- [ ] commercetools Payment has a `CancelAuthorization` transaction (Success)
-- [ ] `paymentStatus.interfaceCode` is `cancelled`
+- Import test APIs from `vitest`: `describe`, `it`, `expect`, `vi`, and lifecycle hooks such as `beforeEach` or `afterEach`.
+- Use `vi.mock(...)` for external modules before importing the class or route under test.
+- Use `vi.hoisted(...)` when mock functions need to be referenced inside mock factories and assertions.
+- Use `vi.stubGlobal(...)` and `vi.unstubAllGlobals()` for browser globals such as `fetch`.
+- Prefer small test helpers such as `makeEnablerOptions()`, `makeReply()`, `buildFastifyApp()`, and `createService()` to keep individual cases focused on behavior.
+- For Fastify routes, use `fastify.inject(...)` when validating request/response behavior at the framework boundary.
+- For Nuvei DMN scenarios, reuse or extend `processor/test/unit/fixtures/dmn.fixtures.ts` instead of duplicating webhook payloads inline.
 
-### Refund
+Focus new tests on externally visible behavior and invariants that can break payment processing:
 
-- [ ] Trigger refund via Payment Intents API (`refundPayment` action)
-- [ ] commercetools Payment has a `Refund` transaction (Success)
-- [ ] `paymentStatus.interfaceCode` is `refunded`
+| Area | What to cover |
+| --- | --- |
+| Enabler option validation | Invalid processor URLs, missing session or merchant fields, safe public errors without leaking secrets. |
+| Payment method registry | Supported method ordering and parity between enabler and processor advertised methods. |
+| Browser SDK loading | Duplicate script avoidance, SDK load failure handling, and callback behavior. |
+| Processor payment routes | Safe errors for unsupported methods, schema boundaries, successful session creation responses. |
+| Payment operations | Authorization, capture, cancel, reverse, refund, partial amounts, and over-refund protection. |
+| DMN processing | Checksum validation, duplicate notifications, amount/currency mismatch rejection, missing payment correlation. |
+| Nuvei client | Request signing, checksum validation, Nuvei status mapping, transport error handling. |
 
-### Error Handling
+## Coverage requirements
 
-- [ ] Declined card (`4000020000000002`) → Payment shows `Authorization` (Failure)
-- [ ] Invalid DMN checksum → Processor returns 400
-- [ ] Duplicate DMN → No duplicate transaction created
-- [ ] Missing/invalid session → Auth error returned
+No coverage threshold is configured in `enabler/vitest.config.ts`, `processor/vitest.config.ts`, package-level `package.json` files, or a separate coverage config file in this repository.
 
-## Browser Sandbox Testing
+| Type | Threshold |
+| --- | --- |
+| Lines | No coverage threshold configured. |
+| Branches | No coverage threshold configured. |
+| Functions | No coverage threshold configured. |
+| Statements | No coverage threshold configured. |
 
-For end-to-end testing with a real browser:
+Coverage can still be generated locally with Vitest's V8 provider because both packages install `@vitest/coverage-v8`:
 
-### Setup
+```bash
+npm run test --prefix processor -- --coverage
+npm run test --prefix enabler -- --coverage
+```
 
-1. Deploy the connector to a Connect preview environment.
-2. Create a commercetools Checkout session pointing to the deployed connector.
-3. Open the checkout page in Chrome.
+Before adding a threshold, make sure both package suites have stable coverage for route errors, DMN edge cases, and enabler browser callback paths.
 
-### Testing Approach
+## CI integration
 
-1. **Normal flow:** Complete payment with test card, verify DMN arrival, check CT Payment state.
-2. **3DS flow:** Use an enrolled card, complete the 3DS challenge, verify authorization.
-3. **Declined flow:** Use a declined card, verify the widget shows the error and CT Payment reflects failure.
-4. **Timeout flow:** Let a payment session expire, verify no stale state persists.
+CI is defined in `.github/workflows/connect-validate.yml`.
 
-### Using DevTools
+| Workflow | Trigger | Job | Test command |
+| --- | --- | --- | --- |
+| `Connect validation` | Pull requests, pushes to `main`, and manual `workflow_dispatch` | `validate-connect-app` | No test command is run. |
 
-- Monitor the **Network** tab for `/payments` and `/webhooks/nuvei` requests.
-- Check the **Console** for enabler errors.
-- Inspect the commercetools Payment via ImpEx or Merchant Center after each test.
+The workflow currently performs these steps:
+
+1. Checks out the repository.
+2. Sets up Node.js `20` with npm cache entries for `enabler/package-lock.json` and `processor/package-lock.json`.
+3. Runs `npm ci --prefix enabler`.
+4. Runs `npm ci --prefix processor`.
+5. Installs `@commercetools/cli@0.0.17` globally.
+6. Runs `commercetools connect validate .`.
+
+Because CI validates the Connect descriptor but does not run Vitest, run both package test suites locally before opening or merging changes.
+
+## Static quality gate
+
+Before manual payment testing, run the same baseline described in `docs/TEST_SCENARIOS.md`:
+
+```bash
+npm run test --prefix processor
+npm run build --prefix processor
+npm run test --prefix enabler
+npm run build --prefix enabler
+```
+
+Expected results:
+
+- Processor tests pass.
+- Processor TypeScript build succeeds.
+- Enabler tests pass.
+- Enabler TypeScript and Vite build succeeds.
+- `enabler/public/connector-enabler.es.js` and `enabler/public/connector-enabler.umd.js` are generated by the enabler build.
+
+## Local mocked commercetools harness
+
+The `testing/` package provides an Express mock server and browser test page for local connector testing:
+
+| File | Purpose |
+| --- | --- |
+| `testing/mock-commercetools-server.mjs` | Mock server with a local cart/payment ledger and connector-like endpoints. |
+| `testing/nuvei-local-mock-ct-test.html` | Browser test page for exercising enabler flows against a local processor or mock endpoints. |
+| `testing/nuvei-local-mock-ct-test.md` | Detailed local test procedure and expected observations. |
+| `testing/postman-local-mock-ct.environment.json` | Postman environment for local mock testing. |
+| `testing/postman-nuvei-connector-local-testing.collection.json` | Postman collection for connector endpoint testing. |
+
+Install and start the harness:
+
+```bash
+npm ci --prefix testing
+npm start --prefix testing
+```
+
+The mock server defaults to port `8089` and exposes:
+
+```text
+GET  /
+GET  /ledger
+POST /reset
+GET  /config
+GET  /payment-components
+POST /payments
+POST /payments/confirmPayments/:id
+POST /webhooks/nuvei
+POST /payment-intents/:id
+```
+
+The fixed mock IDs are:
+
+| Item | Value |
+| --- | --- |
+| Cart ID | `cart-local-001` |
+| Payment ID | `payment-local-001` |
+| Amount | `10.00` |
+| Currency | `EUR` |
+
+Use the harness to verify connector behavior while watching browser DevTools, processor logs, tunnel inspector output, `/ledger`, and the Nuvei sandbox dashboard.
+
+## Manual sandbox scenarios
+
+`docs/TEST_SCENARIOS.md` is the source of truth for end-to-end functional scenarios. It covers static validation, configuration and status endpoints, supported payment components, card and drop-in authorization, 3DS, declines, capture, partial capture, cancel, refund, partial refund, reverse, DMN idempotency, invalid checksums, payment correlation failures, amount/currency mismatch, session auth rejection, Nuvei outage handling, custom storefront usage, deployment scripts, and documentation readiness.
+
+For each manual scenario, record:
+
+- Checkout mode: Complete Checkout, Payment Only, or custom storefront.
+- Cart ID, Payment ID, Order ID if created, Nuvei session token, and Nuvei transaction ID.
+- Browser result: success, decline, challenge, redirect, or error.
+- commercetools Payment transactions before and after DMN processing.
+- Nuvei dashboard transaction state.
+- Processor log excerpt for the request path.
+
+Use Nuvei sandbox test cards from Nuvei's current sandbox documentation. Do not hard-code production credentials or production card data in tests or documentation.
+
+<!-- VERIFY: Confirm the current Nuvei sandbox card numbers and 3DS challenge cards against the Nuvei testing-card documentation before executing payment scenarios, because external sandbox test data can change outside this repository. -->

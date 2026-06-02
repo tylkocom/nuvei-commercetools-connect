@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: phase_complete
+status: completed
 stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-06-02T17:35:47Z"
+last_updated: "2026-06-02T18:49:21.117Z"
 last_activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 11
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 
 ## Current Position
 
-Phase: 1 of 8 (Contract and Method Hardening)
+Phase: 1 of 7 (Contract and Method Hardening)
 Plan: 3 of 3 in current phase
 Status: Phase 1 complete; ready for Phase 2
 Last activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
@@ -81,7 +81,7 @@ None yet.
 
 - Phase 2 depends on real Nuvei sandbox and commercetools Checkout evidence for DMN correlation, 3DS behavior, and operation payloads.
 - Production rollout remains out of scope until sandbox E2E, reconciliation, fixtures, CI, and operational runbooks are complete.
-- Docs ingest found warnings that must be resolved before pruning: checksum algorithm policy, stale endpoint names, stale package-manager commands, and readiness claim drift.
+- Docs were pruned after ingest: canonical docs were regenerated/verified, migrated/stale docs were removed, and remaining checksum policy cleanup is tracked by OPS-07.
 - Security-review findings were imported as planning refinements: unsigned DMN field revalidation, replay protection, HTTPS processorUrl, return URL allowlist, payment creation idempotency, and money-moving amount bounds.
 
 ## Deferred Items
