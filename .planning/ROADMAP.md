@@ -13,7 +13,7 @@ This roadmap delivers a reconciliation-first Nuvei commercetools connector by ha
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Contract and Method Hardening** - Invalid inputs and unsupported methods fail before Nuvei or commercetools state is created.
+- [x] **Phase 1: Contract and Method Hardening** - Invalid inputs and unsupported methods fail before Nuvei or commercetools state is created.
 - [ ] **Phase 2: Nuvei Sandbox Evidence and Checkout Validation** - Real sandbox card, 3DS, operation, duplicate, and mismatch behavior is captured and Checkout card authorization is proven.
 - [ ] **Phase 3: Processor Reconciliation Correctness** - DMNs, frontend confirmation, and Payment Intents operations reconcile to the right commercetools Payment exactly once.
 - [ ] **Phase 4: Checkout Data and Metadata Correctness** - Card payment creation uses validated shopper, billing, return, locale, origin, and safe native Payment metadata.
@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-03-PLAN.md — Add cross-package parity tests proving processor advertisements, processor accepted methods, and enabler builders stay aligned.
+- [x] 01-03-PLAN.md — Add cross-package parity tests proving processor advertisements, processor accepted methods, and enabler builders stay aligned.
 
 **UI hint**: yes
 
@@ -169,7 +169,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Contract and Method Hardening | 2/3 | In Progress | - |
+| 1. Contract and Method Hardening | 3/3 | Complete | 2026-06-02 |
 | 2. Nuvei Sandbox Evidence and Checkout Validation | 0/TBD | Not started | - |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |

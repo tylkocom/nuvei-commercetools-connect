@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-06-02T17:27:05Z"
-last_activity: 2026-06-02 — Completed Phase 1 Plan 02 processor contract hardening.
+status: phase_complete
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-06-02T17:35:47Z"
+last_activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -26,25 +26,25 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 1 of 8 (Contract and Method Hardening)
-Plan: 2 of 3 in current phase
-Status: Plan 02 complete; ready for Plan 03
-Last activity: 2026-06-02 — Completed Phase 1 Plan 02 processor contract hardening.
+Plan: 3 of 3 in current phase
+Status: Phase 1 complete; ready for Phase 2
+Last activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
 
-Progress: [███████░░░] 67%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 2
-- Average duration: not recorded for latest plan
-- Total execution time: at least 3 min recorded
+- Total plans completed: 3
+- Average duration: at least 5 min recorded for latest plan
+- Total execution time: at least 8 min recorded
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| Phase 1 | 2 | at least 3 min recorded | not recorded for latest plan |
+| Phase 1 | 3 | at least 8 min recorded | not fully recorded |
 
 **Recent Trend:**
 
@@ -69,6 +69,7 @@ Recent decisions affecting current work:
 - [Phase 1 Plan 02]: Processor accepts exactly `card` and transitional `embedded`; `dropin` is not a processor payment method alias.
 - [Phase 1 Plan 02]: Missing processor payment method options default explicitly to `card` for the legacy GET/no-options path.
 - [Phase 1 Plan 02]: Processor setup failures use safe public `{ code, message }` responses with redacted route/service diagnostics.
+- [Phase 1 Plan 03]: Cross-package parity tests compare actual processor and enabler registries and keep `embedded` explicitly transitional with empty PSP metadata.
 
 ### Pending Todos
 
@@ -89,6 +90,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-02T17:27:05Z
-Stopped at: Completed 01-02-PLAN.md
-Resume file: .planning/phases/01-contract-and-method-hardening/01-02-SUMMARY.md
+Last session: 2026-06-02T17:35:47Z
+Stopped at: Completed 01-03-PLAN.md
+Resume file: .planning/phases/01-contract-and-method-hardening/01-03-SUMMARY.md
