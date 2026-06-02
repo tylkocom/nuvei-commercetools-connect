@@ -1,7 +1,27 @@
-*.log
+# OS
 .DS_Store
+
+# Environment
 .env
-build/
+
+# IDE
+.vite/
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
 dist/
-node_modules/
+
+# Build outputs
+build/
 public/
+
+# Dependencies
+node_modules/
+bun.lock
+pnpm-lock.yaml
+
+# Test coverage
+coverage/
