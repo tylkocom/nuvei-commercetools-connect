@@ -729,7 +729,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   /**
-   * Create a payment intent (openOrder) with Nuvei
+   * Create a payment session (openOrder) with Nuvei
    *
    * @remarks
    * Creates a Nuvei openOrder session and a corresponding CT Payment.
@@ -737,7 +737,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
    * @param options - Optional payment method options
    * @returns Promise with cartId, sessionToken, paymentReference, merchantReturnUrl
    */
-  public async createPaymentIntent(options?: unknown): Promise<{
+  public async createPaymentSession(options?: unknown): Promise<{
     cartId: string;
     sessionToken: string;
     paymentReference: string;
@@ -750,7 +750,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       const amountPlanned = await this.ctCartService.getPaymentAmount({ cart });
       const formattedAmount = this.formatAmount(amountPlanned);
 
-      log.info("Creating Nuvei payment intent via openOrder.", {
+      log.info("Creating Nuvei payment session via openOrder.", {
         cartId: cart.id,
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
@@ -775,7 +775,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       const config = getConfig();
       const merchantReturnUrl = getMerchantReturnUrlFromContext() || config.returnUrl;
 
-      log.info("Payment intent created successfully.", {
+      log.info("Payment session created successfully.", {
         cartId: cart.id,
         sessionToken: this.redactToken(sessionToken),
         paymentReference,
@@ -790,12 +790,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
     } catch (error) {
       if (error instanceof PaymentSetupError) {
         log.warn("Payment setup validation failed.", {
-          route: "POST /payments",
+          route: "POST /payments/session",
           code: error.code,
           ...error.diagnostics,
         });
       } else {
-        log.error("Error creating payment intent", {
+        log.error("Error creating payment session", {
           error: error instanceof Error ? error.message : String(error),
         });
       }

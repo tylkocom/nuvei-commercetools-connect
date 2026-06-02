@@ -38,37 +38,20 @@ type WebhookRoutesOptions = {
 /**
  * Payment routes for the Nuvei connector.
  *
- * GET / - Create a payment intent (backward compatible, no options)
- * POST / - Create a payment intent with payment method options
- * POST /confirmPayments/:id - Confirm a payment after Nuvei widget completion
+ * POST /session - Create a payment session with payment method options
+ * POST /confirm/:id - Confirm a payment after Nuvei widget completion
  */
 export const paymentRoutes = async (
   fastify: FastifyInstance,
   opts: FastifyPluginOptions & PaymentRoutesOptions,
 ) => {
-  // GET / - Backward compatible endpoint (no payment method options)
-  fastify.get<{ Reply: PaymentResponseSchemaDTO }>(
-    "/",
-    {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
-      schema: {
-        response: {
-          200: PaymentResponseSchema,
-        },
-      },
-    },
-    async (_, reply) => {
-      const resp = await opts.paymentService.createPaymentIntent();
-      return reply.status(200).send(resp);
-    },
-  );
 
-  // POST / - New endpoint with payment method options support
+  // POST /session - Create a payment session with payment method options support
   fastify.post<{
     Body: PaymentMethodOptionsSchemaDTO;
     Reply: PaymentResponseSchemaDTO | PublicPaymentErrorSchemaDTO;
   }>(
-    "/",
+    "/session",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
@@ -82,12 +65,12 @@ export const paymentRoutes = async (
     },
     async (request, reply) => {
       try {
-        const resp = await opts.paymentService.createPaymentIntent(request.body);
+        const resp = await opts.paymentService.createPaymentSession(request.body);
         return reply.status(200).send(resp);
       } catch (error) {
         if (error instanceof PaymentSetupError) {
           log.warn("Payment setup request rejected.", {
-            route: "POST /payments",
+            route: "POST /payments/session",
             code: error.code,
             ...error.diagnostics,
           });
@@ -104,12 +87,12 @@ export const paymentRoutes = async (
     Reply: { outcome: "approved" | "rejected" };
     Params: { id: string };
   }>(
-    "/confirmPayments/:id",
+    "/confirm/:id",
     {
       preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         params: {
-          $id: "paramsSchema",
+          $id: "confirmParamsSchema",
           type: "object",
           properties: {
             id: Type.String(),
