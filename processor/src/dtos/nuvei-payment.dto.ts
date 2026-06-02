@@ -6,6 +6,8 @@ export const PaymentResponseSchema = Type.Object({
   sessionToken: Type.String(),
   paymentReference: Type.String(),
   merchantReturnUrl: Type.String(),
+  amount: Type.Number(),
+  currency: Type.String(),
 });
 
 export type PaymentResponseSchemaDTO = Static<typeof PaymentResponseSchema>;

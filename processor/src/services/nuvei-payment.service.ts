@@ -805,6 +805,8 @@ export class NuveiPaymentService extends AbstractPaymentService {
     sessionToken: string;
     paymentReference: string;
     merchantReturnUrl: string;
+    amount: number;
+    currency: string;
   }> {
     try {
       const paymentMethod = this.validatePaymentMethodOptions(options);
@@ -849,6 +851,8 @@ export class NuveiPaymentService extends AbstractPaymentService {
         sessionToken,
         paymentReference,
         merchantReturnUrl,
+        amount: Number(formattedAmount),
+        currency: amountPlanned.currencyCode,
       };
     } catch (error) {
       if (error instanceof PaymentSetupError) {

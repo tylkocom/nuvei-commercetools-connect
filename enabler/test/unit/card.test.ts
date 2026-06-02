@@ -84,6 +84,8 @@ describe("CardComponent", () => {
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "ref-123",
+      amount: 10,
+      currency: "USD",
     });
 
     const builder = new CardComponentBuilder(makeEnablerOptions());
@@ -103,7 +105,9 @@ describe("CardComponent", () => {
     mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
-      paymentReference: "payment-ref-123",
+      paymentReference: "ref-123",
+      amount: 10,
+      currency: "USD",
     });
 
     const builder = new CardComponentBuilder(makeEnablerOptions());
@@ -118,6 +122,8 @@ describe("CardComponent", () => {
           env: "int",
           merchantId: "merchant-123",
           merchantSiteId: "site-456",
+          amount: 10,
+          currency: "USD",
           renderTo: "#container",
         }),
       ),
@@ -206,6 +212,8 @@ describe("CardComponent", () => {
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "ref-123",
+      amount: 10,
+      currency: "USD",
     });
 
     const builder = new CardComponentBuilder(makeEnablerOptions());
@@ -233,6 +241,8 @@ describe("CardComponent", () => {
     mockCreatePayment.mockResolvedValue({
       sessionToken: "known-session-token",
       paymentReference: "payment-ref-123",
+      amount: 10,
+      currency: "USD",
     });
 
     const builder = new CardComponentBuilder(makeEnablerOptions());

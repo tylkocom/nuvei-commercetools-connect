@@ -93,6 +93,8 @@ class DropinComponents implements DropinComponent {
         env: this.baseOptions.env === "test" ? "int" : "prod",
         merchantId: this.baseOptions.merchantId,
         merchantSiteId: this.baseOptions.merchantSiteId,
+        amount: paymentRes.amount,
+        currency: paymentRes.currency,
         locale: this.baseOptions.locale,
         country: "US",
         billingAddress: {

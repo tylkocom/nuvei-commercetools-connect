@@ -20,6 +20,8 @@ export type PaymentSessionResponse = {
   sessionToken: string;
   paymentReference: string;
   merchantReturnUrl?: string;
+  amount: number;
+  currency: string;
 };
 
 /**
