@@ -10,6 +10,9 @@
 # Logs
 *.log
 
+# commercetools Connect CLI
+.connect/
+
 # TypeScript
 *.tsbuildinfo
 dist/

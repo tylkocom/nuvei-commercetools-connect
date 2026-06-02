@@ -69,6 +69,10 @@ pnpm run test
 pnpm run lint
 ```
 
+## CI validation
+
+Pull requests and pushes to `main` run `commercetools connect validate .` through the commercetools CLI. This catches Connect validation failures before Connector preview or publish.
+
 ## Project Status
 
 MVP implementation complete. Supports:
