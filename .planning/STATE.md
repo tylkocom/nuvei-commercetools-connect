@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-06-02T18:49:21.117Z"
-last_activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
+status: verifying
+stopped_at: Completed 01.1-01-PLAN.md
+last_updated: "2026-06-02T19:46:03.807Z"
+last_activity: 2026-06-02 — Completed Phase 1.1 Plan 01 processor route cleanup and health endpoint.
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
-  percent: 11
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Card-first Nuvei payments must reconcile correctly and safely between browser Checkout, Nuvei, and commercetools Payments without duplicate, missing, or misattributed transactions.
-**Current focus:** Phase 1: Contract and Method Hardening
+**Current focus:** Phase 1.1: Processor API design cleanup and health endpoint
 
 ## Current Position
 
-Phase: 1 of 7 (Contract and Method Hardening)
-Plan: 3 of 3 in current phase
-Status: Phase 1 complete; ready for Phase 2
-Last activity: 2026-06-02 — Completed Phase 1 Plan 03 cross-package contract parity tests.
+Phase: 1.1 of 9 (Processor API design cleanup and health endpoint)
+Plan: 1 of 2 in current phase
+Status: Plan 01 complete; ready for Plan 02 caller/documentation updates
+Last activity: 2026-06-02 — Completed Phase 1.1 Plan 01 processor route cleanup and health endpoint.
 
-Progress: [██████████] 100%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: at least 5 min recorded for latest plan
-- Total execution time: at least 8 min recorded
+- Total execution time: at least 13 min recorded
 
 **By Phase:**
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 - Trend: N/A
 
 *Updated after each plan completion*
+| Phase 01.1 P01 | 5 min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 1 Plan 03]: Cross-package parity tests compare actual processor and enabler registries and keep `embedded` explicitly transitional with empty PSP metadata.
 - [Ingest docs]: Existing `.planning` remains canonical over stale docs for npm/package-local commands, current endpoint names, and `embedded` vs `dropin` terminology.
 - [Ingest docs]: Custom storefront direct usage is deferred to v2 unless explicitly promoted after hosted Checkout and Payment Only card reconciliation are proven.
+- [Phase 01.1]: Kept /payment-intents/:id and /webhooks/nuvei unchanged while renaming processor-owned payment session and confirm routes. — These paths are external platform/dashboard contracts; Plan 01 only cleans processor-owned API naming.
+- [Phase 01.1]: Added unauthenticated GET /health as a config-only 200 response that exposes no config values. — Infrastructure probes need a lightweight endpoint without Checkout JWTs or live CT/Nuvei network calls.
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-02T17:35:47Z
-Stopped at: Completed 01-03-PLAN.md
-Resume file: .planning/phases/01-contract-and-method-hardening/01-03-SUMMARY.md
+Last session: 2026-06-02T19:46:03.804Z
+Stopped at: Completed 01.1-01-PLAN.md
+Resume file: None

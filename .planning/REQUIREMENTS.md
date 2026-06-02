@@ -78,7 +78,7 @@ Requirements for the production-ready card-first connector. Each maps to roadmap
 - [ ] **OPS-01**: README, deployment, testing, and operations docs describe commands that match the actual repository package manager strategy.
 - [ ] **OPS-02**: Connect deployment configuration, post-deploy, and pre-undeploy scripts are verified in a real environment.
 - [ ] **OPS-03**: Nuvei dashboard setup for DMN URL, environment, checksum policy, and sandbox credentials is documented with verification steps.
-- [ ] **OPS-04**: `/health` and `/status` checks give operators actionable visibility into processor, commercetools, and Nuvei reachability.
+- [x] **OPS-04**: `/health` and `/status` checks give operators actionable visibility into processor, commercetools, and Nuvei reachability.
 - [ ] **OPS-05**: Runbooks exist for failed authorization, missing DMN, invalid checksum, failed capture, failed refund, auth-scope failure, CORS/session failure, and Nuvei outage.
 - [ ] **OPS-06**: Public readiness claims are updated to match observed sandbox evidence and known limitations.
 - [ ] **OPS-07**: Nuvei DMN checksum algorithm policy is resolved to one documented behavior and conflicting MD5/SHA-256 guidance is removed from public docs.
@@ -169,7 +169,7 @@ Which phases cover which v1 requirements. Updated during roadmap creation.
 | OPS-01 | Phase 7 | Pending |
 | OPS-02 | Phase 7 | Pending |
 | OPS-03 | Phase 7 | Pending |
-| OPS-04 | Phase 7 | Pending |
+| OPS-04 | Phase 7 | Complete |
 | OPS-05 | Phase 7 | Pending |
 | OPS-06 | Phase 7 | Pending |
 | OPS-07 | Phase 7 | Pending |

@@ -54,11 +54,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal:** Remove Stripe-template naming from the processor HTTP API surface, drop dead routes, and add GET /health for unauthenticated infra probes. All existing commercetools Checkout compatibility is preserved.
 **Requirements**: OPS-04
 **Depends on:** Phase 1
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 **Wave 1**
 
-- [ ] 01.1-01-PLAN.md — Processor route renames, GET /health endpoint, DTO fixes, and test updates.
+- [x] 01.1-01-PLAN.md — Processor route renames, GET /health endpoint, DTO fixes, and test updates.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
