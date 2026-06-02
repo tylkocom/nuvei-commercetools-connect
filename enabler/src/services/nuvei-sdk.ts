@@ -25,7 +25,7 @@ export interface NuveiResult {
 export const NUVEI_SDK_URL =
   "https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js";
 export const NUVEI_SDK_INTEGRITY =
-  "sha384-S5b4DOR5dVcXV9iTeCds2A4KbxfU7z9yv7cMfJA76JlXu9wnrgM7IqFstB7lT8Gv";
+  "sha384-jXz2SXPMCDTc9b7nqIihqgILPWC2weDLLfs1gpM/DQAKFgW0GDWAFtRcZHIJzlg1";
 
 let sdkLoadPromise: Promise<SafeChargeFactory> | undefined;
 
