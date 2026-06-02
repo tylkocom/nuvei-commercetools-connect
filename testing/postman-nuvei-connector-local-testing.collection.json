@@ -220,8 +220,61 @@
             ],
             "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
             "url": "{{processorBaseUrl}}/payments/confirm/{{paymentId}}",
-            "description": "Real processor POST /payments/confirm/:paymentId. Normal caller: enabler after Nuvei SDK onResult. Tests Nuvei getPaymentStatus verification and CT Payment transaction update."
-          }
+            "description": "Real processor POST /payments/confirm/:paymentId. Normal caller: enabler after Nuvei SDK onResult. Returns tri-state outcome: approved (HTTP 200), pending (HTTP 200), or rejected (HTTP 402). CT Authorization interactionId is always canonical PPP_TransactionID. Approved writes CT Authorization Success. Rejected writes CT Authorization Failure only when PPP_TransactionID is present. Pending writes no CT transaction."
+          },
+          "response": [
+            {
+              "name": "Approved - 200 outcome approved",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "X-Session-ID", "value": "{{sessionId}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+                "url": "{{processorBaseUrl}}/payments/confirm/{{paymentId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"outcome\": \"approved\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "Pending - 200 outcome pending",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "X-Session-ID", "value": "{{sessionId}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+                "url": "{{processorBaseUrl}}/payments/confirm/{{paymentId}}"
+              },
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"outcome\": \"pending\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "Rejected - 402 outcome rejected",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "X-Session-ID", "value": "{{sessionId}}" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": { "mode": "raw", "raw": "{\n  \"sessionToken\": \"{{sessionToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+                "url": "{{processorBaseUrl}}/payments/confirm/{{paymentId}}"
+              },
+              "status": "Payment Required",
+              "code": 402,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"outcome\": \"rejected\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
         },
         {
           "name": "06 Processor DMN Webhook Replay",
