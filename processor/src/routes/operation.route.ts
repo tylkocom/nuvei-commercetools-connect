@@ -15,6 +15,7 @@ import {
   PaymentIntentResponseSchemaDTO,
 } from "../dtos/operations/payment-intents.dto.js";
 import { StatusResponseSchema, StatusResponseSchemaDTO } from "../dtos/operations/status.dto.js";
+import { HealthResponseSchema, HealthResponseSchemaDTO } from "../dtos/operations/health.dto.js";
 import { AbstractPaymentService } from "../services/abstract-payment.service.js";
 import {
   TransactionDraft,
@@ -64,6 +65,21 @@ export const operationsRoute = async (
     async (_, reply) => {
       const status = await opts.paymentService.status();
       reply.code(200).send(status);
+    },
+  );
+
+  fastify.get<{ Reply: HealthResponseSchemaDTO }>(
+    "/health",
+    {
+      schema: {
+        response: {
+          200: HealthResponseSchema,
+        },
+      },
+    },
+    async (_, reply) => {
+      const result = await opts.paymentService.health();
+      return reply.status(200).send(result);
     },
   );
 

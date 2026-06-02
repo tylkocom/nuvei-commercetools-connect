@@ -17,6 +17,7 @@ import {
 import { SupportedPaymentComponentsSchemaDTO } from "../dtos/operations/payment-components.dto.js";
 import { TransactionDraftDTO, TransactionResponseDTO } from "../dtos/operations/transaction.dto.js";
 import { PaymentIntentResponseSchemaDTO } from "../dtos/operations/payment-intents.dto.js";
+import { HealthResponseSchemaDTO } from "../dtos/operations/health.dto.js";
 import { log } from "../libs/logger/index.js";
 
 export abstract class AbstractPaymentService {
@@ -53,6 +54,14 @@ export abstract class AbstractPaymentService {
    * @returns Promise with a list of status from different external systems
    */
   abstract status(): Promise<StatusResponse>;
+
+  /**
+   * Perform a lightweight config-var presence check.
+   *
+   * @remarks
+   * Returns ok/degraded without network calls.
+   */
+  abstract health(): Promise<HealthResponseSchemaDTO>;
 
   /**
    * Get supported payment components

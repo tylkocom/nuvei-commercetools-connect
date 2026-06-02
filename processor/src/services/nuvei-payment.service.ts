@@ -25,6 +25,7 @@ import {
   PaymentTransactions,
 } from "../dtos/operations/payment-intents.dto.js";
 import { TransactionDraftDTO, TransactionResponseDTO } from "../dtos/operations/transaction.dto.js";
+import { HealthResponseSchemaDTO } from "../dtos/operations/health.dto.js";
 import { AbstractPaymentService } from "./abstract-payment.service.js";
 import { getConfig } from "../config/config.js";
 import { appLogger, paymentSDK } from "../payment-sdk.js";
@@ -411,6 +412,34 @@ export class NuveiPaymentService extends AbstractPaymentService {
     })();
 
     return handler.body;
+  }
+
+  public async health(): Promise<HealthResponseSchemaDTO> {
+    const config = getConfig();
+    const required = [
+      { name: "CTP_PROJECT_KEY", value: config.projectKey },
+      { name: "CTP_CLIENT_ID", value: config.clientId },
+      { name: "CTP_CLIENT_SECRET", value: config.clientSecret },
+      { name: "CTP_AUTH_URL", value: config.authUrl },
+      { name: "CTP_API_URL", value: config.apiUrl },
+      { name: "CTP_SESSION_URL", value: config.sessionUrl },
+      { name: "CTP_CHECKOUT_URL", value: config.checkoutUrl },
+      { name: "CTP_JWKS_URL", value: config.jwksUrl },
+      { name: "CTP_JWT_ISSUER", value: config.jwtIssuer },
+      { name: "NUVEI_MERCHANT_ID", value: config.nuveiMerchantId },
+      { name: "NUVEI_MERCHANT_SITE_ID", value: config.nuveiMerchantSiteId },
+      { name: "NUVEI_SECRET_KEY", value: config.nuveiSecretKey },
+      { name: "NUVEI_API_BASE_URL", value: config.nuveiApiBaseUrl },
+    ];
+    const checks = required.map(({ name, value }) => ({
+      name,
+      status: value && value.trim().length > 0 ? ("ok" as const) : ("failed" as const),
+    }));
+
+    return {
+      status: checks.every((check) => check.status === "ok") ? "ok" : "degraded",
+      checks,
+    };
   }
 
   /**
