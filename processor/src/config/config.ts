@@ -1,3 +1,28 @@
+import { execFileSync } from "node:child_process";
+
+function resolveBuildCommit(): string {
+  const envCommit = [
+    process.env.GIT_COMMIT_SHA,
+    process.env.GITHUB_SHA,
+    process.env.VCS_REF,
+    process.env.COMMIT_SHA,
+  ].find((value) => value && value.trim().length > 0);
+
+  if (envCommit) {
+    return envCommit.trim();
+  }
+
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "unknown";
+  }
+}
+
 export const config = {
   // Required by Payment SDK
   projectKey: process.env.CTP_PROJECT_KEY || "payment-integration",
@@ -35,6 +60,7 @@ export const config = {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
+  buildCommit: resolveBuildCommit(),
 };
 
 export const getConfig = () => {

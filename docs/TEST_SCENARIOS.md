@@ -156,7 +156,7 @@ Steps:
 
 Expected result:
 
-- With valid config, CT permission checks are `UP`.
+- With valid config, the response includes the running commit hash and all CT permission checks are `UP`.
 - With valid config, Nuvei reachability is `UP`.
 - With invalid Nuvei config, the Nuvei check reports `DOWN` without leaking secrets.
 
@@ -166,7 +166,7 @@ Purpose: Confirm commercetools Checkout sees the same supported methods that the
 
 Steps:
 
-1. Send `GET {PROCESSOR_URL}/payment-components` with a valid JWT.
+1. Send `GET {PROCESSOR_URL}/operations/payment-components` with a valid JWT.
 2. Confirm `dropins` is empty.
 3. Confirm `components` contains `card`.
 4. Confirm unsupported production methods such as wallets or APMs are not advertised unless implemented.

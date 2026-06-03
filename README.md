@@ -145,7 +145,7 @@ The connector follows the commercetools payment integration split defined in `co
 - `processor` exposes:
   - `POST /payments/session` and `POST /payments/confirm/:id` for payment session creation and widget result confirmation. `POST /payments/confirm/:id` returns `{ outcome: "approved" | "rejected" | "pending" }` with HTTP `200` for approved and pending, `402` for rejected.
   - `POST /webhooks/nuvei` for Nuvei DMN webhook processing with raw-body checksum validation.
-  - `GET /config`, `GET /status`, `GET /payment-components`, `POST /payment-intents/:id`, and `POST /transactions` for Connect payment operations.
+  - `GET /config`, `GET /health`, `GET /status`, `GET /payment-components`, `POST /payment-intents/:id`, and `POST /transactions` for Connect payment operations. The same operation routes are also mounted under `/operations/*` for commercetools Checkout integration callbacks. `GET /health` reports config presence plus the running commit hash.
 - `processor/src/services/nuvei-payment.service.ts` implements authorization, capture, cancel, refund, reverse, transaction creation, payment confirmation, and DMN reconciliation.
 
 ## Configuration

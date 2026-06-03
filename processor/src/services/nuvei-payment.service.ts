@@ -476,6 +476,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     return {
       status: checks.every((check) => check.status === "ok") ? "ok" : "degraded",
+      commit: config.buildCommit,
       checks,
     };
   }

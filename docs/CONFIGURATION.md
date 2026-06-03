@@ -35,6 +35,8 @@ Do not expose `CTP_CLIENT_SECRET`, `NUVEI_SECRET_KEY`, or other credential value
 | `CTP_CHECKOUT_APPLICATION_KEY` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. Keep only if your deployment tooling or external setup requires it. |
 | `CTP_SCOPE` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. The required commercetools API scopes are documented in `connect.yaml` under `CTP_CLIENT_ID`. |
 
+The processor health endpoint reports the running commit hash using the first available value from `GIT_COMMIT_SHA`, `GITHUB_SHA`, `VCS_REF`, `COMMIT_SHA`, or the local Git checkout `HEAD`.
+
 ## Config file format
 
 ### Local dotenv files

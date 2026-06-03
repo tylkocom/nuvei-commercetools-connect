@@ -212,7 +212,7 @@ GET  /
 GET  /ledger
 POST /reset
 GET  /config
-GET  /payment-components
+GET  /operations/payment-components
 POST /payments/session
 POST /payments/confirm/:id
 POST /webhooks/nuvei

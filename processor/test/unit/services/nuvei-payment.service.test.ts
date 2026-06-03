@@ -37,8 +37,17 @@ vi.mock("../../../src/config/config", () => ({
     nuveiApiBaseUrl: "https://sandbox.safecharge.com",
     nuveiDmnChecksumAlgorithm: "sha256",
     projectKey: "test-project",
+    clientId: "client-id",
+    clientSecret: "client-secret",
+    authUrl: "https://auth.example.com",
+    apiUrl: "https://api.example.com",
+    sessionUrl: "https://session.example.com",
+    checkoutUrl: "https://checkout.example.com",
+    jwksUrl: "https://mc-api.example.com/.well-known/jwks.json",
+    jwtIssuer: "https://mc-api.example.com",
     healthCheckTimeout: 5000,
     returnUrl: "https://example.com/return",
+    buildCommit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
   }),
   config: {},
 }));
@@ -325,6 +334,37 @@ describe("NuveiPaymentService", () => {
       expect(checkResult.status).toBe("DOWN");
       expect(checkResult.details?.error).toBe("Connection refused");
       expect(mockNuveiClientInstance.isReachable).toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // health()
+  // -------------------------------------------------------------------------
+  describe("health()", () => {
+    it("returns config check status together with the running commit", async () => {
+      const { service } = createService();
+
+      const result = await service.health();
+
+      expect(result).toEqual({
+        status: "ok",
+        commit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+        checks: [
+          { name: "CTP_PROJECT_KEY", status: "ok" },
+          { name: "CTP_CLIENT_ID", status: "ok" },
+          { name: "CTP_CLIENT_SECRET", status: "ok" },
+          { name: "CTP_AUTH_URL", status: "ok" },
+          { name: "CTP_API_URL", status: "ok" },
+          { name: "CTP_SESSION_URL", status: "ok" },
+          { name: "CTP_CHECKOUT_URL", status: "ok" },
+          { name: "CTP_JWKS_URL", status: "ok" },
+          { name: "CTP_JWT_ISSUER", status: "ok" },
+          { name: "NUVEI_MERCHANT_ID", status: "ok" },
+          { name: "NUVEI_MERCHANT_SITE_ID", status: "ok" },
+          { name: "NUVEI_SECRET_KEY", status: "ok" },
+          { name: "NUVEI_API_BASE_URL", status: "ok" },
+        ],
+      });
     });
   });
 

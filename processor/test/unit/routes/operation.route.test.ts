@@ -231,31 +231,47 @@ describe("operation routes", () => {
     expect(healthRoute!.method).toBe("GET");
   });
 
-  it("GET /health returns 200 with ok status when all checks pass", async () => {
+  it("GET /health returns 200 with commit and ok status when all checks pass", async () => {
     const healthRoute = app.routes.find((r) => r.url === "/health");
     const okChecks = [
       { name: "CTP_PROJECT_KEY", status: "ok" },
       { name: "NUVEI_SECRET_KEY", status: "ok" },
     ];
-    paymentService.health.mockResolvedValueOnce({ status: "ok", checks: okChecks });
+    paymentService.health.mockResolvedValueOnce({
+      status: "ok",
+      commit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+      checks: okChecks,
+    });
     const reply = makeReply();
     await healthRoute!.handler({}, reply);
     expect(paymentService.health).toHaveBeenCalledOnce();
     expect(reply.status).toHaveBeenCalledWith(200);
-    expect(reply.send).toHaveBeenCalledWith({ status: "ok", checks: okChecks });
+    expect(reply.send).toHaveBeenCalledWith({
+      status: "ok",
+      commit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+      checks: okChecks,
+    });
   });
 
-  it("GET /health returns 200 with degraded status when a check fails", async () => {
+  it("GET /health returns 200 with commit and degraded status when a check fails", async () => {
     const healthRoute = app.routes.find((r) => r.url === "/health");
     const degradedChecks = [
       { name: "CTP_PROJECT_KEY", status: "ok" },
       { name: "NUVEI_SECRET_KEY", status: "failed" },
     ];
-    paymentService.health.mockResolvedValueOnce({ status: "degraded", checks: degradedChecks });
+    paymentService.health.mockResolvedValueOnce({
+      status: "degraded",
+      commit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+      checks: degradedChecks,
+    });
     const reply = makeReply();
     await healthRoute!.handler({}, reply);
     expect(reply.status).toHaveBeenCalledWith(200);
-    expect(reply.send).toHaveBeenCalledWith({ status: "degraded", checks: degradedChecks });
+    expect(reply.send).toHaveBeenCalledWith({
+      status: "degraded",
+      commit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+      checks: degradedChecks,
+    });
   });
 
   it("registers /payment-intents/:id route that extracts params and calls modifyPayment()", async () => {

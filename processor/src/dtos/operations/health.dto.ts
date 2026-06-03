@@ -7,6 +7,7 @@ export const HealthCheckItemSchema = Type.Object({
 
 export const HealthResponseSchema = Type.Object({
   status: Type.Union([Type.Literal("ok"), Type.Literal("degraded")]),
+  commit: Type.String(),
   checks: Type.Array(HealthCheckItemSchema),
 });
 

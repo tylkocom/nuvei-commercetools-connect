@@ -87,10 +87,10 @@ graph TD
 | --- | --- | --- | --- | --- |
 | `GET` | `/config` | `processor/src/routes/operation.route.ts` | commercetools session header | Return frontend Nuvei environment, merchant ID, and merchant site ID. |
 | `GET` | `/status` | `processor/src/routes/operation.route.ts` | JWT | Run commercetools permission and Nuvei reachability checks. |
-| `GET` | `/health` | `processor/src/routes/operation.route.ts` | None | No auth. Returns `{ status: ok|degraded, checks: [{name, status}] }` based on config-var presence. |
-| `GET` | `/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return supported components and express methods. |
-| `POST` | `/payment-intents/:id` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_payment_intents` | Capture, cancel, refund, or reverse a payment intent. |
-| `POST` | `/transactions` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_transactions` | Create a server-driven Nuvei order and commercetools Payment for a cart. |
+| `GET` | `/health` | `processor/src/routes/operation.route.ts` | None | No auth. Returns `{ status: ok|degraded, commit: string, checks: [{name, status}] }` based on config-var presence plus the running commit hash. |
+| `GET` | `/payment-components`, `/operations/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return supported components and express methods. |
+| `POST` | `/payment-intents/:id`, `/operations/payment-intents/:id` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_payment_intents` | Capture, cancel, refund, or reverse a payment intent. |
+| `POST` | `/transactions`, `/operations/transactions` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_transactions` | Create a server-driven Nuvei order and commercetools Payment for a cart. |
 | `POST` | `/payments/session` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for the `card` payment method, defaulting to `card` if omitted. |
 | `POST` | `/payments/confirm/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a payment with Nuvei and return `{ outcome: "approved" \| "rejected" \| "pending" }`. HTTP `200` for approved and pending, `402` for rejected. CT `Authorization` `interactionId` uses canonical Nuvei `PPP_TransactionID` only. |
 | `POST` | `/webhooks/nuvei` | `processor/src/routes/nuvei-payment.route.ts` | Nuvei checksum/header hook | Process Nuvei DMN webhooks and reconcile Payment transactions. |

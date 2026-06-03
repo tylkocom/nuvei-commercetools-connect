@@ -143,7 +143,7 @@ Optional configuration used by the current source:
 
 ## Post-deployment verification
 
-Use implemented processor endpoints only. The source currently registers `/config`, `/status`, `/health`, `/payment-components`, `/payment-intents/:id`, `/transactions`, `/payments/session`, `/payments/confirm/:id`, and `/webhooks/nuvei`.
+Use implemented processor endpoints only. The source currently registers `/config`, `/status`, `/health`, `/payment-components`, `/payment-intents/:id`, `/transactions`, `/payments/session`, `/payments/confirm/:id`, and `/webhooks/nuvei`. Operation routes are also available under `/operations/*`, including `/operations/payment-components` for the commercetools Checkout Add payment integration flow.
 
 Recommended checks:
 
@@ -163,13 +163,13 @@ Recommended checks:
    curl https://<processor-service-url>/health
    ```
 
-   Expected response shape is `{ status: "ok"|"degraded", checks: [{ name, status }] }` and contains only configuration variable names, never values.
+   Expected response shape is `{ status: "ok"|"degraded", commit: string, checks: [{ name, status }] }` and contains only configuration variable names, never values.
 
 4. Call the authenticated payment components endpoint with a valid JWT:
 
    ```bash
    curl -H "Authorization: Bearer <jwt>" \
-     https://<processor-service-url>/payment-components
+     https://<processor-service-url>/operations/payment-components
    ```
 
    The current implementation advertises the `card` component only.
