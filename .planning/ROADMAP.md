@@ -49,6 +49,27 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 **UI hint**: yes
 
+### Phase 01.2: Enabler dual-mode Nuvei frontend integration (INSERTED)
+
+**Goal:** Add explicit NuveiSimplyConnectEnabler and NuveiWebSdkEnabler classes, remove embedded/drop-in support everywhere, split SDK loaders, migrate testing harness to examples/nuvei-web-ui, and remove Postman assets.
+**Requirements**: CONT-03, CONT-04, CONT-05, TEST-01, TEST-04
+**Depends on:** Phase 1
+**Plans:** 5 plans
+
+**Wave 1** *(parallel — no shared files)*
+
+- [ ] 01.2-01-PLAN.md — Remove embedded from processor registry and DropinType enum; update parity test skeleton to card-only.
+- [ ] 01.2-02-PLAN.md — Delete dropin-embedded.ts; rename nuvei-sdk.ts → simply-connect-sdk.ts; remove embedded from enabler registry and public API.
+- [ ] 01.2-03-PLAN.md — Scaffold examples/nuvei-web-ui npm package; migrate mock CT server, tunnel, e2e scripts; delete Postman assets.
+
+**Wave 2** *(blocked on Wave 1 — 01.2-02 specifically)*
+
+- [ ] 01.2-04-PLAN.md — Implement Web SDK card path (web-sdk.ts loader, WebSdkCardComponent); add NuveiSimplyConnectEnabler, NuveiWebSdkEnabler, NuveiEnabler facade; unit tests for both modes.
+
+**Wave 3** *(blocked on Waves 1 and 2)*
+
+- [ ] 01.2-05-PLAN.md — Finalize cross-package parity tests; add examples/nuvei-web-ui/index.html mode selector; update docs.
+
 ### Phase 01.1: Processor API design cleanup and health endpoint (INSERTED)
 
 **Goal:** Remove Stripe-template naming from the processor HTTP API surface, drop dead routes, and add GET /health for unauthenticated infra probes. All existing commercetools Checkout compatibility is preserved.
