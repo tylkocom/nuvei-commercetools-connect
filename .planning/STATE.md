@@ -80,6 +80,10 @@ Recent decisions affecting current work:
 - [Phase 01.1-processor-api-design-cleanup-and-health-endpoint]: [Phase 01.1 Plan 02]: Removed getPayment from the enabler API contract after GET /payments was dropped. — Enabler callers now use POST /payments/session and POST /payments/confirm/:id exclusively.
 - [Phase 01.1-processor-api-design-cleanup-and-health-endpoint]: [Phase 01.1 Plan 02]: Local mock and manual test docs mirror the renamed processor routes. — Route stale checks now cover enabler, testing, and docs for old confirmPayments and bare POST /payments references.
 
+### Roadmap Evolution
+
+- Phase 9 added: Harden secret handling and log redaction, as discussed above
+
 ### Pending Todos
 
 None yet.

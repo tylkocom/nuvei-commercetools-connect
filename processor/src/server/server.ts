@@ -1,15 +1,30 @@
 import autoLoad from "@fastify/autoload";
 import cors from "@fastify/cors";
 import fastifyFormBody from "@fastify/formbody";
+import rawBody from "fastify-raw-body";
 import Fastify from "fastify";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config/config.js";
+import debugDumpPlugin from "./debug-dump.plugin.js";
 import { requestContextPlugin } from "../libs/fastify/context/context.js";
 import { errorHandler } from "../libs/fastify/error-handler.js";
-const rawBody = import("fastify-raw-body");
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function getMerchantCenterOrigin(jwtIssuer: string): string | undefined {
+  try {
+    const issuerUrl = new URL(jwtIssuer);
+    if (!issuerUrl.hostname.startsWith("mc-api.")) {
+      return undefined;
+    }
+
+    return `${issuerUrl.protocol}//${issuerUrl.hostname.replace(/^mc-api\./, "mc.")}`;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Setup Fastify server instance
@@ -47,8 +62,9 @@ export const setupFastify = async () => {
   server.setErrorHandler(errorHandler);
 
   // Enable CORS
+  const merchantCenterOrigin = getMerchantCenterOrigin(config.jwtIssuer);
   const allowedOrigins = new Set(
-    [config.checkoutUrl, ...config.corsAllowedOrigins].filter(Boolean),
+    [config.checkoutUrl, merchantCenterOrigin, ...config.corsAllowedOrigins].filter(Boolean),
   );
   await server.register(cors, {
     allowedHeaders: [
@@ -78,7 +94,6 @@ export const setupFastify = async () => {
   });
 
   // Register debug dump plugin manually (kept outside autoload dir to avoid double-registration)
-  const { default: debugDumpPlugin } = await import("./debug-dump.plugin.js");
   await server.register(debugDumpPlugin);
 
   return server;

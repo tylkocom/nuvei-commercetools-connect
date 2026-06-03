@@ -177,7 +177,7 @@ Runtime defaults from `processor/src/config/config.ts` are:
 | `CONNECT_SERVICE_URL` | Empty string | Used only by the post-deploy script for printing the DMN URL. |
 | `PORT` | `8080` | Parsed with `parseInt`. |
 | `RETURN_URL` | Empty string | Used only when no merchant return URL is present in request context. |
-| `CORS_ALLOWED_ORIGINS` | Empty list | Split on commas, trimmed, and empty entries removed. |
+| `CORS_ALLOWED_ORIGINS` | Empty list | Split on commas, trimmed, and empty entries removed. The Merchant Center origin derived from `CTP_JWT_ISSUER` and the configured Checkout URL are always allowed. |
 
 The Nuvei client has one additional internal default: request timeout is `10000` milliseconds when no timeout is passed to `NuveiClient`. The production singleton in `processor/src/clients/nuvei.client.ts` does not pass a timeout override.
 

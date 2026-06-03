@@ -230,3 +230,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 6. Regression Fixtures, Local Mock, and CI Gates | 0/TBD | Not started | - |
 | 7. Deployment and Operational Readiness | 0/TBD | Not started | - |
 | 8. Optional Payment Method Expansion | 0/TBD | Not started | - |
+
+### Phase 9: Harden secret handling and log redaction, as discussed above
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 9 to break down)

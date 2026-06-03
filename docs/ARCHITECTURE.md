@@ -177,7 +177,7 @@ The frontend enabler receives runtime configuration from its host application ra
 - Successful payment confirmations validate Nuvei-reported amount, currency, and cart identity before writing CT transactions. CT `Authorization` `interactionId` is always the canonical Nuvei `PPP_TransactionID`; `sessionToken` and optional fiscal `TransactionID` are never used as terminal transaction identity.
 - Successful DMNs validate Nuvei-reported amount, currency, cart identity, and `PPP_TransactionID` identity before updating commercetools Payment data.
 - Fastify sets defensive response headers (`x-content-type-options`, `referrer-policy`, `x-frame-options`, and `permissions-policy`) for all responses.
-- CORS allows requests with no `Origin`, the configured commercetools Checkout URL, and any explicitly configured `CORS_ALLOWED_ORIGINS`.
+- CORS allows requests with no `Origin`, the configured commercetools Checkout URL, the Merchant Center origin derived from `CTP_JWT_ISSUER`, and any explicitly configured `CORS_ALLOWED_ORIGINS`.
 - The Nuvei SDK script is loaded with a fixed subresource integrity hash from `enabler/src/services/nuvei-sdk.ts`.
 
 > **SECURITY GAP — requires follow-up:** Nuvei does not publish versioned CDN URLs for `safecharge.js`. The script is served from a mutable path (`/v1/websdk/safecharge.js`) that Nuvei can update at any time without notice. This means:
