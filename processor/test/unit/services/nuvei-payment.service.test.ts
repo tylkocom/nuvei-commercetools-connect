@@ -720,11 +720,9 @@ describe("NuveiPaymentService", () => {
   // confirmPayment()
   // -------------------------------------------------------------------------
   describe("confirmPayment()", () => {
-    it("returns pending for approved official-shaped status without PPP (legacy test updated for D-14)", async () => {
+    it("commits approved official-shaped status without PPP using Nuvei transactionId", async () => {
       const { service } = createService();
 
-      // Official-shaped getPaymentStatus response: only fiscal transactionId, no PPP variants.
-      // Without PPP, /confirm cannot safely write a canonical CT terminal record, so returns pending.
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
         status: "SUCCESS",
         transactionStatus: "APPROVED",
@@ -736,9 +734,17 @@ describe("NuveiPaymentService", () => {
 
       const result = await service.confirmPayment("payment-1", "session-token-1");
 
-      expect(result).toEqual({ outcome: "pending" });
-      // Must NOT use fiscal transactionId as interactionId (D-13)
-      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(result).toEqual({ outcome: "approved" });
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pspReference: "auth-tx-1",
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Success",
+            interactionId: "auth-tx-1",
+          }),
+        }),
+      );
     });
   });
   // -------------------------------------------------------------------------
@@ -816,7 +822,7 @@ describe("NuveiPaymentService", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
-    it("approved official-shaped status without PPP remains pending when no CT terminal exists", async () => {
+    it("approved status without PPP uses transactionId even when Initial session transaction exists", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(
         makeMockPayment({
@@ -841,11 +847,18 @@ describe("NuveiPaymentService", () => {
 
       const result = await service.confirmPayment("payment-1", "session-token-1");
 
-      expect(result).toEqual({ outcome: "pending" });
+      expect(result).toEqual({ outcome: "approved" });
       expect(mockNuveiClientInstance.getPaymentStatus).toHaveBeenCalledWith({
         sessionToken: "session-token-1",
       });
-      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            state: "Success",
+            interactionId: "fiscal-tx-1",
+          }),
+        }),
+      );
     });
 
     it("returns { outcome: 'approved' } for SUCCESS+APPROVED with canonical PPP_TransactionID (D-01, D-15)", async () => {
@@ -885,25 +898,31 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it("approved official-shaped status without PPP returns { outcome: 'pending' } and does not call updatePayment (D-03, D-04, D-09, D-14)", async () => {
+    it("approved status without any Nuvei transaction id uses session token as fallback id", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
-      // Official-shaped getPaymentStatus: has transactionId but NO PPP_TransactionID variants
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
         status: "SUCCESS",
         transactionStatus: "APPROVED",
-        transactionId: "fiscal-tx-1",
         amount: "10.00",
         currency: "USD",
       });
 
       const result = await service.confirmPayment("payment-1", "session-token-1");
 
-      expect(result).toEqual({ outcome: "pending" });
-      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(result).toEqual({ outcome: "approved" });
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pspReference: "session-token-1",
+          transaction: expect.objectContaining({
+            state: "Success",
+            interactionId: "session-token-1",
+          }),
+        }),
+      );
     });
 
-    it("rejected (DECLINED) without PPP returns { outcome: 'rejected' } and does not write CT terminal (D-05, D-06, D-12, D-14, D-16)", async () => {
+    it("rejected (DECLINED) without PPP writes Failure Authorization using transactionId", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
@@ -917,11 +936,19 @@ describe("NuveiPaymentService", () => {
       const result = await service.confirmPayment("payment-1", "session-token-1");
 
       expect(result).toEqual({ outcome: "rejected" });
-      // Must NOT write any CT terminal transaction (no sessionToken or fiscal ID fallback)
-      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pspReference: "fiscal-tx-1",
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Failure",
+            interactionId: "fiscal-tx-1",
+          }),
+        }),
+      );
     });
 
-    it("rejected (ERROR) without PPP returns { outcome: 'rejected' } and does not write CT terminal (D-16)", async () => {
+    it("rejected (ERROR) without PPP writes Failure Authorization using transactionId", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
@@ -933,7 +960,15 @@ describe("NuveiPaymentService", () => {
       const result = await service.confirmPayment("payment-1", "session-token-1");
 
       expect(result).toEqual({ outcome: "rejected" });
-      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Authorization",
+            state: "Failure",
+            interactionId: "fiscal-tx-1",
+          }),
+        }),
+      );
     });
 
     it("rejected with PPP_TransactionID writes one Failure Authorization using PPP as interactionId (D-16)", async () => {

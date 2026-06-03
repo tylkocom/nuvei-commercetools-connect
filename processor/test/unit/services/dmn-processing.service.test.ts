@@ -487,6 +487,44 @@ describe("NuveiPaymentService – DMN processing", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
       expect(mockConvertDmnToPaymentUpdate).not.toHaveBeenCalled();
     });
+
+    it("skips Auth DMN when confirm already recorded terminal success with fallback transactionId", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Success",
+              interactionId: "fiscal-tx-from-status",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "50001",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+
+      await service.processNuveiDmn(dmnDuplicateAuth);
+
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalled();
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
