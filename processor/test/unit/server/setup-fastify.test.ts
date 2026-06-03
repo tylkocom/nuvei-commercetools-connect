@@ -74,6 +74,30 @@ describe("setupFastify CORS", () => {
     }
   });
 
+  it("allows HTTPS commercetools.app origins", async () => {
+    const { setupFastify } = await import("../../../src/server/server");
+    const server = await setupFastify();
+
+    try {
+      server.get("/ping", async () => ({ ok: true }));
+
+      const origin = "https://service-mwh0z0m12vm2wvn1ck52y8hf.europe-west1.gcp.4.sandbox.commercetools.app";
+      const response = await server.inject({
+        method: "OPTIONS",
+        url: "/operations/config",
+        headers: {
+          origin,
+          "access-control-request-method": "GET",
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      expect(response.headers["access-control-allow-origin"]).toBe(origin);
+    } finally {
+      await server.close();
+    }
+  });
+
   it("does not treat '*' as a wildcard CORS origin", async () => {
     vi.resetModules();
     vi.doMock("../../../src/config/config", () => ({

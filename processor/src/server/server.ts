@@ -49,6 +49,15 @@ function deriveMerchantCenterOrigin(jwtIssuer: string): string | undefined {
   }
 }
 
+function isCommercetoolsAppOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && url.hostname.endsWith(".commercetools.app");
+  } catch {
+    return false;
+  }
+}
+
 function buildAllowedCorsOrigins(): ReadonlySet<string> {
   const origins = new Set<string>();
   const checkoutOrigin = normalizeOrigin(config.checkoutUrl);
@@ -70,7 +79,7 @@ function isAllowedCorsOrigin(origin: string | undefined, allowedOrigins: Readonl
   if (origin === undefined) return true;
 
   const normalizedOrigin = normalizeOrigin(origin);
-  return normalizedOrigin === origin && allowedOrigins.has(normalizedOrigin);
+  return normalizedOrigin === origin && (allowedOrigins.has(normalizedOrigin) || isCommercetoolsAppOrigin(normalizedOrigin));
 }
 
 function addSecurityHeaders(reply: FastifyReply): void {
