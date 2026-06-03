@@ -411,5 +411,5 @@ app.get("/mock-ct/payments/:id", (req, res) => {
 
 app.listen(port, () => {
   console.log(`Nuvei local mock CT server listening on http://localhost:${port}`);
-  console.log("Run from testing/: npm install && npm start");
+  console.log("Run from examples/nuvei-web-ui/: npm install && npm start");
 });

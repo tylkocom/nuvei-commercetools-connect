@@ -12,7 +12,6 @@ export {
   PAYMENT_METHOD_REGISTRY,
   SUPPORTED_PAYMENT_METHODS,
   getComponentPaymentMethods,
-  getDropinPaymentMethods,
   getPaymentMethodRegistryEntry,
   isSupportedPaymentMethod,
 } from "./method-registry.js";
@@ -60,13 +59,21 @@ function configInvalid(field: string, expectation: string): PaymentSetupError {
   );
 }
 
-export function methodUnsupported(method: string, kind: "component" | "dropin"): PaymentSetupError {
+export function methodUnsupported(method: string, kind: "component"): PaymentSetupError {
   return new PaymentSetupError(
     PublicPaymentErrorCode.METHOD_UNSUPPORTED,
     `Unsupported ${kind} payment method. Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
     { method, kind },
   );
 }
+export function modeUnsupported(mode: unknown): PaymentSetupError {
+  return new PaymentSetupError(
+    PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+    "Unsupported or missing Nuvei integration mode. Supported modes: simply-connect, web-sdk.",
+    { mode },
+  );
+}
+
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
@@ -111,7 +118,7 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
 }
 
 /**
- * Entry point for creating payment components and drop-in builders.
+ * Entry point for creating payment components.
  *
  * Usage:
  *   const enabler = new NuveiEnabler({
@@ -121,15 +128,14 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
  *     merchantSiteId: '…',
  *     env:          'test',
  *     onComplete:   (result) => { … },
- *   });
+ *   }, 'simply-connect');
  *
- *   const builder = await enabler.createDropinBuilder(DropinType.embedded);
- *   const dropin  = builder.build({ showPayButton: true });
- *   dropin.mount('#payment-container');
+ *   const builder = await enabler.createComponentBuilder(PaymentMethod.card);
+ *   const component = builder.build({ showPayButton: true });
+ *   component.mount('#payment-container');
  */
 export interface PaymentEnabler {
   createComponentBuilder(type: PaymentMethodKey | string): Promise<PaymentComponentBuilder>;
-  createDropinBuilder(type: DropinType | string): Promise<PaymentDropinBuilder>;
 }
 
 /**
@@ -155,22 +161,6 @@ export interface PaymentComponent {
 export interface PaymentComponentBuilder {
   componentHasSubmit?: boolean;
   build(config: ComponentOptions): PaymentComponent;
-}
-
-/**
- * Builds a {@link DropinComponent} from configuration.
- */
-export interface PaymentDropinBuilder {
-  dropinHasSubmit: boolean;
-  build(config: DropinOptions): DropinComponent;
-}
-
-/**
- * A mounted drop-in component (renders the full Nuvei Simply Connect widget).
- */
-export interface DropinComponent {
-  mount(selector: string): void;
-  submit(): void;
 }
 
 /**
@@ -224,19 +214,3 @@ export type ComponentOptions = {
   showPayButton?: boolean;
   onPayButtonClick?: () => Promise<void>;
 };
-
-/**
- * Options for drop-in component builders.
- */
-export type DropinOptions = {
-  showPayButton?: boolean;
-  onDropinReady?: () => Promise<void>;
-  onPayButtonClick?: () => Promise<void>;
-};
-
-/**
- * Supported drop-in rendering modes.
- */
-export enum DropinType {
-  embedded = "embedded",
-}

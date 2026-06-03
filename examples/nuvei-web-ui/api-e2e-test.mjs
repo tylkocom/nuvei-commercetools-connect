@@ -8,7 +8,7 @@
  * test page instead.
  *
  * Run with:
- *   node testing/api-e2e-test.mjs
+ *   node examples/nuvei-web-ui/api-e2e-test.mjs
  *
  * Prerequisites:
  *   - Processor running on PORT (default 8080)

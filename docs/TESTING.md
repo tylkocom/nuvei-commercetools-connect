@@ -88,9 +88,11 @@ Current test layout:
 enabler/test/unit/
   api-service.test.ts
   card.test.ts
-  dropin.test.ts
-  nuvei-sdk.test.ts
+  simply-connect-sdk.test.ts
+  web-sdk.test.ts
+  web-sdk-card.test.ts
   payment-enabler.test.ts
+```
 
 processor/test/unit/
   clients/nuvei.client.test.ts
@@ -188,21 +190,19 @@ Expected results:
 
 ## Local mocked commercetools harness
 
-The `testing/` package provides an Express mock server and browser test page for local connector testing:
+The `examples/nuvei-web-ui/` package provides the Express mock server and browser evidence harness for local connector testing:
 
 | File | Purpose |
 | --- | --- |
-| `testing/mock-commercetools-server.mjs` | Mock server with a local cart/payment ledger and connector-like endpoints. |
-| `testing/nuvei-local-mock-ct-test.html` | Browser test page for exercising enabler flows against a local processor or mock endpoints. |
-| `testing/nuvei-local-mock-ct-test.md` | Detailed local test procedure and expected observations. |
-| `testing/postman-local-mock-ct.environment.json` | Postman environment for local mock testing. |
-| `testing/postman-nuvei-connector-local-testing.collection.json` | Postman collection for connector endpoint testing. |
+| `examples/nuvei-web-ui/mock-commercetools-server.mjs` | Mock server with a local cart/payment ledger and connector-like endpoints. |
+| `examples/nuvei-web-ui/index.html` | Browser entry point for Simply Connect and Web SDK card modes. |
+| `examples/nuvei-web-ui/README.md` | Local setup, scripts, and evidence-capture workflow. |
 
 Install and start the harness:
 
 ```bash
-npm ci --prefix testing
-npm start --prefix testing
+npm install --prefix examples/nuvei-web-ui
+npm start --prefix examples/nuvei-web-ui
 ```
 
 The mock server defaults to port `8089` and exposes:
@@ -232,7 +232,7 @@ Use the harness to verify connector behavior while watching browser DevTools, pr
 
 ## Manual sandbox scenarios
 
-`docs/TEST_SCENARIOS.md` is the source of truth for end-to-end functional scenarios. It covers static validation, configuration and status endpoints, supported payment components, card and drop-in authorization, 3DS, declines, capture, partial capture, cancel, refund, partial refund, reverse, DMN idempotency, invalid checksums, payment correlation failures, amount/currency mismatch, session auth rejection, Nuvei outage handling, custom storefront usage, deployment scripts, and documentation readiness.
+`docs/TEST_SCENARIOS.md` is the source of truth for end-to-end functional scenarios. It covers static validation, configuration and status endpoints, supported payment components, card authorization in Simply Connect and Web SDK modes, 3DS, declines, capture, partial capture, cancel, refund, partial refund, reverse, DMN idempotency, invalid checksums, payment correlation failures, amount/currency mismatch, session auth rejection, Nuvei outage handling, custom storefront usage, deployment scripts, and documentation readiness.
 
 For each manual scenario, record:
 

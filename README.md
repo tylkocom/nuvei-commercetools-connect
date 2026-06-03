@@ -5,12 +5,12 @@ A private commercetools Connect payment Connector that integrates Nuvei payments
 
 ## Installation
 
-This repository contains two Connect applications and a local testing harness. Install dependencies per package from the repository root:
+This repository contains two Connect applications and a browser evidence harness in `examples/nuvei-web-ui/`. Install dependencies per package from the repository root:
 
 ```bash
 npm ci --prefix enabler
 npm ci --prefix processor
-npm ci --prefix testing
+npm ci --prefix examples/nuvei-web-ui
 ```
 
 The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there is no root-level `package.json` or workspace install command in this repository.
@@ -41,8 +41,8 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 4. Optional: run the local mocked commercetools harness:
 
    ```bash
-   npm ci --prefix testing
-   npm start --prefix testing
+   npm ci --prefix examples/nuvei-web-ui
+   npm start --prefix examples/nuvei-web-ui
    ```
 
    The mock server listens on `http://localhost:8089` by default and exposes `/ledger`, `/config`, `/payment-components`, `/payments`, `/payments/confirm/payment-local-001`, `/webhooks/nuvei`, and `/payment-intents/payment-local-001`.
@@ -52,19 +52,18 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 | Path | Purpose |
 | --- | --- |
 | `connect.yaml` | commercetools Connect deployment descriptor. Defines the `enabler` assets application, the `processor` service application, deployment scripts, and required configuration keys. |
-| `enabler/` | Browser-side Nuvei Simply Connect wrapper built with TypeScript and Vite. It exports `NuveiEnabler`, card component support, and embedded drop-in support. |
+| `enabler/` | Browser-side Nuvei wrapper built with TypeScript and Vite. It exports the explicit dual-mode card enablers and card component support. |
 | `processor/` | Fastify service that creates Nuvei payment sessions, confirms widget results, handles commercetools payment operations, and processes Nuvei DMN webhooks. |
-| `testing/` | Local Express mock server, Postman collection, environment file, and HTML test page for exercising connector flows with mocked commercetools state. |
+| `examples/nuvei-web-ui/` | Local Express mock server and browser evidence harness for exercising connector flows with mocked commercetools state. |
 | `docs/` | Operational, deployment, architecture, testing, and Nuvei setup documentation. |
 
 ## Usage examples
 
-### Mount the embedded Nuvei drop-in
+### Mount the card component
 
-`enabler/src/index.ts` exports `NuveiEnabler`, `DropinType`, `PaymentMethod`, `CardComponentBuilder`, and `DropinEmbeddedBuilder`.
-
+`enabler/src/index.ts` exports `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, `PaymentMethod`, `PaymentComponentBuilder`, `SimplyConnectCardBuilder`, and `WebSdkCardBuilder`.
 ```ts
-import { DropinType, NuveiEnabler } from "@nuvei-commercetools/enabler";
+import { NuveiEnabler } from "@nuvei-commercetools/enabler";
 
 const enabler = new NuveiEnabler({
   processorUrl: "https://service-<id>.<region>.gcp.commercetools.app",
@@ -79,14 +78,14 @@ const enabler = new NuveiEnabler({
     }
   },
   onError: console.error,
-});
+}, "simply-connect");
 
-const builder = await enabler.createDropinBuilder(DropinType.embedded);
-const dropin = builder.build({ showPayButton: true });
-dropin.mount("#payment-container");
+const builder = await enabler.createComponentBuilder("card");
+const component = builder.build({});
+component.mount("#payment-container");
 ```
 
-Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the embedded Nuvei widget into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback. `onComplete` is only called for approved outcomes.
+Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the card widget into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback. Pass `"web-sdk"` to the facade, or use `NuveiWebSdkEnabler` directly, to mount the Web SDK card mode and show the external Pay button. `onComplete` is only called for approved outcomes.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
@@ -116,7 +115,7 @@ Expected response shape:
 }
 ```
 
-Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The local testing guide also exercises an embedded drop-in body against the mock server.
+Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The local example harness exercises the same card body against the mock server.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
@@ -125,23 +124,16 @@ Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The loc
 `enabler/src/payment-enabler/method-registry.ts` and the processor payment-components DTO advertise:
 
 ```ts
-import {
-  getComponentPaymentMethods,
-  getDropinPaymentMethods,
-  PaymentMethod,
-} from "@nuvei-commercetools/enabler";
+import { getComponentPaymentMethods, PaymentMethod } from "@nuvei-commercetools/enabler";
 
 console.log(getComponentPaymentMethods().map((method) => method.key));
 // ["card"]
 
-console.log(getDropinPaymentMethods().map((method) => method.key));
-// ["embedded"]
-
-console.log(PaymentMethod.card, PaymentMethod.embedded);
-// "card" "embedded"
+console.log(PaymentMethod.card);
+// "card"
 ```
 
-Expected result: custom storefront or Checkout integration code can distinguish the card component from the transitional embedded drop-in without hard-coding display metadata.
+Expected result: custom storefront or Checkout integration code can distinguish the card component from the explicit mode enablers without hard-coding display metadata.
 
 ## Runtime behavior
 
@@ -222,12 +214,11 @@ npm run test --prefix enabler
 npm run test --prefix processor
 ```
 
-For manual local flow testing, use the files in `testing/`:
+For manual local flow testing, use the files in `examples/nuvei-web-ui/`:
 
-- `testing/mock-commercetools-server.mjs` starts the local mock server.
-- `testing/nuvei-local-mock-ct-test.html` provides a browser test page.
-- `testing/postman-nuvei-connector-local-testing.collection.json` and `testing/postman-local-mock-ct.environment.json` provide Postman coverage for the local mock flow.
-- `testing/nuvei-local-mock-ct-test.md` documents the local test scenarios, expected state transitions, and visibility points.
+- `examples/nuvei-web-ui/mock-commercetools-server.mjs` starts the local mock server.
+- `examples/nuvei-web-ui/index.html` provides the browser evidence page with the mode selector.
+- `examples/nuvei-web-ui/start-dmn-tunnel.mjs` exposes `/webhooks/nuvei` to the Nuvei sandbox.
 
 ## Deployment
 

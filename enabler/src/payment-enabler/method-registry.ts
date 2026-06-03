@@ -1,9 +1,8 @@
 export enum PaymentMethod {
   card = "card",
-  embedded = "embedded",
 }
 
-export type PaymentMethodKind = "component" | "dropin";
+export type PaymentMethodKind = "component";
 export type PaymentMethodKey = `${PaymentMethod}`;
 
 export type PaymentMethodRegistryEntry = {
@@ -22,14 +21,6 @@ export const PAYMENT_METHOD_REGISTRY = [
     advertisedType: PaymentMethod.card,
     displayName: "Nuvei card",
     transitional: false,
-    pspMetadata: {},
-  },
-  {
-    key: PaymentMethod.embedded,
-    kind: "dropin",
-    advertisedType: PaymentMethod.embedded,
-    displayName: "Nuvei embedded drop-in",
-    transitional: true,
     pspMetadata: {},
   },
 ] as const satisfies readonly PaymentMethodRegistryEntry[];
@@ -52,6 +43,3 @@ export function getComponentPaymentMethods(): readonly PaymentMethodRegistryEntr
   return PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component");
 }
 
-export function getDropinPaymentMethods(): readonly PaymentMethodRegistryEntry[] {
-  return PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin");
-}

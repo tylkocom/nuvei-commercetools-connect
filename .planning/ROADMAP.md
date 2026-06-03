@@ -56,19 +56,19 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on:** Phase 1
 **Plans:** 5 plans
 
-**Wave 1** *(parallel — no shared files)*
+**Wave 1** *(complete)*
 
-- [ ] 01.2-01-PLAN.md — Remove embedded from processor registry and DropinType enum; update parity test skeleton to card-only.
-- [ ] 01.2-02-PLAN.md — Delete dropin-embedded.ts; rename nuvei-sdk.ts → simply-connect-sdk.ts; remove embedded from enabler registry and public API.
-- [ ] 01.2-03-PLAN.md — Scaffold examples/nuvei-web-ui npm package; migrate mock CT server, tunnel, e2e scripts; delete Postman assets.
+- [x] 01.2-01-PLAN.md — Remove embedded from processor registry and DropinType enum; update parity test skeleton to card-only.
+- [x] 01.2-02-PLAN.md — Delete dropin-embedded.ts; rename nuvei-sdk.ts → simply-connect-sdk.ts; remove embedded from enabler registry and public API.
+- [x] 01.2-03-PLAN.md — Scaffold examples/nuvei-web-ui npm package; migrate mock CT server, tunnel, e2e scripts; delete Postman assets.
 
-**Wave 2** *(blocked on Wave 1 — 01.2-02 specifically)*
+**Wave 2** *(complete)*
 
-- [ ] 01.2-04-PLAN.md — Implement Web SDK card path (web-sdk.ts loader, WebSdkCardComponent); add NuveiSimplyConnectEnabler, NuveiWebSdkEnabler, NuveiEnabler facade; unit tests for both modes.
+- [x] 01.2-04-PLAN.md — Implement Web SDK card path (web-sdk.ts loader, WebSdkCardComponent); add NuveiSimplyConnectEnabler, NuveiWebSdkEnabler, NuveiEnabler facade; unit tests for both modes.
 
-**Wave 3** *(blocked on Waves 1 and 2)*
+**Wave 3** *(complete)*
 
-- [ ] 01.2-05-PLAN.md — Finalize cross-package parity tests; add examples/nuvei-web-ui/index.html mode selector; update docs.
+- [x] 01.2-05-PLAN.md — Finalize cross-package parity tests; add examples/nuvei-web-ui/index.html mode selector; update docs.
 
 ### Phase 01.1: Processor API design cleanup and health endpoint (INSERTED)
 

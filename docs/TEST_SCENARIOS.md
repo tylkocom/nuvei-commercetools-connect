@@ -15,7 +15,7 @@
 | [9. 3DS Frictionless Approval](#scenario-9-3ds-frictionless-approval) | Verifies frictionless 3DS approvals complete without shopper challenge and reconcile correctly. |
 | [10. 3DS Step-Up Challenge Approval](#scenario-10-3ds-step-up-challenge-approval) | Verifies challenge-based 3DS approvals complete and return to the expected checkout state. |
 | [11. 3DS Challenge Failure Or Abandonment](#scenario-11-3ds-challenge-failure-or-abandonment) | Verifies failed or abandoned 3DS flows do not create false successful payments. |
-| [12. Embedded Drop-In Success](#scenario-12-embedded-drop-in-success) | Verifies the embedded Nuvei drop-in path works if drop-in remains supported. |
+| [12. Dual-Mode Card Harness](#scenario-12-dual-mode-card-harness) | Verifies the example page can switch between Simply Connect and Web SDK card modes. |
 | [13. Unsupported Payment Method](#scenario-13-unsupported-payment-method) | Verifies unsupported payment methods are rejected by both enabler and processor. |
 | [14. Capture Authorized Payment](#scenario-14-capture-authorized-payment) | Verifies delayed capture settles a successful authorization using the correct Nuvei transaction. |
 | [15. Partial Capture](#scenario-15-partial-capture) | Verifies partial capture works correctly or is explicitly rejected as unsupported. |
@@ -167,10 +167,10 @@ Purpose: Confirm commercetools Checkout sees the same supported methods that the
 Steps:
 
 1. Send `GET {PROCESSOR_URL}/payment-components` with a valid JWT.
-2. Confirm `dropins` contains `embedded`.
+2. Confirm `dropins` is empty.
 3. Confirm `components` contains `card`.
 4. Confirm unsupported production methods such as wallets or APMs are not advertised unless implemented.
-5. Compare this response with `NuveiEnabler.createComponentBuilder()` and `NuveiEnabler.createDropinBuilder()` behavior.
+5. Compare this response with `NuveiSimplyConnectEnabler.createComponentBuilder()` and `NuveiWebSdkEnabler.createComponentBuilder()` behavior.
 
 Expected result:
 
@@ -185,7 +185,7 @@ Purpose: Confirm the browser asset loads Nuvei SafeCharge SDK reliably.
 Steps:
 
 1. Open a browser page that loads `connector-enabler.es.js` or `connector-enabler.umd.js` from the deployed enabler asset URL.
-2. Instantiate `NuveiEnabler` with valid `processorUrl`, `sessionId`, `merchantId`, `merchantSiteId`, and `env`.
+2. Instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler` with valid `processorUrl`, `sessionId`, `merchantId`, `merchantSiteId`, and `env`.
 3. Create a card component builder with `createComponentBuilder("card")`.
 4. Mount the card component into an empty container.
 5. Inspect DevTools Network for `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js`.
@@ -330,25 +330,24 @@ Expected result:
 - Failure state is recorded if Nuvei provides a final failed status.
 - Later DMNs do not incorrectly mark the payment successful.
 
-## Scenario 12: Embedded Drop-In Success
+## Scenario 12: Dual-Mode Card Harness
 
-Purpose: Confirm the embedded drop-in path works if it remains supported.
+Purpose: Confirm the example harness can switch between Simply Connect and Web SDK card modes.
 
 Steps:
 
-1. Start a Checkout or custom storefront test configured to use drop-in mode.
-2. Instantiate `NuveiEnabler`.
-3. Call `createDropinBuilder("embedded")`.
-4. Build and mount the drop-in.
-5. Complete an approving card payment through the rendered drop-in.
-6. Inspect CT Payment and Nuvei dashboard.
+1. Open `examples/nuvei-web-ui/index.html` in a browser.
+2. Select Simply Connect card mode and mount the card.
+3. Switch to Web SDK card mode and mount the card again.
+4. Confirm the Pay button appears only in Web SDK mode.
+5. Observe the result log for onComplete, onError, or onPending output.
 
 Expected result:
 
-- Drop-in renders.
-- Payment session is created with `paymentMethodOptions.dropin`.
-- Payment authorization succeeds.
-- CT Payment and Nuvei transaction states match.
+- The example page renders the mode selector and card container.
+- Simply Connect mode uses `NuveiSimplyConnectEnabler`.
+- Web SDK mode uses `NuveiWebSdkEnabler`.
+- The evidence harness can drive both card modes without additional payment UI variants.
 
 ## Scenario 13: Unsupported Payment Method
 
@@ -356,7 +355,7 @@ Purpose: Confirm unsupported payment methods fail predictably.
 
 Steps:
 
-1. In a browser harness, instantiate `NuveiEnabler`.
+1. In a browser harness, instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler`.
 2. Call `createComponentBuilder("applepay")` or another unsupported method.
 3. Observe the thrown error.
 4. Send `POST {PROCESSOR_URL}/payments` with `paymentMethodOptions` containing the same unsupported method.
@@ -636,7 +635,7 @@ Steps:
 
 1. Create a simple browser page that loads the enabler asset.
 2. Obtain a valid session ID through the merchant storefront or BFF flow.
-3. Instantiate `NuveiEnabler` with the deployed processor URL and session ID.
+3. Instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler` with the deployed processor URL and session ID.
 4. Mount the card component.
 5. Complete an approving sandbox payment.
 6. Inspect CT Payment and Nuvei dashboard.

@@ -319,14 +319,14 @@ describe("NuveiPaymentService", () => {
   });
 
   describe("processor payment method registry", () => {
-    it("accepts exactly card and transitional embedded", () => {
-      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
-      expect(isSupportedPaymentMethod("embedded")).toBe(true);
+    it("accepts exactly card", () => {
+      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card"]);
+      expect(isSupportedPaymentMethod("embedded")).toBe(false);
       expect(isSupportedPaymentMethod("dropin")).toBe(false);
-      expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "embedded")).toMatchObject({
-        kind: "dropin",
-        advertisedType: "embedded",
-        transitional: true,
+      expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "card")).toMatchObject({
+        kind: "component",
+        advertisedType: "card",
+        transitional: false,
         pspMetadata: {},
       });
     });
@@ -336,11 +336,11 @@ describe("NuveiPaymentService", () => {
   // getSupportedPaymentComponents()
   // -------------------------------------------------------------------------
   describe("getSupportedPaymentComponents()", () => {
-    it("returns registry-derived embedded dropin and card component", async () => {
+    it("returns registry-derived card component and no dropins", async () => {
       const { service } = createService();
       const result = await service.getSupportedPaymentComponents();
       expect(result).toEqual({
-        dropins: [{ type: "embedded" }],
+        dropins: [],
         components: [{ type: "card" }],
         express: [],
       });
@@ -553,21 +553,12 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it("passes paymentMethod 'embedded' when paymentMethodOptions contains embedded", async () => {
+    it("rejects unsupported payment method 'embedded' before Nuvei or commercetools side effects", async () => {
       const { service } = createService();
 
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
-      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-embedded" });
-
-      await service.createPaymentSession({ paymentMethodOptions: { embedded: {} } });
-
-      expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledOnce();
-      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
-        expect.objectContaining({
-          paymentMethod: "embedded",
-        }),
-      );
+      await expect(service.createPaymentSession({ paymentMethodOptions: { embedded: {} } })).rejects.toMatchObject({
+        code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      });
     });
 
     it("passes paymentMethod 'card' when no options are provided", async () => {
@@ -610,7 +601,7 @@ describe("NuveiPaymentService", () => {
     );
 
     it.each([
-      ["multiple method keys", { paymentMethodOptions: { card: {}, embedded: {} } }],
+      ["multiple method keys", { paymentMethodOptions: { card: {}, paypal: {} } }],
       ["no method keys", { paymentMethodOptions: {} }],
       ["empty method key", { paymentMethodOptions: { "": {} } }],
       ["non-object options", []],

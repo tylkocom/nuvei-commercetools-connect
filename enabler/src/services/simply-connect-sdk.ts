@@ -1,12 +1,12 @@
-/** Nuvei Simply Connect SDK loader. */
+/** Nuvei Simply Connect SDK loader (checkout.js / window.checkout). */
 
-/** @deprecated Use CheckoutResult for Simply Connect. Kept for api-service.ts compatibility. */
+/** @deprecated Use CheckoutResult. */
 export type NuveiResult = CheckoutResult;
 
 export interface CheckoutResult {
   transactionStatus: string;
   transactionId?: string;
-  errCode?: number;
+  errCode?: number | string;
   reason?: string;
   sessionToken?: string;
   userPaymentOptionId?: string;
@@ -40,23 +40,23 @@ declare global {
   }
 }
 
-export const NUVEI_SDK_URL =
+export const SIMPLY_CONNECT_SDK_URL =
   "https://cdn.safecharge.com/safecharge_resources/v1/checkout/checkout.js";
 
-let sdkLoadPromise: Promise<CheckoutFunction> | undefined;
+let scLoadPromise: Promise<CheckoutFunction> | undefined;
 
-export function loadNuveiSdk(): Promise<CheckoutFunction> {
+export function loadSimplyConnectSdk(): Promise<CheckoutFunction> {
   if (window.checkout) {
     return Promise.resolve(window.checkout);
   }
 
-  if (sdkLoadPromise) {
-    return sdkLoadPromise;
+  if (scLoadPromise) {
+    return scLoadPromise;
   }
 
-  sdkLoadPromise = new Promise<CheckoutFunction>((resolve, reject) => {
+  scLoadPromise = new Promise<CheckoutFunction>((resolve, reject) => {
     const existing = document.querySelector(
-      `script[src="${NUVEI_SDK_URL}"]`,
+      `script[src="${SIMPLY_CONNECT_SDK_URL}"]`,
     ) as HTMLScriptElement | null;
 
     if (existing) {
@@ -70,7 +70,7 @@ export function loadNuveiSdk(): Promise<CheckoutFunction> {
     }
 
     const script = document.createElement("script");
-    script.src = NUVEI_SDK_URL;
+    script.src = SIMPLY_CONNECT_SDK_URL;
     script.crossOrigin = "anonymous";
     script.referrerPolicy = "no-referrer";
     script.onload = () => {
@@ -84,5 +84,5 @@ export function loadNuveiSdk(): Promise<CheckoutFunction> {
     document.head.appendChild(script);
   });
 
-  return sdkLoadPromise;
+  return scLoadPromise;
 }

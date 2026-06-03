@@ -7,12 +7,12 @@
  * then prints the URL you need to paste into the Nuvei dashboard.
  *
  * Prerequisites:
- *   npm install --prefix testing ngrok
+ *   npm install --prefix examples/nuvei-web-ui ngrok
  *   # OR use localtunnel (free, no account):
- *   npm install --prefix testing localtunnel
+ *   npm install --prefix examples/nuvei-web-ui localtunnel
  *
  * Usage:
- *   node testing/start-dmn-tunnel.mjs
+ *   node examples/nuvei-web-ui/start-dmn-tunnel.mjs
  *
  * Then copy the printed HTTPS URL into:
  *   Nuvei Dashboard > Settings > My Integration Settings > DMN URL
@@ -31,20 +31,20 @@ console.log("");
 
 if (TUNNEL_PROVIDER === "ngrok") {
   console.log("Starting ngrok tunnel...");
-  console.log("(Make sure you ran: npm install --prefix testing ngrok)");
+  console.log("(Make sure you ran: npm install --prefix examples/nuvei-web-ui ngrok)");
   console.log("");
 
   const ngrok = spawn("npx", ["ngrok", "http", PROCESSOR_WEBHOOK_PORT, "--url", "nuvei-dmn-test"], {
-    cwd: "/home/wykwit/Documents/PRIV/tylko-nuvei/testing",
+    cwd: "/home/wykwit/Documents/PRIV/tylko-nuvei/examples/nuvei-web-ui",
     stdio: "inherit",
   });
 
   ngrok.on("error", (err) => {
     console.error("Failed to start ngrok:", err.message);
     console.error("\nInstall it with:");
-    console.error("  npm install --prefix testing ngrok");
+    console.error("  npm install --prefix examples/nuvei-web-ui ngrok");
     console.error("\nOr use localtunnel instead:");
-    console.error("  TUNNEL_PROVIDER=localtunnel node testing/start-dmn-tunnel.mjs");
+    console.error("  TUNNEL_PROVIDER=localtunnel node examples/nuvei-web-ui/start-dmn-tunnel.mjs");
     process.exit(1);
   });
 
@@ -54,7 +54,7 @@ if (TUNNEL_PROVIDER === "ngrok") {
   });
 } else if (TUNNEL_PROVIDER === "localtunnel") {
   console.log("Starting localtunnel...");
-  console.log("(Make sure you ran: npm install --prefix testing localtunnel)");
+  console.log("(Make sure you ran: npm install --prefix examples/nuvei-web-ui localtunnel)");
   console.log("");
 
   try {
@@ -93,7 +93,7 @@ if (TUNNEL_PROVIDER === "ngrok") {
   } catch (err) {
     console.error("Failed to start localtunnel:", err.message);
     console.error("\nInstall it with:");
-    console.error("  npm install --prefix testing localtunnel");
+    console.error("  npm install --prefix examples/nuvei-web-ui localtunnel");
     process.exit(1);
   }
 } else {

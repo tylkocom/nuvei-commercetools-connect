@@ -3,9 +3,9 @@ import { Static, Type } from "@sinclair/typebox";
 type PaymentComponentKind = "component" | "dropin";
 
 export type PaymentMethodRegistryEntry = {
-  key: "card" | "embedded";
+  key: "card";
   kind: PaymentComponentKind;
-  advertisedType: "card" | "embedded";
+  advertisedType: "card";
   displayName: string;
   transitional: boolean;
   pspMetadata: Record<string, never>;
@@ -26,14 +26,6 @@ export const PAYMENT_METHOD_REGISTRY = [
     transitional: false,
     pspMetadata: {},
   },
-  {
-    key: "embedded",
-    kind: "dropin",
-    advertisedType: "embedded",
-    displayName: "Nuvei embedded drop-in",
-    transitional: true,
-    pspMetadata: {},
-  },
 ] as const satisfies readonly PaymentMethodRegistryEntry[];
 
 export const SUPPORTED_PAYMENT_METHODS = PAYMENT_METHOD_REGISTRY.map((entry) => entry.key);
@@ -52,7 +44,6 @@ export function isSupportedPaymentMethod(method: string): method is SupportedPay
 }
 
 const DropinType = Type.Enum({
-  EMBEDDED: "embedded",
   HPP: "hpp",
 });
 
@@ -74,19 +65,13 @@ export const SupportedExpressPaymentData = Type.Object({
  *
  * Example:
  * {
- *   "dropins": [
- *     {
- *       "type": "embedded"
- *     }
- *   ],
+ *   "dropins": [],
  *   "components": [
  *     {
  *       "type": "card"
- *     },
- *     {
- *       "type": "applepay"
  *     }
- *   ]
+ *   ],
+ *   "express": []
  * }
  */
 export const SupportedPaymentComponentsSchema = Type.Object({

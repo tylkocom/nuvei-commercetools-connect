@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: completed
-stopped_at: Phase 1.2 context gathered
-last_updated: "2026-06-03T00:25:25.693Z"
-last_activity: 2026-06-02 — Completed Phase 1.1 processor API design cleanup and health endpoint.
+stopped_at: Phase 1.2 complete
+last_updated: "2026-06-03T02:09:52.231Z"
+last_activity: 2026-06-03 — Completed Phase 1.2 enabler dual-mode frontend integration.
 progress:
   total_phases: 11
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 27
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 13
+  percent: 36
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-02)
 
 **Core value:** Card-first Nuvei payments must reconcile correctly and safely between browser Checkout, Nuvei, and commercetools Payments without duplicate, missing, or misattributed transactions.
-**Current focus:** Phase 1.1: Processor API design cleanup and health endpoint
+**Current focus:** Phase 2: Nuvei Sandbox Evidence and Checkout Validation
 
 ## Current Position
 
-Phase: 1.1 of 9 (Processor API design cleanup and health endpoint)
-Plan: 2 of 2 in current phase
-Status: Plan 01 complete; ready for Plan 02 caller/documentation updates
-Last activity: 2026-06-02 — Completed Phase 1.1 processor API design cleanup and health endpoint.
+Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
+Plan: context gathered; ready for Phase 2 planning
+Status: Phase 1.2 complete; ready for Phase 2 planning
+Last activity: 2026-06-03 — Completed Phase 1.2 enabler dual-mode frontend integration.
 
-Progress: [████████░░] 80%
+Progress: [████░░░░░░] 36%
 
 ## Performance Metrics
 

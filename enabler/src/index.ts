@@ -1,62 +1,71 @@
 /**
- * Nuvei Simply Connect Enabler for commercetools Checkout.
+ * Nuvei Simply Connect / Web SDK Enabler for commercetools Checkout.
  *
- * This library wraps the Nuvei frontend widget and exposes a standard
+ * This library wraps the Nuvei frontend widgets and exposes a standard
  * interface that commercetools Checkout (and custom storefronts) can consume.
  */
 
 import type {
+  EnablerOptions,
   PaymentComponentBuilder,
-  PaymentDropinBuilder,
   PaymentEnabler,
 } from "./payment-enabler/payment-enabler.js";
 import {
-  DropinType,
   PaymentMethod,
-  getComponentPaymentMethods,
-  getDropinPaymentMethods,
   methodUnsupported,
+  modeUnsupported,
   validateEnablerOptions,
 } from "./payment-enabler/payment-enabler.js";
-import { DropinEmbeddedBuilder } from "./dropin/dropin-embedded.js";
-import { CardComponentBuilder } from "./components/card.js";
+import { SimplyConnectCardBuilder } from "./components/simply-connect-card.js";
+import { WebSdkCardBuilder } from "./components/web-sdk-card.js";
 
 export * from "./payment-enabler/payment-enabler.js";
-export { CardComponentBuilder } from "./components/card.js";
-export { DropinEmbeddedBuilder } from "./dropin/dropin-embedded.js";
+export { SimplyConnectCardBuilder } from "./components/simply-connect-card.js";
+export { WebSdkCardBuilder } from "./components/web-sdk-card.js";
 
-const COMPONENT_BUILDERS = {
-  [PaymentMethod.card]: CardComponentBuilder,
-} as const;
-
-const DROPIN_BUILDERS = {
-  [PaymentMethod.embedded]: DropinEmbeddedBuilder,
-} as const;
-
-const SUPPORTED_COMPONENT_METHODS = getComponentPaymentMethods().map((entry) => entry.key);
-const SUPPORTED_DROPIN_METHODS = getDropinPaymentMethods().map((entry) => entry.key);
-
-export class NuveiEnabler implements PaymentEnabler {
-  private opts: import("./payment-enabler/payment-enabler.js").EnablerOptions;
-
-  constructor(opts: import("./payment-enabler/payment-enabler.js").EnablerOptions) {
+export class NuveiSimplyConnectEnabler implements PaymentEnabler {
+  constructor(private readonly opts: EnablerOptions) {
     validateEnablerOptions(opts);
-    this.opts = opts;
   }
 
   async createComponentBuilder(type: string): Promise<PaymentComponentBuilder> {
-    if ((SUPPORTED_COMPONENT_METHODS as readonly string[]).includes(type)) {
-      const Builder = COMPONENT_BUILDERS[type as keyof typeof COMPONENT_BUILDERS];
-      return new Builder(this.opts);
+    if (type !== PaymentMethod.card) {
+      throw methodUnsupported(type, "component");
     }
-    throw methodUnsupported(type, "component");
+
+    return new SimplyConnectCardBuilder(this.opts);
+  }
+}
+
+export class NuveiWebSdkEnabler implements PaymentEnabler {
+  constructor(private readonly opts: EnablerOptions) {
+    validateEnablerOptions(opts);
   }
 
-  async createDropinBuilder(type: DropinType | string): Promise<PaymentDropinBuilder> {
-    if ((SUPPORTED_DROPIN_METHODS as readonly string[]).includes(type)) {
-      const Builder = DROPIN_BUILDERS[type as keyof typeof DROPIN_BUILDERS];
-      return new Builder(this.opts);
+  async createComponentBuilder(type: string): Promise<PaymentComponentBuilder> {
+    if (type !== PaymentMethod.card) {
+      throw methodUnsupported(type, "component");
     }
-    throw methodUnsupported(type, "dropin");
+
+    return new WebSdkCardBuilder(this.opts);
+  }
+}
+
+export class NuveiEnabler implements PaymentEnabler {
+  private readonly delegate: PaymentEnabler;
+
+  constructor(opts: EnablerOptions, mode: "simply-connect" | "web-sdk") {
+    if (mode !== "simply-connect" && mode !== "web-sdk") {
+      throw modeUnsupported(mode);
+    }
+
+    this.delegate =
+      mode === "simply-connect"
+        ? new NuveiSimplyConnectEnabler(opts)
+        : new NuveiWebSdkEnabler(opts);
+  }
+
+  createComponentBuilder(type: string): Promise<PaymentComponentBuilder> {
+    return this.delegate.createComponentBuilder(type);
   }
 }

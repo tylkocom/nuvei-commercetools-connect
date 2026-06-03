@@ -17,7 +17,7 @@ This repository has no root-level `package.json`; install and run each package w
    ```bash
    npm install --prefix enabler
    npm install --prefix processor
-   npm install --prefix testing
+   npm install --prefix examples/nuvei-web-ui
    ```
 
    Use `npm ci --prefix <package>` when you want the same clean lockfile install used by CI.
@@ -57,10 +57,10 @@ This repository has no root-level `package.json`; install and run each package w
    ```bash
    npm run dev --prefix enabler
    npm run dev --prefix processor
-   npm start --prefix testing
+   npm start --prefix examples/nuvei-web-ui
    ```
 
-   `enabler` starts Vite, `processor` starts Fastify through `tsx`, and `testing` starts the local Express mock server from `testing/mock-commercetools-server.mjs`.
+   `enabler` starts Vite, `processor` starts Fastify through `tsx`, and `examples/nuvei-web-ui` starts the local Express mock server from `examples/nuvei-web-ui/mock-commercetools-server.mjs`.
 
 ## Build commands
 
@@ -70,7 +70,7 @@ Run all commands from the repository root.
 | --- | --- |
 | `npm install --prefix enabler` | Install the frontend enabler dependencies for development. |
 | `npm install --prefix processor` | Install the backend processor dependencies for development. |
-| `npm install --prefix testing` | Install the local manual testing harness dependencies. |
+| `npm install --prefix examples/nuvei-web-ui` | Install the browser evidence harness dependencies for development. |
 | `npm run build --prefix enabler` | Run `tsc` and `vite build`; writes the browser bundle to `enabler/public/connector-enabler.es.js` and `enabler/public/connector-enabler.umd.js`. |
 | `npm run dev --prefix enabler` | Start the Vite development server for the enabler package. |
 | `npm run start --prefix enabler` | Serve `enabler/public` on port 8080 with CORS enabled. |
@@ -83,7 +83,7 @@ Run all commands from the repository root.
 | `npm run test --prefix processor` | Run processor Vitest tests through `processor/scripts/run-vitest.mjs`. Additional arguments are passed to `vitest run`. |
 | `npm run connector:post-deploy --prefix processor` | Run the Connect post-deploy script from `processor/dist/connectors/post-deploy.js`. Build the processor first. |
 | `npm run connector:pre-undeploy --prefix processor` | Run the Connect pre-undeploy script from `processor/dist/connectors/pre-undeploy.js`. Build the processor first. |
-| `npm start --prefix testing` | Start the local mocked commercetools/Nuvei test server. |
+| `npm start --prefix examples/nuvei-web-ui` | Start the local mocked commercetools/Nuvei test server. |
 | `npm install --global @commercetools/cli@0.0.17` | Install the same commercetools CLI version used by CI. |
 | `commercetools connect validate .` | Validate `connect.yaml` and the Connect application descriptor from the repository root. |
 
@@ -118,8 +118,8 @@ Use short, descriptive branch names that make the change obvious to reviewers, f
 There is no checked-in pull request template. Use this repository-specific process for changes:
 
 - Open pull requests against `main`.
-- Describe the affected package or area: `enabler`, `processor`, `testing`, `connect.yaml`, or `docs`.
+- Describe the affected package or area: `enabler`, `processor`, `examples/nuvei-web-ui`, `connect.yaml`, or `docs`.
 - Include the exact commands you ran locally, especially package builds, package tests, and `commercetools connect validate .` when the Connect descriptor or deployment behavior changes.
 - Do not include Nuvei keys, commercetools client secrets, local `.env` values, or deployment-only URLs in the PR body, screenshots, logs, or fixtures.
 - Wait for the `Connect validation` GitHub Actions workflow to pass. The workflow installs enabler and processor dependencies with Node.js 20, installs `@commercetools/cli@0.0.17`, and runs `commercetools connect validate .`.
-- If the change affects payment behavior, include the relevant manual verification path from `testing/` or the affected automated Vitest files so reviewers can reproduce the scenario.
+- If the change affects payment behavior, include the relevant manual verification path from `examples/nuvei-web-ui/` or the affected automated Vitest files so reviewers can reproduce the scenario.

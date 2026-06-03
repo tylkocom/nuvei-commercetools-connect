@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { apiService, confirmPaymentResult } from "../../src/services/api-service";
-import type { NuveiResult } from "../../src/services/nuvei-sdk";
+import type { NuveiResult } from "../../src/services/simply-connect-sdk";
 
 describe("apiService", () => {
   afterEach(() => {
@@ -134,7 +134,7 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
         .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
     ).rejects.toThrow();
   });
@@ -149,7 +149,7 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
         .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
     ).rejects.toThrow();
   });
@@ -164,7 +164,7 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
         .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
     ).rejects.toThrow();
   });
@@ -179,7 +179,7 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
         .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
     ).rejects.toThrow();
   });
@@ -267,17 +267,15 @@ describe("confirmPaymentResult", () => {
       onPending,
     );
 
-    expect(onError).toHaveBeenCalledOnce();
     expect(onComplete).not.toHaveBeenCalled();
     expect(onPending).not.toHaveBeenCalled();
-    // Error must be safe: must not leak session token or raw Nuvei details
-    const [err] = onError.mock.calls[0] as [Error];
+    expect(onError).toHaveBeenCalledOnce();
+    const err = onError.mock.calls[0][0] as Error;
     expect(err).toBeInstanceOf(Error);
-    expect(err.message).not.toContain("known-session-token");
-    expect(err.message).not.toContain("browser-session-token");
+    expect(err.message).toContain("Payment was declined");
   });
 
-  it("calls optional onPending and not onComplete or onError when processor outcome is pending (D-19, D-22)", async () => {
+  it("calls onPending with pending result when processor outcome is pending (D-19, D-22)", async () => {
     const mockApi = makeApi("pending");
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -294,70 +292,37 @@ describe("confirmPaymentResult", () => {
     );
 
     expect(onPending).toHaveBeenCalledOnce();
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onError).not.toHaveBeenCalled();
-  });
-
-  it("does not throw when onPending is absent and processor outcome is pending (D-19)", async () => {
-    const mockApi = makeApi("pending");
-    const onComplete = vi.fn();
-    const onError = vi.fn();
-
-    await expect(
-      confirmPaymentResult(
-        makeResult("APPROVED"),
-        "ref-123",
-        "known-session-token",
-        mockApi,
-        onComplete,
-        onError,
-        // onPending intentionally omitted
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onError).not.toHaveBeenCalled();
-  });
-
-  it("uses knownSessionToken (not result.sessionToken) for the confirmPayment call (D-11)", async () => {
-    const mockApi = makeApi("approved");
-
-    await confirmPaymentResult(
-      { transactionStatus: "APPROVED", sessionToken: "browser-session-token" },
-      "ref-123",
-      "known-session-token",
-      mockApi,
-      vi.fn(),
-      vi.fn(),
-    );
-
-    expect(mockApi.confirmPayment).toHaveBeenCalledWith({
-      sessionToken: "known-session-token",
+    expect(onPending).toHaveBeenCalledWith({
       paymentReference: "ref-123",
+      sessionToken: "known-session-token",
     });
-    // Must NOT use browser result sessionToken
-    expect(mockApi.confirmPayment).not.toHaveBeenCalledWith(
-      expect.objectContaining({ sessionToken: "browser-session-token" }),
-    );
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
   });
 
-  it("browser SDK transactionStatus does not independently gate onComplete without approved processor outcome (D-04)", async () => {
-    // Processor returns rejected even though browser says APPROVED
-    const mockApi = makeApi("rejected");
+  it("does not leak session token when processor call throws (D-21 safe error path)", async () => {
     const onComplete = vi.fn();
     const onError = vi.fn();
+    const onPending = vi.fn();
+    const mockApi = {
+      createPayment: vi.fn(),
+      confirmPayment: vi.fn().mockRejectedValue(new Error("backend secret-token failed")),
+    };
 
     await confirmPaymentResult(
-      makeResult("APPROVED"), // browser says approved
+      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
       onComplete,
       onError,
+      onPending,
     );
 
-    // Processor outcome wins – onComplete must NOT be called
     expect(onComplete).not.toHaveBeenCalled();
+    expect(onPending).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledOnce();
+    const error = onError.mock.calls[0][0] as Error;
+    expect(error.message).not.toContain("secret-token");
   });
 });

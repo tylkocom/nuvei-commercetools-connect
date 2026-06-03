@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nuvei Web UI Example</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #f6f7f9;
+        color: #1f2937;
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      .panel {
+        background: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      label {
+        font-size: 0.92rem;
+        font-weight: 600;
+      }
+
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+
+      input,
+      select {
+        border: 1px solid #9ca3af;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #fff;
+      }
+
+      .mode-options {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      .mode-options label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        cursor: pointer;
+        color: #fff;
+        background: #111827;
+      }
+
+      button.secondary {
+        background: #2563eb;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      #payment-container {
+        min-height: 120px;
+        border: 1px dashed #9ca3af;
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px;
+      }
+
+      #result-log {
+        min-height: 120px;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        background: #fff;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+
+      .note {
+        color: #4b5563;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Nuvei Web UI Example</h1>
+      <p class="note">Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.</p>
+      <p class="note">sessionId is provided by the commercetools Checkout session or mock CT server. See examples/nuvei-web-ui/README.md for how to start the mock CT server.</p>
+
+      <section class="panel" aria-labelledby="mode-heading">
+        <h2 id="mode-heading">Mode selector</h2>
+        <div class="mode-options">
+          <label><input type="radio" name="mode" value="simply-connect" checked /> Simply Connect card</label>
+          <label><input type="radio" name="mode" value="web-sdk" /> Web SDK card</label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="config-heading">
+        <h2 id="config-heading">Configuration</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="processor-url">processorUrl</label>
+            <input id="processor-url" name="processor-url" type="url" value="http://localhost:8080" />
+          </div>
+          <div class="field">
+            <label for="session-id">sessionId</label>
+            <input id="session-id" name="session-id" type="text" placeholder="Checkout session id" />
+          </div>
+          <div class="field">
+            <label for="merchant-id">merchantId</label>
+            <input id="merchant-id" name="merchant-id" type="text" placeholder="Nuvei merchant id" />
+          </div>
+          <div class="field">
+            <label for="merchant-site-id">merchantSiteId</label>
+            <input id="merchant-site-id" name="merchant-site-id" type="text" placeholder="Nuvei merchant site id" />
+          </div>
+          <div class="field">
+            <label for="env">env</label>
+            <select id="env" name="env">
+              <option value="test" selected>int</option>
+              <option value="production">production</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="mount-card" type="button">Mount card</button>
+          <button id="pay-button" class="secondary" type="button" hidden>Pay</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="payment-heading">
+        <h2 id="payment-heading">Payment container</h2>
+        <div id="payment-container"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="log-heading">
+        <h2 id="log-heading">Result log</h2>
+        <div id="result-log"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      // Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.
+      import { NuveiSimplyConnectEnabler, NuveiWebSdkEnabler } from "../../enabler/public/connector-enabler.es.js?cb=1";
+
+      const processorUrlInput = document.getElementById("processor-url");
+      const sessionIdInput = document.getElementById("session-id");
+      const merchantIdInput = document.getElementById("merchant-id");
+      const merchantSiteIdInput = document.getElementById("merchant-site-id");
+      const envInput = document.getElementById("env");
+      const mountButton = document.getElementById("mount-card");
+      const payButton = document.getElementById("pay-button");
+      const paymentContainer = document.getElementById("payment-container");
+      const resultLog = document.getElementById("result-log");
+
+      let currentComponent = null;
+      let mountedMode = null;
+
+      function selectedMode() {
+        const chosen = document.querySelector('input[name="mode"]:checked');
+        return chosen ? chosen.value : "simply-connect";
+      }
+
+      function appendLog(label, payload) {
+        const entry = document.createElement("div");
+        entry.textContent = `${label}: ${typeof payload === "string" ? payload : JSON.stringify(payload, null, 2)}`;
+        resultLog.appendChild(entry);
+      }
+
+      function clearLog() {
+        resultLog.textContent = "";
+      }
+
+      function setPayButtonVisible(visible) {
+        payButton.hidden = !visible;
+        payButton.disabled = !visible;
+      }
+
+      function readOptions() {
+        return {
+          processorUrl: processorUrlInput.value.trim(),
+          sessionId: sessionIdInput.value.trim(),
+          merchantId: merchantIdInput.value.trim(),
+          merchantSiteId: merchantSiteIdInput.value.trim(),
+          env: envInput.value,
+          locale: "en",
+          onComplete: (result) => {
+            appendLog("onComplete", {
+              isSuccess: result.isSuccess,
+              paymentReference: result.paymentReference,
+            });
+          },
+          onError: (error) => {
+            appendLog("onError", error instanceof Error ? { name: error.name, message: error.message } : String(error));
+          },
+          onPending: (result) => {
+            appendLog("onPending", result);
+          },
+        };
+      }
+      async function mountCard() {
+        clearLog();
+        paymentContainer.textContent = "";
+        currentComponent = null;
+        mountedMode = null;
+        setPayButtonVisible(false);
+
+        const options = readOptions();
+        const mode = selectedMode();
+        const enabler = mode === "web-sdk"
+          ? new NuveiWebSdkEnabler(options)
+          : new NuveiSimplyConnectEnabler(options);
+
+        const builder = await enabler.createComponentBuilder("card");
+        currentComponent = builder.build({});
+        currentComponent.mount("#payment-container");
+        mountedMode = mode;
+        setPayButtonVisible(mode === "web-sdk");
+        appendLog("mounted", { mode });
+      }
+
+      mountButton.addEventListener("click", () => {
+        mountCard().catch((error) => appendLog("mount-error", error instanceof Error ? { name: error.name, message: error.message } : String(error)));
+      });
+
+      payButton.addEventListener("click", () => {
+        if (!currentComponent || typeof currentComponent.submit !== "function") {
+          appendLog("pay-error", "Pay is only available after mounting the Web SDK card.");
+          return;
+        }
+
+        try {
+          currentComponent.submit();
+        } catch (error) {
+          appendLog("pay-error", error instanceof Error ? { name: error.name, message: error.message } : String(error));
+        }
+      });
+
+      document.querySelectorAll('input[name="mode"]').forEach((input) => {
+        input.addEventListener("change", () => {
+          setPayButtonVisible(selectedMode() === mountedMode && mountedMode === "web-sdk" && currentComponent !== null);
+        });
+      });
+
+      setPayButtonVisible(false);
+    </script>
+  </body>
+</html>

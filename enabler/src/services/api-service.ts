@@ -12,7 +12,7 @@ import {
   type PendingPaymentResult,
   type PublicPaymentError,
 } from "../payment-enabler/payment-enabler.js";
-import type { NuveiResult } from "./nuvei-sdk.js";
+import type { NuveiResult } from "./simply-connect-sdk.js";
 
 /** Shape of the response returned by `POST /payments/session`. */
 export type PaymentSessionResponse = {
@@ -80,8 +80,8 @@ export async function confirmPaymentResult(
   let confirmRes: ConfirmPaymentResponse;
   try {
     confirmRes = await api.confirmPayment({ sessionToken: knownSessionToken, paymentReference });
-  } catch (error) {
-    onError?.(error);
+  } catch {
+    onError?.(new Error("Failed to confirm payment."));
     return;
   }
 

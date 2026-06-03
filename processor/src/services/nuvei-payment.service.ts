@@ -155,7 +155,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return `${token.slice(0, 6)}...[redacted]...${token.slice(-4)}`;
   }
 
-  public validatePaymentMethodOptions(options?: unknown): "card" | "embedded" {
+  public validatePaymentMethodOptions(options?: unknown): "card" {
     if (options === undefined) {
       return "card";
     }
@@ -486,9 +486,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
    */
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
-      dropins: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin").map((entry) => ({
-        type: entry.advertisedType,
-      })),
+      dropins: [],
       components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map(
         (entry) => ({
           type: entry.advertisedType,

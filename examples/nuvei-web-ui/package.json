@@ -1,5 +1,7 @@
 {
-  "name": "nuvei-local-testing-harness",
+  "name": "nuvei-web-ui",
+  "version": "0.1.0",
+  "description": "Local integration example and evidence harness for the Nuvei commercetools connector",
   "private": true,
   "type": "module",
   "scripts": {

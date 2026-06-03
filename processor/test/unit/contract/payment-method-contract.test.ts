@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   CommercetoolsCartService,
   CommercetoolsOrderService,
@@ -10,7 +10,11 @@ import {
   SUPPORTED_PAYMENT_METHODS as processorSupportedPaymentMethods,
   isSupportedPaymentMethod as isProcessorSupportedPaymentMethod,
 } from "../../../src/dtos/operations/payment-components.dto";
-import { NuveiEnabler } from "../../../../enabler/src/index";
+import {
+  NuveiEnabler,
+  NuveiSimplyConnectEnabler,
+  NuveiWebSdkEnabler,
+} from "../../../../enabler/src/index";
 import type { EnablerOptions } from "../../../../enabler/src/payment-enabler/payment-enabler";
 import {
   PAYMENT_METHOD_REGISTRY as enablerPaymentMethodRegistry,
@@ -55,34 +59,62 @@ function makeEnablerOptions(): EnablerOptions {
   };
 }
 
-describe("processor/enabler payment method contract parity", () => {
-  it("keeps mirrored registry public contract fields aligned in deterministic order", () => {
-    expect(publicRegistryContract(processorPaymentMethodRegistry)).toEqual(
-      publicRegistryContract(enablerPaymentMethodRegistry),
-    );
-    expect(processorPaymentMethodRegistry.map((entry) => entry.key)).toEqual(
-      enablerPaymentMethodRegistry.map((entry) => entry.key),
-    );
-  });
+function expectFacadeModeRejection(mode: unknown): void {
+  const fetchSpy = vi.spyOn(globalThis, "fetch");
 
-  it("keeps processor accepted methods equal to enabler-supported builder keys", () => {
-    const processorRegistryKeys = processorPaymentMethodRegistry.map((entry) => entry.key);
-    const enablerRegistryKeys = enablerPaymentMethodRegistry.map((entry) => entry.key);
+  try {
+    let caught: unknown;
 
-    expect(processorSupportedPaymentMethods).toEqual(processorRegistryKeys);
-    expect(processorSupportedPaymentMethods).toEqual(enablerRegistryKeys);
-    expect(enablerSupportedPaymentMethods).toEqual(enablerRegistryKeys);
-
-    for (const method of enablerRegistryKeys) {
-      expect(isProcessorSupportedPaymentMethod(method)).toBe(true);
+    try {
+      new NuveiEnabler(makeEnablerOptions(), mode as any);
+    } catch (error) {
+      caught = error;
     }
 
-    for (const unsupportedMethod of ["paypal", "dropin", ""] as const) {
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { code?: string }).code).toBe("METHOD_UNSUPPORTED");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  } finally {
+    fetchSpy.mockRestore();
+  }
+}
+
+describe("processor/enabler payment method contract parity", () => {
+  it("keeps mirrored registry public contract fields aligned in deterministic order", () => {
+    expect(publicRegistryContract(processorPaymentMethodRegistry)).toEqual([
+      {
+        key: "card",
+        kind: "component",
+        advertisedType: "card",
+        displayName: expect.any(String),
+        transitional: false,
+        pspMetadata: {},
+      },
+    ]);
+    expect(publicRegistryContract(enablerPaymentMethodRegistry)).toEqual([
+      {
+        key: "card",
+        kind: "component",
+        advertisedType: "card",
+        displayName: expect.any(String),
+        transitional: false,
+        pspMetadata: {},
+      },
+    ]);
+    expect(processorPaymentMethodRegistry.map((entry) => entry.key)).toEqual(["card"]);
+    expect(enablerPaymentMethodRegistry.map((entry) => entry.key)).toEqual(["card"]);
+  });
+  it("keeps processor accepted methods equal to enabler-supported builder keys", () => {
+    expect(processorSupportedPaymentMethods).toEqual(["card"]);
+    expect(enablerSupportedPaymentMethods).toEqual(["card"]);
+    expect(isProcessorSupportedPaymentMethod("card")).toBe(true);
+
+    for (const unsupportedMethod of ["paypal", "applepay", ""] as const) {
       expect(isProcessorSupportedPaymentMethod(unsupportedMethod)).toBe(false);
     }
   });
 
-  it("keeps card as a component and embedded as a transitional drop-in with empty PSP metadata", () => {
+  it("keeps card as the only component with empty PSP metadata and no dropins", () => {
     expect(processorPaymentMethodRegistry).toEqual([
       expect.objectContaining({
         key: "card",
@@ -92,15 +124,9 @@ describe("processor/enabler payment method contract parity", () => {
         transitional: false,
         pspMetadata: {},
       }),
-      expect.objectContaining({
-        key: "embedded",
-        kind: "dropin",
-        advertisedType: "embedded",
-        displayName: expect.any(String),
-        transitional: true,
-        pspMetadata: {},
-      }),
     ]);
+
+    expect(processorPaymentMethodRegistry).toHaveLength(1);
 
     for (const entry of processorPaymentMethodRegistry) {
       expect(entry.displayName.length).toBeGreaterThan(0);
@@ -114,7 +140,7 @@ describe("processor/enabler payment method contract parity", () => {
     const advertised = await service.getSupportedPaymentComponents();
 
     expect(advertised).toEqual({
-      dropins: [{ type: "embedded" }],
+      dropins: [],
       components: [{ type: "card" }],
       express: [],
     });
@@ -130,21 +156,50 @@ describe("processor/enabler payment method contract parity", () => {
     );
   });
 
-  it("builds every advertised component and drop-in through the enabler", async () => {
+  it("builds every advertised component through the Simply Connect enabler", async () => {
     const service = makePaymentService();
     const advertised = await service.getSupportedPaymentComponents();
-    const enabler = new NuveiEnabler(makeEnablerOptions());
+    const enabler = new NuveiSimplyConnectEnabler(makeEnablerOptions());
 
     for (const component of advertised.components) {
       const builder = await enabler.createComponentBuilder(component.type);
       expect(builder.componentHasSubmit).toBe(false);
       expect(typeof builder.build).toBe("function");
     }
+  });
 
-    for (const dropin of advertised.dropins) {
-      const builder = await enabler.createDropinBuilder(dropin.type);
-      expect(builder.dropinHasSubmit).toBe(false);
+  describe("dual-mode enabler contract", () => {
+    it("NuveiSimplyConnectEnabler builds card with componentHasSubmit=false", async () => {
+      const builder = await new NuveiSimplyConnectEnabler(makeEnablerOptions()).createComponentBuilder("card");
+
+      expect(builder.componentHasSubmit).toBe(false);
       expect(typeof builder.build).toBe("function");
-    }
+    });
+
+    it("NuveiWebSdkEnabler builds card with componentHasSubmit=true", async () => {
+      const builder = await new NuveiWebSdkEnabler(makeEnablerOptions()).createComponentBuilder("card");
+
+      expect(builder.componentHasSubmit).toBe(true);
+      expect(typeof builder.build).toBe("function");
+    });
+
+    it("NuveiEnabler facade rejects missing mode before processor call", () => {
+      expectFacadeModeRejection(undefined);
+    });
+
+    it("NuveiEnabler facade rejects unsupported mode before processor call", () => {
+      expectFacadeModeRejection("hpp");
+    });
+
+    it("card is the method key for both modes — mode is not a processor payment method", async () => {
+      expect(processorSupportedPaymentMethods).not.toContain("simply-connect");
+      expect(processorSupportedPaymentMethods).not.toContain("web-sdk");
+
+      const simplyConnectBuilder = await new NuveiSimplyConnectEnabler(makeEnablerOptions()).createComponentBuilder("card");
+      const webSdkBuilder = await new NuveiWebSdkEnabler(makeEnablerOptions()).createComponentBuilder("card");
+
+      expect(simplyConnectBuilder.componentHasSubmit).toBe(false);
+      expect(webSdkBuilder.componentHasSubmit).toBe(true);
+    });
   });
 });

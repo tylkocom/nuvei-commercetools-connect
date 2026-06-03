@@ -5,14 +5,14 @@ import type { EnablerOptions } from "../../src/payment-enabler/payment-enabler";
 // Hoisted mock functions – accessible both inside vi.mock factories and in tests
 // ---------------------------------------------------------------------------
 
-const mockLoadNuveiSdk = vi.hoisted(() => vi.fn());
+const mockLoadSimplyConnectSdk = vi.hoisted(() => vi.fn());
 const mockCreatePayment = vi.hoisted(() => vi.fn());
 const mockGetPayment = vi.hoisted(() => vi.fn());
 const mockConfirmPayment = vi.hoisted(() => vi.fn());
 const mockConfirmPaymentResult = vi.hoisted(() => vi.fn());
 
-vi.mock("../../src/services/nuvei-sdk", () => ({
-  loadNuveiSdk: mockLoadNuveiSdk,
+vi.mock("../../src/services/simply-connect-sdk", () => ({
+  loadSimplyConnectSdk: mockLoadSimplyConnectSdk,
 }));
 
 vi.mock("../../src/services/api-service", () => ({
@@ -24,7 +24,7 @@ vi.mock("../../src/services/api-service", () => ({
   confirmPaymentResult: mockConfirmPaymentResult,
 }));
 
-import { CardComponentBuilder } from "../../src/components/card";
+import { SimplyConnectCardBuilder } from "../../src/components/simply-connect-card";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,14 +52,14 @@ function stubDocument() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("CardComponentBuilder", () => {
+describe("SimplyConnectCardBuilder", () => {
   it("creates a builder with componentHasSubmit = false", () => {
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     expect(builder.componentHasSubmit).toBe(false);
   });
 
   it("build() returns a PaymentComponent with mount and submit methods", () => {
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     expect(component).toBeDefined();
@@ -68,19 +68,16 @@ describe("CardComponentBuilder", () => {
   });
 });
 
-describe("CardComponent", () => {
+describe("SimplyConnectCardComponent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
 
-  // -------------------------------------------------------------------------
-  // mount()
-  // -------------------------------------------------------------------------
   it("mount() initiates payment creation and SDK loading", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
-    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
+    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "ref-123",
@@ -88,12 +85,12 @@ describe("CardComponent", () => {
       currency: "USD",
     });
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     component.mount("#container");
 
-    expect(mockLoadNuveiSdk).toHaveBeenCalled();
+    expect(mockLoadSimplyConnectSdk).toHaveBeenCalled();
     expect(mockCreatePayment).toHaveBeenCalledWith({
       paymentMethodOptions: { card: {} },
     });
@@ -102,7 +99,7 @@ describe("CardComponent", () => {
   it("passes correct config to checkout()", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
-    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
+    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "ref-123",
@@ -110,7 +107,7 @@ describe("CardComponent", () => {
       currency: "USD",
     });
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     component.mount("#container");
@@ -132,16 +129,15 @@ describe("CardComponent", () => {
 
   it("mount() calls onError when init fails", async () => {
     const error = new Error("SDK unavailable");
-    mockLoadNuveiSdk.mockRejectedValue(error);
+    mockLoadSimplyConnectSdk.mockRejectedValue(error);
 
     const onError = vi.fn();
     const opts = { ...makeEnablerOptions(), onError };
-    const builder = new CardComponentBuilder(opts);
+    const builder = new SimplyConnectCardBuilder(opts);
     const component = builder.build({ showPayButton: true });
 
     component.mount("#container");
 
-    // Wait for the rejected promise to propagate through .catch()
     const { promise: wait1, resolve: done1 } = Promise.withResolvers<void>();
     setTimeout(done1, 0);
     await wait1;
@@ -149,11 +145,8 @@ describe("CardComponent", () => {
     expect(onError).toHaveBeenCalledWith(error);
   });
 
-  // -------------------------------------------------------------------------
-  // submit()
-  // -------------------------------------------------------------------------
   it("submit() throws because Simply Connect handles submission internally", () => {
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: false });
 
     expect(() => component.submit()).toThrow(
@@ -163,7 +156,7 @@ describe("CardComponent", () => {
 
   it("submit() throws regardless of showPayButton setting", () => {
     const onPayButtonClick = vi.fn().mockResolvedValue(undefined);
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true, onPayButtonClick });
 
     expect(() => component.submit()).toThrow(
@@ -172,13 +165,10 @@ describe("CardComponent", () => {
     expect(onPayButtonClick).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // isAvailable()
-  // -------------------------------------------------------------------------
   it("isAvailable() returns true when SDK loads successfully", async () => {
-    mockLoadNuveiSdk.mockResolvedValue(vi.fn());
+    mockLoadSimplyConnectSdk.mockResolvedValue(vi.fn());
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     const available = await component.isAvailable();
@@ -186,20 +176,17 @@ describe("CardComponent", () => {
   });
 
   it("isAvailable() returns false when SDK fails to load", async () => {
-    mockLoadNuveiSdk.mockRejectedValue(new Error("SDK load failed"));
+    mockLoadSimplyConnectSdk.mockRejectedValue(new Error("SDK load failed"));
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     const available = await component.isAvailable();
     expect(available).toBe(false);
   });
 
-  // -------------------------------------------------------------------------
-  // isValid()
-  // -------------------------------------------------------------------------
   it("isValid() returns false before mount", () => {
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     expect(component.isValid()).toBe(false);
@@ -208,7 +195,7 @@ describe("CardComponent", () => {
   it("isValid() returns true after mount completes", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
-    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
+    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
       paymentReference: "ref-123",
@@ -216,28 +203,20 @@ describe("CardComponent", () => {
       currency: "USD",
     });
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     component.mount("#container");
 
-    // Wait for the async init to finish and set mounted = true
     await vi.waitFor(() => expect(component.isValid()).toBe(true));
   });
 
-  // -------------------------------------------------------------------------
-  // Session-token handoff (D-11, D-09)
-  // -------------------------------------------------------------------------
-
   it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
     stubDocument();
-    // The Nuvei widget result has a DIFFERENT sessionToken than the one
-    // from createPayment. confirmPaymentResult must be called with the
-    // known processor session token, not the browser-returned one.
     const mockCheckout = vi.fn().mockImplementation((config) => {
       config.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
     });
-    mockLoadNuveiSdk.mockResolvedValue(mockCheckout);
+    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "known-session-token",
       paymentReference: "payment-ref-123",
@@ -245,22 +224,20 @@ describe("CardComponent", () => {
       currency: "USD",
     });
 
-    const builder = new CardComponentBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
     component.mount("#container");
 
     await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
 
-    // Third argument must be the known session token from createPayment,
-    // NOT "browser-session-token" from the Nuvei widget result.
     expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionToken: "browser-session-token" }), // result (NuveiResult)
-      "payment-ref-123", // paymentReference
-      "known-session-token", // knownSessionToken — from paymentRes, not result
-      expect.any(Object), // api
-      undefined, // onComplete (not set in makeEnablerOptions)
-      undefined, // onError (not set in makeEnablerOptions)
-      undefined, // onPending (not set in makeEnablerOptions)
+      expect.objectContaining({ sessionToken: "browser-session-token" }),
+      "payment-ref-123",
+      "known-session-token",
+      expect.any(Object),
+      undefined,
+      undefined,
+      undefined,
     );
   });
 });

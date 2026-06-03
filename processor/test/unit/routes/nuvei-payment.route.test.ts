@@ -267,7 +267,7 @@ describe("payment routes", () => {
     const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
     const reply = makeReply();
     await postRoute?.handler(
-      { body: { paymentMethodOptions: { card: {}, embedded: {} } } } satisfies PaymentRouteRequest,
+      { body: { paymentMethodOptions: { card: {}, paypal: {} } } } satisfies PaymentRouteRequest,
       reply,
     );
 

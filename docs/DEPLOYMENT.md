@@ -172,7 +172,7 @@ Recommended checks:
      https://<processor-service-url>/payment-components
    ```
 
-   The current implementation advertises the `card` component and the `embedded` drop-in.
+   The current implementation advertises the `card` component only.
 
 5. Run a test checkout flow that creates a payment session through `POST /payments/session` with `X-Session-ID`, confirms an approved Nuvei widget result through `POST /payments/confirm/:id`, and verifies that the commercetools Payment receives the expected transaction update.
 
