@@ -61,18 +61,30 @@ export const setupFastify = async () => {
   // Setup error handler
   server.setErrorHandler(errorHandler);
 
-  // Enable CORS only for explicit origin allow-lists. A configured wildcard means
-  // Connect/Checkout ingress should handle browser access without Fastify CORS
-  // enforcement rejecting commercetools preflights.
+  // Enable CORS. When corsAllowedOrigins is exactly ["*"], register with origin: "*"
+  // so @fastify/cors handles OPTIONS preflights before any auth hook (template behaviour).
+  // Explicit allow-lists restrict to those origins only.
   const configuredOrigins = config.corsAllowedOrigins.filter(Boolean);
   const corsIsWildcardOnly = configuredOrigins.length === 1 && configuredOrigins[0] === "*";
-  if (!corsIsWildcardOnly) {
+  if (corsIsWildcardOnly) {
+    await server.register(cors, {
+      methods: ["GET", "HEAD", "POST", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Correlation-ID",
+        "X-Request-ID",
+        "X-Session-ID",
+      ],
+      origin: "*",
+    });
+  } else {
     const merchantCenterOrigin = getMerchantCenterOrigin(config.jwtIssuer);
     const allowedOrigins = new Set(
       [config.checkoutUrl, merchantCenterOrigin, ...configuredOrigins].filter(Boolean),
     );
     await server.register(cors, {
-      methods: ["GET", "POST", "OPTIONS"],
+      methods: ["GET", "HEAD", "POST", "DELETE", "OPTIONS"],
       allowedHeaders: [
         "Content-Type",
         "Authorization",

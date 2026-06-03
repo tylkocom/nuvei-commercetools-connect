@@ -115,12 +115,10 @@ describe("setupFastify CORS", () => {
         },
       });
 
-      // Without @fastify/cors, OPTIONS falls through to the route or 404 — it must NOT
-      // return a 403/500 CORS rejection and must NOT set a restrictive
-      // access-control-allow-origin header.
-      expect(response.statusCode).not.toBe(403);
-      expect(response.statusCode).not.toBe(500);
-      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+      // With origin:"*", @fastify/cors handles the preflight and returns 204
+      // with a wildcard allow-origin — no auth hook runs.
+      expect(response.statusCode).toBe(204);
+      expect(response.headers["access-control-allow-origin"]).toBe("*");
     } finally {
       await server.close();
       vi.resetModules();
