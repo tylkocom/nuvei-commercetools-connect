@@ -1,8 +1,9 @@
 /**
- * Nuvei Simply Connect Enabler – public interface definitions.
+ * Nuvei payment enabler public interface definitions.
  *
- * These types model the contract between the commercetools Checkout
- * (or a custom storefront) and the Nuvei payment widget.
+ * The `Enabler` export is intentionally aligned with the commercetools
+ * payment-template contract so whitelabel Checkout can instantiate the
+ * connector without Nuvei-specific constructor knowledge.
  */
 
 import { SUPPORTED_PAYMENT_METHODS } from "./method-registry.js";
@@ -59,13 +60,14 @@ function configInvalid(field: string, expectation: string): PaymentSetupError {
   );
 }
 
-export function methodUnsupported(method: string, kind: "component"): PaymentSetupError {
+export function methodUnsupported(method: string, kind: string): PaymentSetupError {
   return new PaymentSetupError(
     PublicPaymentErrorCode.METHOD_UNSUPPORTED,
     `Unsupported ${kind} payment method. Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
     { method, kind },
   );
 }
+
 export function modeUnsupported(mode: unknown): PaymentSetupError {
   return new PaymentSetupError(
     PublicPaymentErrorCode.METHOD_UNSUPPORTED,
@@ -78,16 +80,8 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-type EnablerOptionsInput = Partial<Record<keyof EnablerOptions, unknown>>;
-
-/**
- * Validate enabler options at runtime and return an actionable safe error
- * describing the first problem found.
- *
- * @throws {PaymentSetupError} When any required option is missing or invalid.
- */
-export function validateEnablerOptions(opts: EnablerOptions): void {
-  const candidate = opts as EnablerOptionsInput;
+function validateBaseEnablerOptions(opts: CheckoutEnablerOptions): void {
+  const candidate = opts as Partial<Record<keyof CheckoutEnablerOptions, unknown>>;
 
   if (!isNonEmptyString(candidate.processorUrl)) {
     throw configInvalid("processorUrl", "must be a non-empty URL string");
@@ -102,6 +96,23 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
   if (!isNonEmptyString(candidate.sessionId)) {
     throw configInvalid("sessionId", "must be a non-empty string");
   }
+}
+
+/**
+ * Validate the template-compatible Checkout enabler options.
+ */
+export function validateCheckoutEnablerOptions(opts: CheckoutEnablerOptions): void {
+  validateBaseEnablerOptions(opts);
+}
+
+/**
+ * Validate Nuvei-specific concrete enabler options.
+ *
+ * @throws {PaymentSetupError} When any required option is missing or invalid.
+ */
+export function validateEnablerOptions(opts: EnablerOptions): void {
+  validateBaseEnablerOptions(opts);
+  const candidate = opts as Partial<Record<keyof EnablerOptions, unknown>>;
 
   if (!isNonEmptyString(candidate.merchantId)) {
     throw configInvalid("merchantId", "must be a non-empty string");
@@ -116,100 +127,125 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
   }
 }
 
-/**
- * Entry point for creating payment components.
- *
- * Usage:
- *   const enabler = new NuveiEnabler({
- *     processorUrl: '…',
- *     sessionId:    '…',
- *     merchantId:   '…',
- *     merchantSiteId: '…',
- *     env:          'test',
- *     onComplete:   (result) => { … },
- *   }, 'simply-connect');
- *
- *   const builder = await enabler.createComponentBuilder(PaymentMethod.card);
- *   const component = builder.build({ showPayButton: true });
- *   component.mount('#payment-container');
- */
+/** Entry point for creating payment components. */
 export interface PaymentEnabler {
   createComponentBuilder(type: PaymentMethodKey | string): Promise<PaymentComponentBuilder>;
+  createDropinBuilder?(type: string): Promise<PaymentDropinBuilder>;
+  createExpressBuilder?(type: string): Promise<PaymentExpressBuilder>;
+  createStoredPaymentMethodBuilder?(type: string): Promise<StoredComponentBuilder>;
+  isStoredPaymentMethodsEnabled?(): Promise<boolean>;
+  getStoredPaymentMethods?(opts?: StoredPaymentMethodsOptions): Promise<StoredPaymentMethodsResult>;
+  setStorePaymentDetails?(enabled: boolean): void;
 }
 
-/**
- * A mounted payment component (e.g. a card element).
- */
-export interface PaymentComponent {
-  mount(selector: string): void;
-  submit(): void;
-  isValid?(): boolean;
-  getState?(): {
-    card?: {
-      endDigits?: string;
-      brand?: string;
-      expiryDate?: string;
-    };
+export type PaymentComponentState = {
+  card?: {
+    endDigits?: string;
+    brand?: string;
+    expiryDate?: string;
   };
+};
+
+/** A mounted payment component (for example, a card element). */
+export interface PaymentComponent {
+  mount(selector: string): Promise<void>;
+  submit(options?: SubmitOptions): Promise<void>;
+  showValidation?(): Promise<void>;
+  isValid?(): Promise<boolean>;
+  getState?(): Promise<PaymentComponentState>;
   isAvailable?(): Promise<boolean>;
 }
 
-/**
- * Builds a {@link PaymentComponent} from configuration.
- */
+/** Builds a {@link PaymentComponent} from configuration. */
 export interface PaymentComponentBuilder {
   componentHasSubmit?: boolean;
   build(config: ComponentOptions): PaymentComponent;
 }
 
-/**
- * Options passed to {@link NuveiEnabler} at construction time.
- */
-export type EnablerOptions = {
+export type SubmitOptions = {
+  storePaymentDetails?: boolean;
+};
+
+/** Options accepted by the Checkout-facing `Enabler` adapter. */
+export type CheckoutEnablerOptions = {
   /** Base URL of the Nuvei processor backend. */
   processorUrl: string;
   /** commercetools session identifier forwarded as X-Session-ID. */
   sessionId: string;
-  /** Locale string (e.g. "en_US"). Forwarded to the Nuvei widget when provided. */
+  /** Locale string forwarded to the Nuvei widget when provided. */
   locale?: string;
+  /** Shopper country code forwarded to Nuvei when available. */
+  countryCode?: string;
+  /** Called when additional payment action is required. */
+  onActionRequired?: () => Promise<void>;
+  /** Called when the processor confirms the payment is approved. */
+  onComplete?: (result: PaymentResult) => void;
+  /** Called when an error occurs. */
+  onError?: (error: unknown, context?: { paymentReference?: string }) => void;
+  /**
+   * Nuvei extension: called when the processor confirms the payment is pending.
+   * The payment is not terminal; final state should arrive through DMN.
+   */
+  onPending?: (result: PendingPaymentResult) => void;
+};
+
+/** Nuvei-specific concrete enabler options. */
+export type EnablerOptions = CheckoutEnablerOptions & {
   /** Nuvei merchant identifier. */
   merchantId: string;
   /** Nuvei merchant site identifier. */
   merchantSiteId: string;
   /** Nuvei environment: "test" maps to SafeCharge integration, "production" to live. */
   env: "test" | "production";
-  /** Called when the Nuvei widget reports a completed payment. */
-  onComplete?: (result: PaymentResult) => void;
-  /** Called when the Nuvei widget or the enabler encounters an error. */
-  onError?: (error: unknown) => void;
-  /**
-   * Called when the processor confirms the payment is pending (inconclusive
-   * state). The payment is neither approved nor rejected at this point.
-   * No polling is performed — the merchant should await a DMN webhook.
-   */
-  onPending?: (result: PendingPaymentResult) => void;
 };
 
-/**
- * Result returned by the Nuvei widget on payment completion.
- */
+/** Result returned to the host when payment completion is known. */
 export type PaymentResult =
-  | { isSuccess: true; paymentReference: string; sessionToken: string }
-  | { isSuccess: false };
+  | { isSuccess: true; paymentReference: string }
+  | { isSuccess: false; paymentReference?: string };
 
-/**
- * Result passed to {@link EnablerOptions.onPending} when the processor
- * returns a pending confirmation outcome.
- */
+/** Result passed to {@link CheckoutEnablerOptions.onPending}. */
 export type PendingPaymentResult = {
   paymentReference: string;
-  sessionToken: string;
 };
 
-/**
- * Options for individual payment component builders.
- */
+/** Options for individual payment component builders. */
 export type ComponentOptions = {
   showPayButton?: boolean;
+  onPayButtonClick?: () => Promise<void | SubmitOptions>;
+};
+
+export interface PaymentDropinBuilder extends PaymentComponentBuilder {}
+export interface PaymentExpressBuilder extends PaymentComponentBuilder {}
+
+export type StoredComponentOptions = {
+  showPayButton?: boolean;
   onPayButtonClick?: () => Promise<void>;
+  id: string;
+  brands: string[];
+};
+
+export interface StoredComponent extends PaymentComponent {
+  remove(): Promise<void>;
+}
+
+export interface StoredComponentBuilder {
+  componentHasSubmit: boolean;
+  build(config: StoredComponentOptions): StoredComponent;
+}
+
+export type StoredPaymentMethod = {
+  id: string;
+  type: string;
+  createdAt: string;
+  isDefault: boolean;
+  displayOptions: Record<string, unknown>;
+};
+
+export type StoredPaymentMethodsOptions = {
+  allowedMethodTypes?: string[];
+};
+
+export type StoredPaymentMethodsResult = {
+  storedPaymentMethods: StoredPaymentMethod[];
 };

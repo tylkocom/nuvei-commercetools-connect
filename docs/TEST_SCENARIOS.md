@@ -170,7 +170,7 @@ Steps:
 2. Confirm `dropins` is empty.
 3. Confirm `components` contains `card`.
 4. Confirm unsupported production methods such as wallets or APMs are not advertised unless implemented.
-5. Compare this response with `NuveiSimplyConnectEnabler.createComponentBuilder()` and `NuveiWebSdkEnabler.createComponentBuilder()` behavior.
+5. Compare this response with Checkout-facing `Enabler.createComponentBuilder()` behavior and the Nuvei-specific enablers used by the local harness.
 
 Expected result:
 
@@ -185,9 +185,9 @@ Purpose: Confirm the browser asset loads Nuvei SafeCharge SDK reliably.
 Steps:
 
 1. Open a browser page that loads `connector-enabler.es.js` or `connector-enabler.umd.js` from the deployed enabler asset URL.
-2. Instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler` with valid `processorUrl`, `sessionId`, `merchantId`, `merchantSiteId`, and `env`.
+2. Instantiate the Checkout-facing `Enabler` with valid `processorUrl` and `sessionId`; do not pass Nuvei merchant identifiers in the shopper page.
 3. Create a card component builder with `createComponentBuilder("card")`.
-4. Mount the card component into an empty container.
+4. Await `component.mount("#payment-container")`, then submit through `await component.submit({ storePaymentDetails: false })`.
 5. Inspect DevTools Network for `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js`.
 6. Reload the page and repeat mounting multiple components on the same page.
 
@@ -355,7 +355,7 @@ Purpose: Confirm unsupported payment methods fail predictably.
 
 Steps:
 
-1. In a browser harness, instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler`.
+1. In a browser harness, instantiate the Checkout-facing `Enabler`.
 2. Call `createComponentBuilder("applepay")` or another unsupported method.
 3. Observe the thrown error.
 4. Send `POST {PROCESSOR_URL}/payments` with `paymentMethodOptions` containing the same unsupported method.
@@ -541,21 +541,23 @@ Expected result:
 
 ## Scenario 23: DMN Missing Payment Correlation
 
-Purpose: Confirm current behavior for missing or unusable `merchant_unique_id`.
+Purpose: Confirm DMNs resolve to the exact CT Payment and never update an unrelated payment.
 
 Steps:
 
-1. Create or capture a DMN-like payload with a valid checksum but no `merchant_unique_id`, if Nuvei tooling allows this.
+1. Create or capture a DMN-like payload with a valid checksum, no `merchant_unique_id`, and a `sessionToken` that matches exactly one CT Payment `interfaceId`.
 2. Send it to `POST {PROCESSOR_URL}/webhooks/nuvei`.
-3. Repeat with `merchant_unique_id` set to an unknown CT Payment ID.
-4. Inspect response and logs.
+3. Repeat with `merchant_unique_id` set to an unknown CT Payment ID and the same valid `sessionToken`.
+4. Repeat with no `merchant_unique_id` and no `sessionToken`.
+5. Repeat with a `sessionToken` that matches zero or multiple CT Payments.
+6. Inspect response, CT Payment state, and logs.
 
 Expected result:
 
-- Missing correlation is rejected safely.
-- Unknown Payment ID is rejected safely.
+- Valid `sessionToken -> Payment.interfaceId` fallback updates only the matching Payment.
+- Unknown `merchant_unique_id` falls back to session-token lookup only when exactly one Payment matches.
+- Missing session token, zero matches, and multiple matches are rejected safely.
 - No unrelated Payment is modified.
-- This scenario should be used to confirm the known DMN correlation gap is resolved before production.
 
 ## Scenario 24: DMN Amount Or Currency Mismatch
 
@@ -635,8 +637,8 @@ Steps:
 
 1. Create a simple browser page that loads the enabler asset.
 2. Obtain a valid session ID through the merchant storefront or BFF flow.
-3. Instantiate `NuveiSimplyConnectEnabler` or `NuveiWebSdkEnabler` with the deployed processor URL and session ID.
-4. Mount the card component.
+3. Instantiate the Checkout-facing `Enabler` with the deployed processor URL and session ID.
+4. Await mounting of the card component and submit through the host-owned submit flow.
 5. Complete an approving sandbox payment.
 6. Inspect CT Payment and Nuvei dashboard.
 

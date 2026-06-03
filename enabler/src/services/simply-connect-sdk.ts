@@ -82,6 +82,9 @@ export function loadSimplyConnectSdk(): Promise<CheckoutFunction> {
     };
     script.onerror = () => reject(new Error("Failed to load Nuvei SDK script"));
     document.head.appendChild(script);
+  }).catch((error: unknown) => {
+    scLoadPromise = undefined;
+    throw error;
   });
 
   return scLoadPromise;

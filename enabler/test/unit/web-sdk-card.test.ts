@@ -49,13 +49,13 @@ describe("WebSdkCardBuilder", () => {
     expect(builder.componentHasSubmit).toBe(true);
   });
 
-  it("build() returns a component with mount, submit and isValid", () => {
+  it("build() returns a component with mount, submit and isValid", async () => {
     const builder = new WebSdkCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
     expect(typeof component.mount).toBe("function");
     expect(typeof component.submit).toBe("function");
-    expect(component.isValid()).toBe(false);
+    await expect(component.isValid()).resolves.toBe(false);
   });
 });
 
@@ -65,11 +65,11 @@ describe("WebSdkCardComponent", () => {
     vi.clearAllMocks();
   });
 
-  it("submit() throws before mount", () => {
+  it("submit() rejects before mount", async () => {
     const builder = new WebSdkCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
-    expect(() => component.submit()).toThrow("WebSdkCardComponent: not mounted yet");
+    await expect(component.submit()).rejects.toThrow("WebSdkCardComponent: not mounted yet");
   });
 
   it("mount() creates a card field and submit() confirms using res.result", async () => {
@@ -86,6 +86,7 @@ describe("WebSdkCardComponent", () => {
     };
 
     mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
       sessionToken: "session-token-1",
       paymentReference: "payment-ref-1",
       amount: "10.00",
@@ -95,13 +96,13 @@ describe("WebSdkCardComponent", () => {
 
     const builder = new WebSdkCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
-    component.mount("#container");
+    await component.mount("#container");
 
-    await vi.waitFor(() => expect(mockLoadWebSdk).toHaveBeenCalled());
-    await vi.waitFor(() => expect(attach).toHaveBeenCalled());
-    expect(component.isValid()).toBe(true);
+    expect(mockLoadWebSdk).toHaveBeenCalled();
+    expect(attach).toHaveBeenCalled();
+    await expect(component.isValid()).resolves.toBe(true);
 
-    component.submit();
+    await component.submit();
 
     await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
 
@@ -113,6 +114,7 @@ describe("WebSdkCardComponent", () => {
     expect(sfc.createPayment).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionToken: "session-token-1",
+        clientUniqueId: "cart-1",
         paymentOption: cardField,
         billingAddress: {
           email: "sandbox@example.com",
@@ -136,6 +138,7 @@ describe("WebSdkCardComponent", () => {
     stubDocument();
     const simplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
     mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
       sessionToken: "session-token-1",
       paymentReference: "payment-ref-1",
       amount: "10.00",
@@ -148,9 +151,9 @@ describe("WebSdkCardComponent", () => {
 
     const builder = new WebSdkCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
-    component.mount("#container");
+    await component.mount("#container");
 
-    await vi.waitFor(() => expect(mockLoadWebSdk).toHaveBeenCalled());
+    expect(mockLoadWebSdk).toHaveBeenCalled();
     expect(simplyConnectSpy).not.toHaveBeenCalled();
   });
 });

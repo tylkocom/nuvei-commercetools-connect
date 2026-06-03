@@ -122,7 +122,7 @@ Focus new tests on externally visible behavior and invariants that can break pay
 
 | Area | What to cover |
 | --- | --- |
-| Enabler option validation | Invalid processor URLs, missing session or merchant fields, safe public errors without leaking secrets. |
+| Enabler option validation | Template-compatible `Enabler` accepts processor URL/session only; Nuvei-specific classes reject invalid processor URLs, missing session or merchant fields, and expose safe public errors without leaking secrets. |
 | Payment method registry | Supported method ordering and parity between enabler and processor advertised methods. |
 | Browser SDK loading | Duplicate script avoidance, SDK load failure handling, and callback behavior. |
 | Processor payment routes | Safe errors for unsupported methods, schema boundaries, successful session creation responses. |

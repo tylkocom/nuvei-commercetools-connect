@@ -965,12 +965,73 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return { outcome };
   }
 
+  private getOptionalDmnString(body: Record<string, unknown>, keys: string[]): string | undefined {
+    for (const key of keys) {
+      const value = body[key];
+      if (typeof value === "string" && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return undefined;
+  }
+
+  private async resolveDmnPayment(body: Record<string, unknown>): Promise<Payment> {
+    const merchantUniqueId = this.getOptionalDmnString(body, ["merchant_unique_id"]);
+    const sessionToken = this.getOptionalDmnString(body, [
+      "sessionToken",
+      "session_token",
+      "SessionToken",
+    ]);
+
+    if (merchantUniqueId) {
+      let payment: Payment | undefined;
+      try {
+        payment = await this.ctPaymentService.getPayment({ id: merchantUniqueId });
+      } catch (error) {
+        if (!sessionToken) {
+          throw error;
+        }
+        log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
+          merchantUniqueId,
+        });
+      }
+
+      if (payment) {
+        if (sessionToken && payment.interfaceId !== sessionToken) {
+          throw new Error("DMN session token does not match merchant_unique_id payment");
+        }
+        return payment;
+      }
+    } else if (!sessionToken) {
+      throw new Error("Missing merchant_unique_id in DMN body");
+    }
+
+    if (!sessionToken) {
+      throw new Error("Missing DMN session token for Payment fallback");
+    }
+
+    const payments = await this.ctPaymentService.findPaymentsByInterfaceId({
+      interfaceId: sessionToken,
+    });
+
+    if (payments.length === 0) {
+      throw new Error("No Payment found for DMN session token");
+    }
+
+    if (payments.length > 1) {
+      throw new Error("Multiple Payments found for DMN session token");
+    }
+
+    return payments[0];
+  }
+
   /**
    * Process a Nuvei DMN (Direct Merchant Notification) webhook
    *
    * @remarks
-   * Validates the DMN checksum, checks idempotency, and updates the CT Payment
-   * with the appropriate transaction and payment status.
+   * Validates the DMN checksum, resolves the exact CT Payment by
+   * merchant_unique_id or sessionToken fallback, checks idempotency, and updates
+   * the CT Payment with the appropriate transaction and payment status.
    *
    * @param body - The DMN request body
    */
@@ -984,10 +1045,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     this.assertDmnMatchesConfig(body);
 
-    const paymentId = body.merchant_unique_id as string;
-    if (!paymentId) {
-      throw new Error("Missing merchant_unique_id in DMN body");
-    }
+    const ctPayment = await this.resolveDmnPayment(body);
+    const paymentId = ctPayment.id;
+    const bodyForConversion = { ...body, merchant_unique_id: paymentId };
 
     log.info("Processing Nuvei DMN.", {
       paymentId,
@@ -995,11 +1055,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
       pppStatus: String(body.ppp_status),
     });
 
-    const ctPayment = await this.ctPaymentService.getPayment({ id: paymentId });
-
     // Idempotency: deduplicate by canonical PPP identity (D-18).
     // Do not deduplicate on optional fiscal TransactionID alone.
-    const dmnPpp = extractCanonicalPpp(body);
+    const dmnPpp = extractCanonicalPpp(bodyForConversion);
     if (dmnPpp) {
       const existingInteractionIds = (ctPayment.transactions || [])
         .map((tx) => tx.interactionId)
@@ -1015,11 +1073,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     const updateData = this.nuveiEventConverter.convertDmnToPaymentUpdate(
-      body,
+      bodyForConversion,
       ctPayment.amountPlanned?.centAmount,
     );
     this.assertDmnUpdateMatchesPayment(updateData, ctPayment);
-    await this.assertDmnMatchesNuveiStatus(updateData, ctPayment, body);
+    await this.assertDmnMatchesNuveiStatus(updateData, ctPayment, bodyForConversion);
 
     for (const tx of updateData.transactions) {
       await this.ctPaymentService.updatePayment({

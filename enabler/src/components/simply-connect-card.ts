@@ -5,6 +5,7 @@ import type {
   EnablerOptions,
   PaymentComponent,
   PaymentComponentBuilder,
+  PaymentComponentState,
 } from "../payment-enabler/payment-enabler.js";
 import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import type { ApiService } from "../services/api-service.js";
@@ -26,6 +27,7 @@ class SimplyConnectCardComponent implements PaymentComponent {
   private readonly api: ApiService;
   private sessionToken = "";
   private paymentReference = "";
+  private initPromise: Promise<void> | undefined;
 
   constructor(
     private readonly baseOptions: EnablerOptions,
@@ -37,16 +39,29 @@ class SimplyConnectCardComponent implements PaymentComponent {
     });
   }
 
-  mount(selector: string): void {
-    this.init(selector).catch((error: unknown) => this.baseOptions.onError?.(error));
+  mount(selector: string): Promise<void> {
+    this.initPromise ??= this.init(selector).catch((error: unknown) => {
+      this.initPromise = undefined;
+      this.baseOptions.onError?.(error);
+      throw error;
+    });
+    return this.initPromise;
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
     throw new Error("Simply Connect handles submission internally via the widget pay button.");
   }
 
-  isValid(): boolean {
+  async isValid(): Promise<boolean> {
     return this.mounted;
+  }
+
+  async getState(): Promise<PaymentComponentState> {
+    return {};
+  }
+
+  async showValidation(): Promise<void> {
+    // Nuvei-hosted validation is controlled by the Simply Connect widget.
   }
 
   async isAvailable(): Promise<boolean> {
@@ -59,6 +74,8 @@ class SimplyConnectCardComponent implements PaymentComponent {
   }
 
   private async init(selector: string): Promise<void> {
+    void this.componentOptions;
+
     const [paymentRes, checkout] = await Promise.all([
       this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.card]: {} } }),
       loadSimplyConnectSdk(),
@@ -72,7 +89,6 @@ class SimplyConnectCardComponent implements PaymentComponent {
       throw new Error(`Mount target not found: ${selector}`);
     }
 
-    // Clear any previous content
     container.innerHTML = "";
 
     checkout({
@@ -83,10 +99,10 @@ class SimplyConnectCardComponent implements PaymentComponent {
       amount: paymentRes.amount,
       currency: paymentRes.currency,
       locale: this.baseOptions.locale,
-      country: "US",
+      country: this.baseOptions.countryCode ?? "US",
       billingAddress: {
-        email: "test@example.com",
-        country: "US",
+        email: "sandbox@example.com",
+        country: this.baseOptions.countryCode ?? "US",
       },
       renderTo: selector,
       onResult: (result: CheckoutResult) => {
@@ -98,8 +114,6 @@ class SimplyConnectCardComponent implements PaymentComponent {
   }
 
   private handleCheckoutResult(result: CheckoutResult): void {
-    console.log("[NuveiEnabler] Simply Connect onResult:", JSON.stringify(result));
-
     const nuveiResult = {
       transactionStatus: result.transactionStatus,
       sessionToken: result.sessionToken,

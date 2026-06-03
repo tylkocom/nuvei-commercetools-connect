@@ -1,8 +1,9 @@
 /**
- * Nuvei Simply Connect / Web SDK Enabler for commercetools Checkout.
+ * Nuvei payment enabler for commercetools Checkout.
  *
- * This library wraps the Nuvei frontend widgets and exposes a standard
- * interface that commercetools Checkout (and custom storefronts) can consume.
+ * `Enabler` is the Checkout-facing payment-template-compatible adapter.
+ * The Nuvei-specific enablers remain exported for custom storefronts and local
+ * harnesses that intentionally choose a Nuvei SDK mode.
  */
 
 import type {
@@ -20,6 +21,7 @@ import { SimplyConnectCardBuilder } from "./components/simply-connect-card.js";
 import { WebSdkCardBuilder } from "./components/web-sdk-card.js";
 
 export * from "./payment-enabler/payment-enabler.js";
+export { Enabler } from "./payment-enabler/checkout-enabler.js";
 export { SimplyConnectCardBuilder } from "./components/simply-connect-card.js";
 export { WebSdkCardBuilder } from "./components/web-sdk-card.js";
 

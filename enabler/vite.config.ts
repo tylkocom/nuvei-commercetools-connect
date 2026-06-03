@@ -7,7 +7,7 @@ export default defineConfig({
     outDir: resolve(__dirname, "public"),
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
-      name: "NuveiEnabler",
+      name: "Connector",
       fileName: (format) => `connector-enabler.${format}.js`,
       formats: ["es", "umd"],
     },

@@ -60,6 +60,7 @@ vi.mock("../../../src/libs/fastify/context/context", () => ({
 const mockHasTransactionInState = vi.fn();
 const mockGetPayment = vi.fn();
 const mockUpdatePayment = vi.fn();
+const mockFindPaymentsByInterfaceId = vi.fn();
 const mockGetCart = vi.fn();
 const mockGetPaymentAmount = vi.fn();
 
@@ -72,6 +73,7 @@ vi.mock("@commercetools/connect-payments-sdk", () => ({
   CommercetoolsPaymentService: class {
     getPayment = mockGetPayment;
     updatePayment = mockUpdatePayment;
+    findPaymentsByInterfaceId = mockFindPaymentsByInterfaceId;
     hasTransactionInState = mockHasTransactionInState;
   },
   ErrorInvalidOperation: class extends Error {
@@ -138,6 +140,7 @@ function createService() {
   const ctPaymentService = {
     getPayment: mockGetPayment,
     updatePayment: mockUpdatePayment,
+    findPaymentsByInterfaceId: mockFindPaymentsByInterfaceId,
     hasTransactionInState: mockHasTransactionInState,
   };
   const ctOrderService = {};
@@ -149,6 +152,7 @@ function createService() {
   });
   mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
   mockGetPayment.mockResolvedValue(makeMockPayment());
+  mockFindPaymentsByInterfaceId.mockResolvedValue([makeDmnMockPayment()]);
   mockUpdatePayment.mockResolvedValue(undefined);
 
   const service = new NuveiPaymentService({
@@ -258,6 +262,7 @@ describe("NuveiPaymentService – DMN processing", () => {
     mockHasTransactionInState.mockReset();
     mockGetPayment.mockReset();
     mockUpdatePayment.mockReset();
+    mockFindPaymentsByInterfaceId.mockReset();
     mockGetCart.mockReset();
     mockGetPaymentAmount.mockReset();
     mockConvertDmnToPaymentUpdate.mockReset();
@@ -522,7 +527,7 @@ describe("NuveiPaymentService – DMN processing", () => {
   // processNuveiDmn – missing merchant_unique_id
   // -------------------------------------------------------------------------
   describe("merchant_unique_id validation", () => {
-    it("rejects when merchant_unique_id is missing", async () => {
+    it("rejects when merchant_unique_id is missing and no sessionToken fallback exists", async () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
@@ -532,6 +537,108 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
 
       expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockFindPaymentsByInterfaceId).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("falls back to sessionToken when merchant_unique_id is absent", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-session",
+        interfaceId: "nuvei-session-token",
+      });
+      const body = {
+        ...dmnMissingMerchantUniqueId,
+        sessionToken: "nuvei-session-token",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockFindPaymentsByInterfaceId).toHaveBeenCalledWith({
+        interfaceId: "nuvei-session-token",
+      });
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "payment-from-session" }),
+        1000,
+      );
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "payment-from-session" }),
+      );
+    });
+
+    it("falls back to sessionToken when merchant_unique_id is not a CT Payment id", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-session",
+        interfaceId: "nuvei-session-token",
+      });
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "nuvei-non-payment-reference",
+        sessionToken: "nuvei-session-token",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockRejectedValue(new Error("Payment not found"));
+      mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockFindPaymentsByInterfaceId).toHaveBeenCalledWith({
+        interfaceId: "nuvei-session-token",
+      });
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "payment-from-session" }),
+      );
+    });
+
+    it("rejects when merchant_unique_id payment conflicts with DMN sessionToken", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({ id: "payment-1", interfaceId: "different-session-token" }),
+      );
+
+      await expect(
+        service.processNuveiDmn({ ...dmnAuthOk, sessionToken: "nuvei-session-token" }),
+      ).rejects.toThrow("DMN session token does not match merchant_unique_id payment");
+
+      expect(mockFindPaymentsByInterfaceId).not.toHaveBeenCalled();
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
   });

@@ -14,6 +14,13 @@ import {
 } from "../payment-enabler/payment-enabler.js";
 import type { NuveiResult } from "./simply-connect-sdk.js";
 
+/** Shape of the response returned by `GET /operations/config`. */
+export type ProcessorConfigResponse = {
+  environment: "test" | "production" | string;
+  merchantId: string;
+  merchantSiteId: string;
+};
+
 /** Shape of the response returned by `POST /payments/session`. */
 export type PaymentSessionResponse = {
   cartId: string;
@@ -36,6 +43,7 @@ export type ConfirmPaymentResponse = {
 
 /** Public contract exposed to consuming code. */
 export type ApiService = {
+  getConfig: () => Promise<ProcessorConfigResponse>;
   createPayment: (opts?: CreatePaymentRequest) => Promise<PaymentSessionResponse>;
   confirmPayment: (opts: ConfirmPaymentRequest) => Promise<ConfirmPaymentResponse>;
 };
@@ -55,33 +63,26 @@ export type ConfirmPaymentRequest = {
  * callback based on the authoritative processor outcome.
  *
  * The processor response is the single source of truth:
- * - `approved` → onComplete (D-20)
- * - `rejected` → safe onError; does not call onComplete or onPending (D-21)
- * - `pending`  → optional onPending; does not call onComplete or onError (D-19, D-22)
- *
- * @param result           - Nuvei browser widget result (used for reference only)
- * @param paymentReference - CT Payment id used as the confirmation endpoint path
- * @param knownSessionToken - Session token from the processor createPayment response (D-11)
- *                           Must NOT be taken from `result.sessionToken` (browser-side value)
- * @param api              - API service bound to the processor backend
- * @param onComplete       - Called on approved outcome
- * @param onError          - Called on rejected outcome with a safe error
- * @param onPending        - Called on pending outcome (optional; no polling added)
+ * - `approved` → onComplete
+ * - `rejected` → safe onError; does not call onComplete or onPending
+ * - `pending`  → optional onPending; if omitted, onError receives a safe pending error
  */
 export async function confirmPaymentResult(
   result: NuveiResult,
   paymentReference: string,
   knownSessionToken: string,
-  api: ApiService,
+  api: Pick<ApiService, "confirmPayment">,
   onComplete?: (result: PaymentResult) => void,
-  onError?: (error: unknown) => void,
+  onError?: (error: unknown, context?: { paymentReference?: string }) => void,
   onPending?: (result: PendingPaymentResult) => void,
 ): Promise<void> {
+  void result;
+
   let confirmRes: ConfirmPaymentResponse;
   try {
     confirmRes = await api.confirmPayment({ sessionToken: knownSessionToken, paymentReference });
   } catch {
-    onError?.(new Error("Failed to confirm payment."));
+    onError?.(new Error("Failed to confirm payment."), { paymentReference });
     return;
   }
 
@@ -90,22 +91,32 @@ export async function confirmPaymentResult(
       onComplete?.({
         isSuccess: true,
         paymentReference,
-        sessionToken: knownSessionToken,
       });
       break;
 
     case "rejected":
-      // Safe error — do not expose session token, raw Nuvei data, or diagnostics (T-01.1.1-08)
       onError?.(
         new PaymentSetupError(
           PublicPaymentErrorCode.REQUEST_MALFORMED,
           "Payment was declined. Please try a different payment method.",
         ),
+        { paymentReference },
       );
       break;
 
     case "pending":
-      onPending?.({ paymentReference, sessionToken: knownSessionToken });
+      if (onPending) {
+        onPending({ paymentReference });
+        return;
+      }
+
+      onError?.(
+        new PaymentSetupError(
+          PublicPaymentErrorCode.REQUEST_MALFORMED,
+          "Payment is pending confirmation. Please wait for final payment status.",
+        ),
+        { paymentReference },
+      );
       break;
   }
 }
@@ -122,6 +133,16 @@ async function readPublicPaymentError(res: Response): Promise<PublicPaymentError
   return undefined;
 }
 
+function readJsonOrThrow<T>(res: Response, route: string): Promise<T> {
+  if (!res.ok) {
+    throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, `Failed to call ${route}.`, {
+      route,
+      status: res.status,
+    });
+  }
+  return res.json() as Promise<T>;
+}
+
 /**
  * Creates an {@link ApiService} bound to a processor URL and session.
  */
@@ -133,6 +154,14 @@ export function apiService(opts: { baseApi: string; sessionId: string }): ApiSer
   };
 
   return {
+    async getConfig(): Promise<ProcessorConfigResponse> {
+      const res = await fetch(`${baseApi}/operations/config`, {
+        method: "GET",
+        headers,
+      });
+      return readJsonOrThrow<ProcessorConfigResponse>(res, "GET /operations/config");
+    },
+
     async createPayment(params?: CreatePaymentRequest): Promise<PaymentSessionResponse> {
       const res = await fetch(`${baseApi}/payments/session`, {
         method: "POST",

@@ -7,6 +7,37 @@ describe("apiService", () => {
     vi.restoreAllMocks();
   });
 
+  it("gets processor config with the commercetools session header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          environment: "test",
+          merchantId: "merchant-123",
+          merchantSiteId: "site-456",
+        }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await apiService({
+      baseApi: "https://processor.example.com/",
+      sessionId: "session-123",
+    }).getConfig();
+
+    expect(result).toEqual({
+      environment: "test",
+      merchantId: "merchant-123",
+      merchantSiteId: "site-456",
+    });
+    expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/operations/config", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-ID": "session-123",
+      },
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // createPayment
   // ---------------------------------------------------------------------------
@@ -233,6 +264,7 @@ describe("confirmPaymentResult", () => {
 
   function makeApi(outcome: string) {
     return {
+      getConfig: vi.fn(),
       createPayment: vi.fn(),
       confirmPayment: vi.fn().mockResolvedValue({ outcome }),
     };
@@ -258,7 +290,6 @@ describe("confirmPaymentResult", () => {
     expect(onComplete).toHaveBeenCalledWith({
       isSuccess: true,
       paymentReference: "ref-123",
-      sessionToken: "known-session-token",
     });
     expect(onError).not.toHaveBeenCalled();
     expect(onPending).not.toHaveBeenCalled();
@@ -307,7 +338,6 @@ describe("confirmPaymentResult", () => {
     expect(onPending).toHaveBeenCalledOnce();
     expect(onPending).toHaveBeenCalledWith({
       paymentReference: "ref-123",
-      sessionToken: "known-session-token",
     });
     expect(onComplete).not.toHaveBeenCalled();
     expect(onError).not.toHaveBeenCalled();
@@ -318,6 +348,7 @@ describe("confirmPaymentResult", () => {
     const onError = vi.fn();
     const onPending = vi.fn();
     const mockApi = {
+      getConfig: vi.fn(),
       createPayment: vi.fn(),
       confirmPayment: vi.fn().mockRejectedValue(new Error("backend secret-token failed")),
     };

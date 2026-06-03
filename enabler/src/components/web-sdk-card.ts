@@ -3,6 +3,8 @@ import type {
   EnablerOptions,
   PaymentComponent,
   PaymentComponentBuilder,
+  PaymentComponentState,
+  SubmitOptions,
 } from "../payment-enabler/payment-enabler.js";
 import type { ApiService } from "../services/api-service.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";
@@ -29,6 +31,8 @@ class WebSdkCardComponent implements PaymentComponent {
   private scard: SafeChargeCardField | undefined;
   private sessionToken = "";
   private paymentReference = "";
+  private cartId = "";
+  private initPromise: Promise<void> | undefined;
 
   constructor(
     private readonly baseOptions: EnablerOptions,
@@ -40,23 +44,37 @@ class WebSdkCardComponent implements PaymentComponent {
     });
   }
 
-  mount(selector: string): void {
-    this.init(selector).catch((error: unknown) => this.baseOptions.onError?.(error));
+  mount(selector: string): Promise<void> {
+    this.initPromise ??= this.init(selector).catch((error: unknown) => {
+      this.initPromise = undefined;
+      this.baseOptions.onError?.(error);
+      throw error;
+    });
+    return this.initPromise;
   }
 
-  submit(): void {
+  async submit(options: SubmitOptions = {}): Promise<void> {
+    if (!this.initPromise) {
+      throw new Error("WebSdkCardComponent: not mounted yet");
+    }
+
+    await this.initPromise;
+
     if (!this.sfc || !this.scard) {
       throw new Error("WebSdkCardComponent: not mounted yet");
     }
 
+    const clickOptions = await this.componentOptions.onPayButtonClick?.();
+    void (clickOptions?.storePaymentDetails ?? options.storePaymentDetails);
+
     this.sfc.createPayment(
       {
         sessionToken: this.sessionToken,
+        clientUniqueId: this.cartId,
         paymentOption: this.scard,
         billingAddress: {
-          /* SANDBOX-ONLY: Phase 4 will source real data. */
           email: "sandbox@example.com",
-          country: "US",
+          country: this.baseOptions.countryCode ?? "US",
         },
       },
       (res: SafeChargeResult) => {
@@ -65,8 +83,16 @@ class WebSdkCardComponent implements PaymentComponent {
     );
   }
 
-  isValid(): boolean {
+  async isValid(): Promise<boolean> {
     return !!this.scard;
+  }
+
+  async getState(): Promise<PaymentComponentState> {
+    return {};
+  }
+
+  async showValidation(): Promise<void> {
+    // Nuvei-hosted iframe validation is triggered during SDK submission.
   }
 
   async isAvailable(): Promise<boolean> {
@@ -84,6 +110,7 @@ class WebSdkCardComponent implements PaymentComponent {
     ]);
 
     this.sessionToken = paymentRes.sessionToken;
+    this.cartId = paymentRes.cartId;
     this.paymentReference = paymentRes.paymentReference;
     this.sfc = sfc;
 

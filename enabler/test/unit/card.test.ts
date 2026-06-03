@@ -45,6 +45,7 @@ function stubDocument() {
     querySelector: vi.fn().mockReturnValue({ innerHTML: "" }),
     createElement: vi.fn(),
     head: { appendChild: vi.fn() },
+    querySelectorAll: vi.fn().mockReturnValue([]),
   });
 }
 
@@ -88,7 +89,7 @@ describe("SimplyConnectCardComponent", () => {
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
-    component.mount("#container");
+    await component.mount("#container");
 
     expect(mockLoadSimplyConnectSdk).toHaveBeenCalled();
     expect(mockCreatePayment).toHaveBeenCalledWith({
@@ -110,7 +111,7 @@ describe("SimplyConnectCardComponent", () => {
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
-    component.mount("#container");
+    await component.mount("#container");
 
     await vi.waitFor(() =>
       expect(mockCheckout).toHaveBeenCalledWith(
@@ -136,30 +137,26 @@ describe("SimplyConnectCardComponent", () => {
     const builder = new SimplyConnectCardBuilder(opts);
     const component = builder.build({ showPayButton: true });
 
-    component.mount("#container");
-
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 0);
-    });
+    await expect(component.mount("#container")).rejects.toThrow(error);
 
     expect(onError).toHaveBeenCalledWith(error);
   });
 
-  it("submit() throws because Simply Connect handles submission internally", () => {
+  it("submit() rejects because Simply Connect handles submission internally", async () => {
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: false });
 
-    expect(() => component.submit()).toThrow(
+    await expect(component.submit()).rejects.toThrow(
       "Simply Connect handles submission internally via the widget pay button.",
     );
   });
 
-  it("submit() throws regardless of showPayButton setting", () => {
+  it("submit() rejects regardless of showPayButton setting", async () => {
     const onPayButtonClick = vi.fn().mockResolvedValue(undefined);
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true, onPayButtonClick });
 
-    expect(() => component.submit()).toThrow(
+    await expect(component.submit()).rejects.toThrow(
       "Simply Connect handles submission internally via the widget pay button.",
     );
     expect(onPayButtonClick).not.toHaveBeenCalled();
@@ -185,11 +182,11 @@ describe("SimplyConnectCardComponent", () => {
     expect(available).toBe(false);
   });
 
-  it("isValid() returns false before mount", () => {
+  it("isValid() returns false before mount", async () => {
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
-    expect(component.isValid()).toBe(false);
+    await expect(component.isValid()).resolves.toBe(false);
   });
 
   it("isValid() returns true after mount completes", async () => {
@@ -206,9 +203,9 @@ describe("SimplyConnectCardComponent", () => {
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
 
-    component.mount("#container");
+    await component.mount("#container");
 
-    await vi.waitFor(() => expect(component.isValid()).toBe(true));
+    await expect(component.isValid()).resolves.toBe(true);
   });
 
   it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
@@ -226,7 +223,7 @@ describe("SimplyConnectCardComponent", () => {
 
     const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
     const component = builder.build({ showPayButton: true });
-    component.mount("#container");
+    await component.mount("#container");
 
     await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
 

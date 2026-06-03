@@ -61,31 +61,30 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 
 ### Mount the card component
 
-`enabler/src/index.ts` exports `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, `PaymentMethod`, `PaymentComponentBuilder`, `SimplyConnectCardBuilder`, and `WebSdkCardBuilder`.
+`enabler/src/index.ts` exports the Checkout-facing `Enabler` adapter, plus Nuvei-specific `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, `PaymentMethod`, `PaymentComponentBuilder`, `SimplyConnectCardBuilder`, and `WebSdkCardBuilder`.
 ```ts
-import { NuveiEnabler } from "@nuvei-commercetools/enabler";
+import { Enabler } from "@nuvei-commercetools/enabler";
 
-const enabler = new NuveiEnabler({
+const enabler = new Enabler({
   processorUrl: "https://service-<id>.<region>.gcp.commercetools.app",
   sessionId: "<checkout-session-id>",
-  merchantId: "<nuvei-merchant-id>",
-  merchantSiteId: "<nuvei-merchant-site-id>",
-  env: "test",
   locale: "en",
+  countryCode: "DE",
   onComplete: (result) => {
     if (result.isSuccess) {
-      console.log(result.paymentReference, result.sessionToken);
+      console.log(result.paymentReference);
     }
   },
   onError: console.error,
-}, "simply-connect");
+});
 
 const builder = await enabler.createComponentBuilder("card");
 const component = builder.build({});
-component.mount("#payment-container");
+await component.mount("#payment-container");
+await component.submit({ storePaymentDetails: false });
 ```
 
-Expected result: the enabler loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the card widget into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback. Pass `"web-sdk"` to the facade, or use `NuveiWebSdkEnabler` directly, to mount the Web SDK card mode and show the external Pay button. `onComplete` is only called for approved outcomes.
+Expected result: the Checkout-facing enabler fetches Nuvei frontend configuration from `GET /operations/config`, loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the card field into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback when provided, otherwise it calls `onError` with a safe pending-state error. `onComplete` is only called for approved outcomes and does not expose the Nuvei session token.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
