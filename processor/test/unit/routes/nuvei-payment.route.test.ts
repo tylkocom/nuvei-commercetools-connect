@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { PaymentSetupError, PublicPaymentErrorCode } from "../../../src/dtos/operations/payment-errors.dto";
+import {
+  PaymentSetupError,
+  PublicPaymentErrorCode,
+} from "../../../src/dtos/operations/payment-errors.dto";
 import Fastify from "fastify";
 
 vi.mock("@commercetools/connect-payments-sdk", () => ({
@@ -136,7 +139,6 @@ describe("payment routes", () => {
     );
   });
 
-
   it("does not register the removed GET / payment route", () => {
     expect(app.routes.find((route) => route.method === "GET" && route.url === "/")).toBeUndefined();
   });
@@ -144,8 +146,12 @@ describe("payment routes", () => {
   it("registers POST /confirm/:id and not the legacy camelCase confirm route", async () => {
     paymentService.confirmPayment.mockResolvedValue({ outcome: "approved" });
 
-    expect(app.routes.find((route) => route.method === "POST" && route.url === "/confirmPayments/:id")).toBeUndefined();
-    const confirmRoute = app.routes.find((route) => route.method === "POST" && route.url === "/confirm/:id");
+    expect(
+      app.routes.find((route) => route.method === "POST" && route.url === "/confirmPayments/:id"),
+    ).toBeUndefined();
+    const confirmRoute = app.routes.find(
+      (route) => route.method === "POST" && route.url === "/confirm/:id",
+    );
     expect(confirmRoute).toBeDefined();
 
     const reply = makeReply();
@@ -166,7 +172,9 @@ describe("payment routes", () => {
       merchantReturnUrl: "https://example.com/return",
     });
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
+    const postRoute = app.routes.find(
+      (route) => route.method === "POST" && route.url === "/session",
+    );
     expect(postRoute).toBeDefined();
 
     const body = { paymentMethodOptions: { card: {} } };
@@ -191,10 +199,14 @@ describe("payment routes", () => {
       }),
     );
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
+    const postRoute = app.routes.find(
+      (route) => route.method === "POST" && route.url === "/session",
+    );
     const reply = makeReply();
     await postRoute?.handler(
-      { body: { paymentMethodOptions: { wechatpay: { token: "secret" } } } } satisfies PaymentRouteRequest,
+      {
+        body: { paymentMethodOptions: { wechatpay: { token: "secret" } } },
+      } satisfies PaymentRouteRequest,
       reply,
     );
 
@@ -207,7 +219,10 @@ describe("payment routes", () => {
       code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
       message: "Payment method is not supported.",
     });
-    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
+    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual([
+      "code",
+      "message",
+    ]);
     expect(log.warn).toHaveBeenCalledWith("Payment setup request rejected.", {
       route: "POST /payments/session",
       code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
@@ -219,7 +234,6 @@ describe("payment routes", () => {
       expect.objectContaining({ paymentMethodOptions: expect.anything() }),
     );
   });
-
 
   it("POST /session unsupported methods reach semantic validation at the Fastify boundary", async () => {
     paymentService.createPaymentSession.mockRejectedValue(
@@ -264,7 +278,9 @@ describe("payment routes", () => {
       }),
     );
 
-    const postRoute = app.routes.find((route) => route.method === "POST" && route.url === "/session");
+    const postRoute = app.routes.find(
+      (route) => route.method === "POST" && route.url === "/session",
+    );
     const reply = makeReply();
     await postRoute?.handler(
       { body: { paymentMethodOptions: { card: {}, paypal: {} } } } satisfies PaymentRouteRequest,
@@ -276,7 +292,10 @@ describe("payment routes", () => {
       code: PublicPaymentErrorCode.REQUEST_MALFORMED,
       message: "Payment setup request is malformed.",
     });
-    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual(["code", "message"]);
+    expect(Object.keys(reply.sent[0] as Record<string, unknown>).sort()).toEqual([
+      "code",
+      "message",
+    ]);
   });
 
   // -------------------------------------------------------------------------

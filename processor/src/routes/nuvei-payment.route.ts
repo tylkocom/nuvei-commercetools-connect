@@ -11,10 +11,7 @@ import {
   PaymentConfirmResponseSchema,
   PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
-import {
-  DmnChecksumInvalidError,
-  NuveiPaymentService,
-} from "../services/nuvei-payment.service.js";
+import { DmnChecksumInvalidError, NuveiPaymentService } from "../services/nuvei-payment.service.js";
 import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
 import {
   PaymentSetupError,
@@ -43,7 +40,6 @@ export const paymentRoutes = async (
   fastify: FastifyInstance,
   opts: FastifyPluginOptions & PaymentRoutesOptions,
 ) => {
-
   // POST /session - Create a payment session with payment method options support
   fastify.post<{
     Body: PaymentMethodOptionsSchemaDTO;

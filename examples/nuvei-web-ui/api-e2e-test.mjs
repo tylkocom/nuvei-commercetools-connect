@@ -139,20 +139,20 @@ async function testMockCtCreateSession() {
   }
   assert(body.sessionToken, "Missing sessionToken");
   assert(body.paymentReference, "Missing paymentReference");
-  ok("TEST-5", `sessionToken=${body.sessionToken.slice(0, 12)}..., paymentReference=${body.paymentReference}`);
+  ok(
+    "TEST-5",
+    `sessionToken=${body.sessionToken.slice(0, 12)}..., paymentReference=${body.paymentReference}`,
+  );
   return body;
 }
 
 async function testMockCtConfirm(paymentReference) {
   log("TEST-6", `POST /payments/confirm/${paymentReference} on mock CT server`);
-  const { status, body } = await request(
-    `${MOCK_CT_URL}/payments/confirm/${paymentReference}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionToken: "mock-session-token" }),
-    },
-  );
+  const { status, body } = await request(`${MOCK_CT_URL}/payments/confirm/${paymentReference}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sessionToken: "mock-session-token" }),
+  });
   if (status !== 200) {
     fail("TEST-6", `Expected 200, got ${status}: ${JSON.stringify(body)}`);
     return false;

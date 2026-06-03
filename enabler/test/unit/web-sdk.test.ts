@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-
 vi.mock("../../src/services/simply-connect-sdk", () => ({
   loadSimplyConnectSdk: vi.fn(),
 }));
@@ -99,7 +98,11 @@ describe("loadWebSdk", () => {
     });
 
     const { loadWebSdk } = await import("../../src/services/web-sdk");
-    const promise = loadWebSdk({ env: "int", merchantId: "merchant-123", merchantSiteId: "site-456" });
+    const promise = loadWebSdk({
+      env: "int",
+      merchantId: "merchant-123",
+      merchantSiteId: "site-456",
+    });
 
     scriptEl.onerror?.();
 
@@ -127,7 +130,11 @@ describe("loadWebSdk", () => {
     });
 
     const { loadWebSdk } = await import("../../src/services/web-sdk");
-    const promise = loadWebSdk({ env: "int", merchantId: "merchant-123", merchantSiteId: "site-456" });
+    const promise = loadWebSdk({
+      env: "int",
+      merchantId: "merchant-123",
+      merchantSiteId: "site-456",
+    });
 
     scriptEl.onload?.();
 

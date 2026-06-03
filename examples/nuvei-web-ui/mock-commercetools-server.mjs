@@ -62,7 +62,15 @@ async function callNuveiOpenOrder({ amount, currency, clientUniqueId }) {
   };
 
   const checksum = calculateNuveiChecksum(
-    ["merchantId", "merchantSiteId", "clientRequestId", "amount", "currency", "timeStamp", "secretKey"],
+    [
+      "merchantId",
+      "merchantSiteId",
+      "clientRequestId",
+      "amount",
+      "currency",
+      "timeStamp",
+      "secretKey",
+    ],
     payload,
     secretKey,
   );
@@ -241,7 +249,8 @@ app.get("/payment-components", (req, res) => {
 app.post("/payments/session", async (req, res) => {
   record("INBOUND", "Create payment session", req, {
     normalCaller: "enabler browser code -> processor",
-    testedFlow: "processor Nuvei openOrder creation path; calls real Nuvei sandbox when credentials are present",
+    testedFlow:
+      "processor Nuvei openOrder creation path; calls real Nuvei sandbox when credentials are present",
   });
 
   const hasNuveiCreds =
@@ -262,7 +271,10 @@ app.post("/payments/session", async (req, res) => {
       });
       sessionToken = nuveiRes.sessionToken;
       orderId = nuveiRes.orderId;
-      console.log("Nuvei openOrder succeeded:", { orderId, sessionToken: sessionToken?.slice(0, 8) + "..." });
+      console.log("Nuvei openOrder succeeded:", {
+        orderId,
+        sessionToken: sessionToken?.slice(0, 8) + "...",
+      });
     } catch (err) {
       console.error("Nuvei openOrder failed:", err.message, err.responseBody);
       return res.status(502).json({
@@ -276,7 +288,9 @@ app.post("/payments/session", async (req, res) => {
   }
 
   ledger.payment.interfaceId = sessionToken;
-  ledger.payment.paymentMethodInfo.method = req.body?.paymentMethodOptions?.embedded ? "embedded" : "card";
+  ledger.payment.paymentMethodInfo.method = req.body?.paymentMethodOptions?.embedded
+    ? "embedded"
+    : "card";
 
   res.json({
     cartId: ledger.cart.id,
@@ -312,7 +326,8 @@ app.post("/payments/confirm/:id", (req, res) => {
 app.post("/webhooks/nuvei", (req, res) => {
   record("INBOUND", "Nuvei DMN webhook", req, {
     normalCaller: "Nuvei sandbox -> processor",
-    testedFlow: "processor DMN checksum/correlation/update path; checksum not enforced by this mock",
+    testedFlow:
+      "processor DMN checksum/correlation/update path; checksum not enforced by this mock",
   });
 
   const body = req.body ?? {};
@@ -344,10 +359,13 @@ app.post("/webhooks/nuvei", (req, res) => {
     interactionId,
   });
 
-  if (type === "Authorization" && state === "Success") ledger.payment.paymentStatus.interfaceCode = "authorized";
+  if (type === "Authorization" && state === "Success")
+    ledger.payment.paymentStatus.interfaceCode = "authorized";
   if (type === "Charge" && state === "Success") ledger.payment.paymentStatus.interfaceCode = "paid";
-  if (type === "Refund" && state === "Success") ledger.payment.paymentStatus.interfaceCode = "refunded";
-  if (type === "CancelAuthorization" && state === "Success") ledger.payment.paymentStatus.interfaceCode = "cancelled";
+  if (type === "Refund" && state === "Success")
+    ledger.payment.paymentStatus.interfaceCode = "refunded";
+  if (type === "CancelAuthorization" && state === "Success")
+    ledger.payment.paymentStatus.interfaceCode = "cancelled";
 
   res.json({
     ok: true,

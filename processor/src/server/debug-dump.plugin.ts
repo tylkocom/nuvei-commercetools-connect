@@ -42,78 +42,70 @@ export function clearDebugDump(): void {
 const debugDumpPlugin = fp(async (fastify: FastifyInstance) => {
   // Capture on every request
   fastify.addHook("onRequest", async (request: FastifyRequest) => {
-    (request as unknown as Record<string, unknown>)["__debugCaptureStart"] =
-      performance.now();
+    (request as unknown as Record<string, unknown>)["__debugCaptureStart"] = performance.now();
   });
 
-  fastify.addHook("onSend", async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-    payload: string,
-  ) => {
-    const start = (request as unknown as Record<string, unknown>)[
-      "__debugCaptureStart"
-    ] as number | undefined;
-    const durationMs = start ? Math.round(performance.now() - start) : 0;
+  fastify.addHook(
+    "onSend",
+    async (request: FastifyRequest, reply: FastifyReply, payload: string) => {
+      const start = (request as unknown as Record<string, unknown>)["__debugCaptureStart"] as
+        | number
+        | undefined;
+      const durationMs = start ? Math.round(performance.now() - start) : 0;
 
-    let body: unknown = undefined;
-    let rawBody: string | undefined = undefined;
+      let body: unknown = undefined;
+      let rawBody: string | undefined = undefined;
 
-    try {
-      // fastify-raw-body may have set rawBody on some routes
-      rawBody = (request as unknown as { rawBody?: string }).rawBody;
-    } catch {
-      // ignore
-    }
-
-    try {
-      if (typeof request.body === "string") {
-        body = request.body;
-      } else if (request.body !== undefined) {
-        body = request.body;
+      try {
+        // fastify-raw-body may have set rawBody on some routes
+        rawBody = (request as unknown as { rawBody?: string }).rawBody;
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
 
-    let responseBody: unknown = undefined;
-    try {
-      if (typeof payload === "string" && payload.length > 0) {
-        responseBody =
-          payload.startsWith("{") || payload.startsWith("[")
-            ? JSON.parse(payload)
-            : payload;
+      try {
+        if (typeof request.body === "string") {
+          body = request.body;
+        } else if (request.body !== undefined) {
+          body = request.body;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      responseBody = payload;
-    }
 
-    const entry: DebugEntry = {
-      id: request.id,
-      at: new Date().toISOString(),
-      method: request.method,
-      url: request.url,
-      headers: request.headers as Record<string, string | string[]>,
-      query: request.query,
-      params: request.params,
-      body,
-      rawBody,
-      statusCode: reply.statusCode,
-      responseBody,
-      durationMs,
-    };
+      let responseBody: unknown = undefined;
+      try {
+        if (typeof payload === "string" && payload.length > 0) {
+          responseBody =
+            payload.startsWith("{") || payload.startsWith("[") ? JSON.parse(payload) : payload;
+        }
+      } catch {
+        responseBody = payload;
+      }
 
-    pushEntry(entry);
-  });
+      const entry: DebugEntry = {
+        id: request.id,
+        at: new Date().toISOString(),
+        method: request.method,
+        url: request.url,
+        headers: request.headers as Record<string, string | string[]>,
+        query: request.query,
+        params: request.params,
+        body,
+        rawBody,
+        statusCode: reply.statusCode,
+        responseBody,
+        durationMs,
+      };
 
-  fastify.addHook("onError", async (
-    request: FastifyRequest,
-    reply: FastifyReply,
-    error: Error,
-  ) => {
-    const start = (request as unknown as Record<string, unknown>)[
-      "__debugCaptureStart"
-    ] as number | undefined;
+      pushEntry(entry);
+    },
+  );
+
+  fastify.addHook("onError", async (request: FastifyRequest, reply: FastifyReply, error: Error) => {
+    const start = (request as unknown as Record<string, unknown>)["__debugCaptureStart"] as
+      | number
+      | undefined;
     const durationMs = start ? Math.round(performance.now() - start) : 0;
 
     const entry: DebugEntry = {

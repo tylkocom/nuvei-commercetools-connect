@@ -24,8 +24,10 @@ describe("apiService", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await apiService({ baseApi: "https://processor.example.com/", sessionId: "session-123" })
-      .createPayment({ paymentMethodOptions: { card: {} } });
+    await apiService({
+      baseApi: "https://processor.example.com/",
+      sessionId: "session-123",
+    }).createPayment({ paymentMethodOptions: { card: {} } });
 
     expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments/session", {
       method: "POST",
@@ -44,8 +46,7 @@ describe("apiService", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
-      .createPayment();
+    await apiService({ baseApi: "https://processor.example.com", sessionId: "s" }).createPayment();
 
     expect(fetchMock).toHaveBeenCalledWith("https://processor.example.com/payments/session", {
       method: "POST",
@@ -67,7 +68,6 @@ describe("apiService", () => {
     ).rejects.toThrow("Failed to create payment session.");
   });
 
-
   // ---------------------------------------------------------------------------
   // confirmPayment
   // ---------------------------------------------------------------------------
@@ -79,8 +79,10 @@ describe("apiService", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await apiService({ baseApi: "https://processor.example.com", sessionId: "session-123" })
-      .confirmPayment({ sessionToken: "st-456", paymentReference: "ref-789" });
+    await apiService({
+      baseApi: "https://processor.example.com",
+      sessionId: "session-123",
+    }).confirmPayment({ sessionToken: "st-456", paymentReference: "ref-789" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://processor.example.com/payments/confirm/ref-789",
@@ -104,8 +106,10 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
-        .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
+      apiService({ baseApi: "https://processor.example.com", sessionId: "s" }).confirmPayment({
+        sessionToken: "st",
+        paymentReference: "ref",
+      }),
     ).rejects.toThrow("Failed to confirm payment: 422 Unprocessable Entity");
   });
 
@@ -118,8 +122,10 @@ describe("apiService", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await apiService({ baseApi: "https://processor.example.com", sessionId: "s" })
-      .confirmPayment({ sessionToken: "st", paymentReference: "ref" });
+    const result = await apiService({
+      baseApi: "https://processor.example.com",
+      sessionId: "s",
+    }).confirmPayment({ sessionToken: "st", paymentReference: "ref" });
 
     expect(result).toEqual({ outcome: "rejected" });
   });
@@ -134,8 +140,10 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
-        .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" }).confirmPayment({
+        sessionToken: "st",
+        paymentReference: "ref",
+      }),
     ).rejects.toThrow();
   });
 
@@ -149,8 +157,10 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
-        .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" }).confirmPayment({
+        sessionToken: "st",
+        paymentReference: "ref",
+      }),
     ).rejects.toThrow();
   });
 
@@ -164,8 +174,10 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
-        .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" }).confirmPayment({
+        sessionToken: "st",
+        paymentReference: "ref",
+      }),
     ).rejects.toThrow();
   });
 
@@ -179,8 +191,10 @@ describe("apiService", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "st" })
-        .confirmPayment({ sessionToken: "st", paymentReference: "ref" }),
+      apiService({ baseApi: "https://processor.example.com", sessionId: "st" }).confirmPayment({
+        sessionToken: "st",
+        paymentReference: "ref",
+      }),
     ).rejects.toThrow();
   });
 
@@ -195,8 +209,7 @@ describe("apiService", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await apiService({ baseApi: "https://processor.example.com/", sessionId: "s" })
-      .createPayment();
+    await apiService({ baseApi: "https://processor.example.com/", sessionId: "s" }).createPayment();
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://processor.example.com/payments/session",

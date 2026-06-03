@@ -63,7 +63,11 @@ export class DmnChecksumInvalidError extends Error {
 // PPP_TransactionID is the mandatory Nuvei payment-page transaction identifier.
 // All three variants are documented in Nuvei DMN docs/examples.
 // ---------------------------------------------------------------------------
-const PPP_TRANSACTION_ID_KEYS = ["PPP_TransactionID", "PPP_TransactionId", "ppp_TransactionID"] as const;
+const PPP_TRANSACTION_ID_KEYS = [
+  "PPP_TransactionID",
+  "PPP_TransactionId",
+  "ppp_TransactionID",
+] as const;
 
 /**
  * Extract the canonical Nuvei PPP transaction ID from a Nuvei status/DMN body.
@@ -96,7 +100,6 @@ function classifyNuveiStatus(
   }
   return "pending";
 }
-
 
 export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
@@ -166,7 +169,8 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
     }
 
-    const paymentMethodOptions = (options as { paymentMethodOptions?: unknown }).paymentMethodOptions;
+    const paymentMethodOptions = (options as { paymentMethodOptions?: unknown })
+      .paymentMethodOptions;
     if (paymentMethodOptions === undefined) {
       return "card";
     }
@@ -927,9 +931,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     // Check for existing canonical PPP Authorization to deduplicate (D-18).
-    const alreadyRecorded = (ctPayment.transactions ?? []).some(
-      (tx) => tx.interactionId === ppp,
-    );
+    const alreadyRecorded = (ctPayment.transactions ?? []).some((tx) => tx.interactionId === ppp);
 
     if (alreadyRecorded) {
       log.info("Canonical PPP Authorization already recorded – short-circuiting.", {

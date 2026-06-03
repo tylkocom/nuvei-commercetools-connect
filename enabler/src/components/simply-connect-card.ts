@@ -1,6 +1,11 @@
 /** Nuvei Simply Connect card component. */
 
-import type { ComponentOptions, EnablerOptions, PaymentComponent, PaymentComponentBuilder } from "../payment-enabler/payment-enabler.js";
+import type {
+  ComponentOptions,
+  EnablerOptions,
+  PaymentComponent,
+  PaymentComponentBuilder,
+} from "../payment-enabler/payment-enabler.js";
 import { PaymentMethod } from "../payment-enabler/payment-enabler.js";
 import type { ApiService } from "../services/api-service.js";
 import { apiService, confirmPaymentResult } from "../services/api-service.js";

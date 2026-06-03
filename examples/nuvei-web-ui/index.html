@@ -7,7 +7,13 @@
     <style>
       :root {
         color-scheme: light;
-        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
       }
 
       body {
@@ -133,13 +139,21 @@
   <body>
     <main>
       <h1>Nuvei Web UI Example</h1>
-      <p class="note">Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.</p>
-      <p class="note">sessionId is provided by the commercetools Checkout session or mock CT server. See examples/nuvei-web-ui/README.md for how to start the mock CT server.</p>
+      <p class="note">
+        Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.
+      </p>
+      <p class="note">
+        sessionId is provided by the commercetools Checkout session or mock CT server. See
+        examples/nuvei-web-ui/README.md for how to start the mock CT server.
+      </p>
 
       <section class="panel" aria-labelledby="mode-heading">
         <h2 id="mode-heading">Mode selector</h2>
         <div class="mode-options">
-          <label><input type="radio" name="mode" value="simply-connect" checked /> Simply Connect card</label>
+          <label
+            ><input type="radio" name="mode" value="simply-connect" checked /> Simply Connect
+            card</label
+          >
           <label><input type="radio" name="mode" value="web-sdk" /> Web SDK card</label>
         </div>
       </section>
@@ -149,19 +163,39 @@
         <div class="grid">
           <div class="field">
             <label for="processor-url">processorUrl</label>
-            <input id="processor-url" name="processor-url" type="url" value="http://localhost:8080" />
+            <input
+              id="processor-url"
+              name="processor-url"
+              type="url"
+              value="http://localhost:8080"
+            />
           </div>
           <div class="field">
             <label for="session-id">sessionId</label>
-            <input id="session-id" name="session-id" type="text" placeholder="Checkout session id" />
+            <input
+              id="session-id"
+              name="session-id"
+              type="text"
+              placeholder="Checkout session id"
+            />
           </div>
           <div class="field">
             <label for="merchant-id">merchantId</label>
-            <input id="merchant-id" name="merchant-id" type="text" placeholder="Nuvei merchant id" />
+            <input
+              id="merchant-id"
+              name="merchant-id"
+              type="text"
+              placeholder="Nuvei merchant id"
+            />
           </div>
           <div class="field">
             <label for="merchant-site-id">merchantSiteId</label>
-            <input id="merchant-site-id" name="merchant-site-id" type="text" placeholder="Nuvei merchant site id" />
+            <input
+              id="merchant-site-id"
+              name="merchant-site-id"
+              type="text"
+              placeholder="Nuvei merchant site id"
+            />
           </div>
           <div class="field">
             <label for="env">env</label>
@@ -191,7 +225,10 @@
 
     <script type="module">
       // Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.
-      import { NuveiSimplyConnectEnabler, NuveiWebSdkEnabler } from "../../enabler/public/connector-enabler.es.js?cb=1";
+      import {
+        NuveiSimplyConnectEnabler,
+        NuveiWebSdkEnabler,
+      } from "../../enabler/public/connector-enabler.es.js?cb=1";
 
       const processorUrlInput = document.getElementById("processor-url");
       const sessionIdInput = document.getElementById("session-id");
@@ -241,7 +278,10 @@
             });
           },
           onError: (error) => {
-            appendLog("onError", error instanceof Error ? { name: error.name, message: error.message } : String(error));
+            appendLog(
+              "onError",
+              error instanceof Error ? { name: error.name, message: error.message } : String(error),
+            );
           },
           onPending: (result) => {
             appendLog("onPending", result);
@@ -257,9 +297,10 @@
 
         const options = readOptions();
         const mode = selectedMode();
-        const enabler = mode === "web-sdk"
-          ? new NuveiWebSdkEnabler(options)
-          : new NuveiSimplyConnectEnabler(options);
+        const enabler =
+          mode === "web-sdk"
+            ? new NuveiWebSdkEnabler(options)
+            : new NuveiSimplyConnectEnabler(options);
 
         const builder = await enabler.createComponentBuilder("card");
         currentComponent = builder.build({});
@@ -270,7 +311,12 @@
       }
 
       mountButton.addEventListener("click", () => {
-        mountCard().catch((error) => appendLog("mount-error", error instanceof Error ? { name: error.name, message: error.message } : String(error)));
+        mountCard().catch((error) =>
+          appendLog(
+            "mount-error",
+            error instanceof Error ? { name: error.name, message: error.message } : String(error),
+          ),
+        );
       });
 
       payButton.addEventListener("click", () => {
@@ -282,13 +328,20 @@
         try {
           currentComponent.submit();
         } catch (error) {
-          appendLog("pay-error", error instanceof Error ? { name: error.name, message: error.message } : String(error));
+          appendLog(
+            "pay-error",
+            error instanceof Error ? { name: error.name, message: error.message } : String(error),
+          );
         }
       });
 
       document.querySelectorAll('input[name="mode"]').forEach((input) => {
         input.addEventListener("change", () => {
-          setPayButtonVisible(selectedMode() === mountedMode && mountedMode === "web-sdk" && currentComponent !== null);
+          setPayButtonVisible(
+            selectedMode() === mountedMode &&
+              mountedMode === "web-sdk" &&
+              currentComponent !== null,
+          );
         });
       });
 

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PaymentModificationStatus, type AmountSchemaDTO } from "../../../src/dtos/operations/payment-intents.dto";
+import {
+  PaymentModificationStatus,
+  type AmountSchemaDTO,
+} from "../../../src/dtos/operations/payment-intents.dto";
 import type { Payment } from "@commercetools/platform-sdk";
 import type {
   CommercetoolsCartService,
@@ -120,7 +123,10 @@ vi.mock("../../../src/services/converters/nuvei-event.converter", () => ({
 
 import { NuveiPaymentService } from "../../../src/services/nuvei-payment.service";
 import { statusHandler } from "@commercetools/connect-payments-sdk";
-import { PaymentSetupError, PublicPaymentErrorCode } from "../../../src/dtos/operations/payment-errors.dto";
+import {
+  PaymentSetupError,
+  PublicPaymentErrorCode,
+} from "../../../src/dtos/operations/payment-errors.dto";
 import { log } from "../../../src/libs/logger/index";
 import {
   PAYMENT_METHOD_REGISTRY,
@@ -264,7 +270,11 @@ describe("NuveiPaymentService", () => {
       );
 
       // Execute the Nuvei reachability check and verify it returns UP
-      const nuveiCheck = capturedChecks[1] as () => Promise<{ name: string; status: string; message: string }>;
+      const nuveiCheck = capturedChecks[1] as () => Promise<{
+        name: string;
+        status: string;
+        message: string;
+      }>;
       const checkResult = await nuveiCheck();
       expect(checkResult.name).toBe("Nuvei Status check");
       expect(checkResult.status).toBe("UP");
@@ -393,7 +403,11 @@ describe("NuveiPaymentService", () => {
             { type: "Authorization", state: "Success", interactionId: "auth-tx-1" },
           ],
         }),
-        amount: { centAmount: 1234, currencyCode: "KWD", fractionDigits: 3 } as unknown as AmountSchemaDTO,
+        amount: {
+          centAmount: 1234,
+          currencyCode: "KWD",
+          fractionDigits: 3,
+        } as unknown as AmountSchemaDTO,
       });
 
       expect(mockNuveiClientInstance.settleTransaction).toHaveBeenCalledWith(
@@ -556,7 +570,9 @@ describe("NuveiPaymentService", () => {
     it("rejects unsupported payment method 'embedded' before Nuvei or commercetools side effects", async () => {
       const { service } = createService();
 
-      await expect(service.createPaymentSession({ paymentMethodOptions: { embedded: {} } })).rejects.toMatchObject({
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { embedded: {} } }),
+      ).rejects.toMatchObject({
         code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
       });
     });
@@ -839,9 +855,7 @@ describe("NuveiPaymentService", () => {
       mockGetPayment.mockResolvedValue(
         makeMockPayment({
           interfaceId: "session-token-1",
-          transactions: [
-            { type: "Authorization", state: "Success", interactionId: "ppp-tx-123" },
-          ],
+          transactions: [{ type: "Authorization", state: "Success", interactionId: "ppp-tx-123" }],
         }),
       );
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
@@ -861,10 +875,16 @@ describe("NuveiPaymentService", () => {
 
     it.each([
       ["missing status and transactionStatus", { transactionId: "fiscal-tx" }],
-      ["PENDING transactionStatus with SUCCESS", { status: "SUCCESS", transactionStatus: "PENDING" }],
+      [
+        "PENDING transactionStatus with SUCCESS",
+        { status: "SUCCESS", transactionStatus: "PENDING" },
+      ],
       ["UPDATE status", { status: "UPDATE", transactionStatus: "APPROVED" }],
       ["cashier ERROR status (not SUCCESS+DECLINED)", { status: "ERROR" }],
-      ["unknown transactionStatus string", { status: "SUCCESS", transactionStatus: "UNKNOWN_FUTURE_VALUE" }],
+      [
+        "unknown transactionStatus string",
+        { status: "SUCCESS", transactionStatus: "UNKNOWN_FUTURE_VALUE" },
+      ],
       ["null transactionStatus", { status: "SUCCESS", transactionStatus: null }],
     ])(
       "inconclusive/unknown Nuvei status (%s) returns { outcome: 'pending' } without CT write (D-03, D-08, D-09, D-17)",
@@ -894,9 +914,9 @@ describe("NuveiPaymentService", () => {
       mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
 
       // Must throw a technical error, not return an outcome
-      await expect(
-        service.confirmPayment("payment-1", "session-token-1"),
-      ).rejects.toThrow("Payment does not belong to authenticated cart session");
+      await expect(service.confirmPayment("payment-1", "session-token-1")).rejects.toThrow(
+        "Payment does not belong to authenticated cart session",
+      );
     });
   });
 
@@ -921,7 +941,7 @@ describe("NuveiPaymentService", () => {
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
-        PPP_TransactionID: "50001",         // canonical PPP – already present on payment
+        PPP_TransactionID: "50001", // canonical PPP – already present on payment
         TransactionID: "tx-auth-new-fiscal", // different fiscal TX – must NOT prevent dedup
         transactionType: "Auth",
         ppp_status: "OK",
@@ -941,15 +961,13 @@ describe("NuveiPaymentService", () => {
       mockGetPayment.mockResolvedValue(
         makeMockPayment({
           interfaceId: "nuvei-tx-100",
-          transactions: [
-            { type: "Authorization", state: "Success", interactionId: "60002" },
-          ],
+          transactions: [{ type: "Authorization", state: "Success", interactionId: "60002" }],
         }),
       );
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
-        PPP_TransactionId: "60002",   // alt casing: PPP_TransactionId
+        PPP_TransactionId: "60002", // alt casing: PPP_TransactionId
         transactionType: "Auth",
         ppp_status: "OK",
         totalAmount: "10.00",
@@ -967,15 +985,13 @@ describe("NuveiPaymentService", () => {
       mockGetPayment.mockResolvedValue(
         makeMockPayment({
           interfaceId: "nuvei-tx-100",
-          transactions: [
-            { type: "Authorization", state: "Success", interactionId: "70003" },
-          ],
+          transactions: [{ type: "Authorization", state: "Success", interactionId: "70003" }],
         }),
       );
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
-        ppp_TransactionID: "70003",   // alt casing: ppp_TransactionID
+        ppp_TransactionID: "70003", // alt casing: ppp_TransactionID
         transactionType: "Auth",
         ppp_status: "OK",
         totalAmount: "10.00",
@@ -1104,12 +1120,12 @@ describe("NuveiPaymentService", () => {
         sessionToken: "nuvei-tx-100",
         amount: "10.00",
         currency: "USD",
-        clientUniqueId: "cart-wrong",  // does not match DMN body's clientUniqueId
+        clientUniqueId: "cart-wrong", // does not match DMN body's clientUniqueId
       });
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
-        clientUniqueId: "cart-123",  // correct cart ID
+        clientUniqueId: "cart-123", // correct cart ID
         TransactionID: "dmn-tx-1",
         totalAmount: "10.00",
         currency: "USD",
@@ -1130,14 +1146,16 @@ describe("NuveiPaymentService", () => {
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
       mockGetPayment.mockResolvedValue(
         makeMockPayment({
-          transactions: [{ interactionId: "ppp-existing-50001", type: "Authorization", state: "Success" }],
+          transactions: [
+            { interactionId: "ppp-existing-50001", type: "Authorization", state: "Success" },
+          ],
         }),
       );
 
       const body: Record<string, unknown> = {
         merchant_unique_id: "payment-1",
         PPP_TransactionID: "ppp-existing-50001", // same PPP already on payment → dedup
-        TransactionID: "tx-different-fiscal",     // different fiscal TX – must not prevent dedup
+        TransactionID: "tx-different-fiscal", // different fiscal TX – must not prevent dedup
         totalAmount: "10.00",
         currency: "USD",
         transactionType: "Sale",

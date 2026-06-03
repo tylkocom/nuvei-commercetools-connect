@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PaymentModificationStatus } from "../../../src/dtos/operations/payment-intents.dto";
 
 // ---------------------------------------------------------------------------
 // Mock all external modules before importing the class under test.
@@ -117,7 +116,6 @@ import {
   dmnAmountMismatch,
   dmnMissingMerchantUniqueId,
   makeDmnMockPayment,
-  makePaymentStatusResponse,
 } from "../fixtures/dmn.fixtures";
 import { PaymentTransactions } from "../../../src/dtos/operations/payment-intents.dto";
 
@@ -205,10 +203,12 @@ function defaultPaymentStatus(
   };
 }
 
-function setupSuccessfulStatusCheck(opts: {
-  statusOverrides?: Record<string, unknown>;
-  bodyOverrides?: Record<string, unknown>;
-} = {}) {
+function setupSuccessfulStatusCheck(
+  opts: {
+    statusOverrides?: Record<string, unknown>;
+    bodyOverrides?: Record<string, unknown>;
+  } = {},
+) {
   const { service } = createService();
 
   mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
@@ -271,9 +271,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           transactions: [
@@ -329,9 +327,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           pspReference: "tx-settle-001",
@@ -548,9 +544,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           transactions: [
@@ -581,9 +575,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           transactions: [
@@ -613,9 +605,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockImplementation(() => {
         throw new Error("Missing required DMN field: TransactionID or TransactionId");
       });
@@ -634,9 +624,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           transactions: [
@@ -668,12 +656,10 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
-          pspReference: "ppp-50001",   // now PPP-based, not fiscal
+          pspReference: "ppp-50001", // now PPP-based, not fiscal
           transactions: [
             {
               type: PaymentTransactions.AUTHORIZATION,
@@ -686,7 +672,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
       mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
         defaultPaymentStatus({
-          transactionId: "different-fiscal-tx-id",  // different from PPP – no longer validated
+          transactionId: "different-fiscal-tx-id", // different from PPP – no longer validated
           sessionToken: "nuvei-session-token",
           clientUniqueId: "cart-123",
         }),
@@ -733,9 +719,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           paymentMethod: "Visa",
@@ -752,9 +736,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const calls = mockUpdatePayment.mock.calls;
       expect(calls.length).toBeGreaterThanOrEqual(2);
 
-      const methodCall = calls.find(
-        (c: any[]) => c[0]?.paymentMethodInfo?.method === "Visa",
-      );
+      const methodCall = calls.find((c: any[]) => c[0]?.paymentMethodInfo?.method === "Visa");
       expect(methodCall).toBeDefined();
 
       const nameCall = calls.find(
@@ -767,9 +749,7 @@ describe("NuveiPaymentService – DMN processing", () => {
       const { service } = createService();
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockResolvedValue(
-        makeDmnMockPayment({ interfaceId: "nuvei-session-token" }),
-      );
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           paymentMethod: undefined,

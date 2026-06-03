@@ -1,6 +1,5 @@
 import { Static, Type } from "@sinclair/typebox";
 
-
 export const PaymentResponseSchema = Type.Object({
   cartId: Type.String(),
   sessionToken: Type.String(),
@@ -11,7 +10,6 @@ export const PaymentResponseSchema = Type.Object({
 });
 
 export type PaymentResponseSchemaDTO = Static<typeof PaymentResponseSchema>;
-
 
 export const PaymentMethodOptionsSchema = Type.Object(
   {

@@ -138,9 +138,9 @@ describe("SimplyConnectCardComponent", () => {
 
     component.mount("#container");
 
-    const { promise: wait1, resolve: done1 } = Promise.withResolvers<void>();
-    setTimeout(done1, 0);
-    await wait1;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(onError).toHaveBeenCalledWith(error);
   });

@@ -249,7 +249,7 @@ export const dmnAuthAltPppTransactionId: Record<string, unknown> = {
     totalAmount: "10.00",
     ErrCode: "0",
   }),
-  PPP_TransactionId: "60002",        // alt casing: capital T, lowercase d
+  PPP_TransactionId: "60002", // alt casing: capital T, lowercase d
 };
 delete (dmnAuthAltPppTransactionId as Record<string, unknown>).PPP_TransactionID;
 
@@ -266,7 +266,7 @@ export const dmnAuthAltPppLower: Record<string, unknown> = {
     totalAmount: "10.00",
     ErrCode: "0",
   }),
-  ppp_TransactionID: "70003",        // alt casing: lowercase ppp_
+  ppp_TransactionID: "70003", // alt casing: lowercase ppp_
 };
 delete (dmnAuthAltPppLower as Record<string, unknown>).PPP_TransactionID;
 

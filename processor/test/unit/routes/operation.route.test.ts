@@ -130,9 +130,11 @@ function expectedPaymentComponentsFromRegistry() {
     dropins: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin").map((entry) => ({
       type: entry.advertisedType,
     })),
-    components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map((entry) => ({
-      type: entry.advertisedType,
-    })),
+    components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map(
+      (entry) => ({
+        type: entry.advertisedType,
+      }),
+    ),
     express: [],
   };
 }

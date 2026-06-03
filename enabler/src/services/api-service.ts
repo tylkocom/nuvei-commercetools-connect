@@ -157,14 +157,11 @@ export function apiService(opts: { baseApi: string; sessionId: string }): ApiSer
     },
 
     async confirmPayment(params: ConfirmPaymentRequest): Promise<ConfirmPaymentResponse> {
-      const res = await fetch(
-        `${baseApi}/payments/confirm/${params.paymentReference}`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ sessionToken: params.sessionToken }),
-        },
-      );
+      const res = await fetch(`${baseApi}/payments/confirm/${params.paymentReference}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ sessionToken: params.sessionToken }),
+      });
 
       // HTTP 402 with outcome === "rejected" is a valid business outcome (D-05, D-07).
       // All other non-ok responses are technical/request failures.

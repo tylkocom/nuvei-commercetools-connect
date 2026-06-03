@@ -54,7 +54,7 @@ describe("validateEnablerOptions", () => {
     ["merchantId", { merchantId: "" }],
     ["merchantSiteId", { merchantSiteId: "" }],
     ["env", { env: "staging" as EnablerOptions["env"] }],
-  ] satisfies Array<[string, Partial<EnablerOptions>]>) (
+  ] satisfies Array<[string, Partial<EnablerOptions>]>)(
     "throws safe CONFIG_INVALID for invalid %s",
     (field, overrides) => {
       const error = expectSafeSetupError(
@@ -67,7 +67,9 @@ describe("validateEnablerOptions", () => {
   );
 
   it("accepts env = production", () => {
-    expect(() => pe.validateEnablerOptions(makeEnablerOptions({ env: "production" }))).not.toThrow();
+    expect(() =>
+      pe.validateEnablerOptions(makeEnablerOptions({ env: "production" })),
+    ).not.toThrow();
   });
 });
 
@@ -150,9 +152,9 @@ describe("NuveiEnabler facade mode validation", () => {
       configurable: true,
     }) as EnablerOptions;
 
-    expect(() => new NuveiEnabler(explosiveOpts, undefined as unknown as "simply-connect" | "web-sdk")).toThrow(
-      pe.PaymentSetupError,
-    );
+    expect(
+      () => new NuveiEnabler(explosiveOpts, undefined as unknown as "simply-connect" | "web-sdk"),
+    ).toThrow(pe.PaymentSetupError);
     expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
     expect(loadWebSdkSpy).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -170,9 +172,9 @@ describe("NuveiEnabler facade mode validation", () => {
       configurable: true,
     }) as EnablerOptions;
 
-    expect(() => new NuveiEnabler(explosiveOpts, "hpp" as unknown as "simply-connect" | "web-sdk")).toThrow(
-      pe.PaymentSetupError,
-    );
+    expect(
+      () => new NuveiEnabler(explosiveOpts, "hpp" as unknown as "simply-connect" | "web-sdk"),
+    ).toThrow(pe.PaymentSetupError);
     expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
     expect(loadWebSdkSpy).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -190,9 +192,9 @@ describe("NuveiEnabler facade mode validation", () => {
       configurable: true,
     }) as EnablerOptions;
 
-    expect(() => new NuveiEnabler(explosiveOpts, "" as unknown as "simply-connect" | "web-sdk")).toThrow(
-      pe.PaymentSetupError,
-    );
+    expect(
+      () => new NuveiEnabler(explosiveOpts, "" as unknown as "simply-connect" | "web-sdk"),
+    ).toThrow(pe.PaymentSetupError);
     expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
     expect(loadWebSdkSpy).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -227,7 +229,10 @@ describe("apiService", () => {
     );
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "session-123" }).createPayment({
+      apiService({
+        baseApi: "https://processor.example.com",
+        sessionId: "session-123",
+      }).createPayment({
         paymentMethodOptions: { paypal: {} },
       }),
     ).rejects.toMatchObject({
@@ -243,7 +248,10 @@ describe("apiService", () => {
     );
 
     await expect(
-      apiService({ baseApi: "https://processor.example.com", sessionId: "session-123" }).createPayment(),
+      apiService({
+        baseApi: "https://processor.example.com",
+        sessionId: "session-123",
+      }).createPayment(),
     ).rejects.toMatchObject({
       code: pe.PublicPaymentErrorCode.REQUEST_MALFORMED,
       message: "Failed to create payment session.",

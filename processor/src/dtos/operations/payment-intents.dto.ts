@@ -76,7 +76,6 @@ export enum PaymentModificationStatus {
 }
 const PaymentModificationSchema = Type.Enum(PaymentModificationStatus);
 
-
 export const PaymentIntentResponseSchema = Type.Object({
   outcome: PaymentModificationSchema,
   error: Type.Optional(Type.String()),

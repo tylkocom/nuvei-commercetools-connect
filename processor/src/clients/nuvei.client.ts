@@ -92,13 +92,9 @@ export class NuveiApiError extends Error {
   public constructor(responseBody: Record<string, unknown>) {
     const rawErrCode = responseBody.errCode;
     const errCode =
-      typeof rawErrCode === "number" || typeof rawErrCode === "string"
-        ? rawErrCode
-        : undefined;
+      typeof rawErrCode === "number" || typeof rawErrCode === "string" ? rawErrCode : undefined;
     const reason =
-      typeof responseBody.reason === "string"
-        ? responseBody.reason
-        : "Nuvei API request failed";
+      typeof responseBody.reason === "string" ? responseBody.reason : "Nuvei API request failed";
     super(reason);
     this.errCode = errCode;
     this.reason = reason;

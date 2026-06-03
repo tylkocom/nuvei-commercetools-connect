@@ -42,4 +42,3 @@ export function getPaymentMethodRegistryEntry(
 export function getComponentPaymentMethods(): readonly PaymentMethodRegistryEntry[] {
   return PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component");
 }
-

@@ -170,14 +170,18 @@ describe("processor/enabler payment method contract parity", () => {
 
   describe("dual-mode enabler contract", () => {
     it("NuveiSimplyConnectEnabler builds card with componentHasSubmit=false", async () => {
-      const builder = await new NuveiSimplyConnectEnabler(makeEnablerOptions()).createComponentBuilder("card");
+      const builder = await new NuveiSimplyConnectEnabler(
+        makeEnablerOptions(),
+      ).createComponentBuilder("card");
 
       expect(builder.componentHasSubmit).toBe(false);
       expect(typeof builder.build).toBe("function");
     });
 
     it("NuveiWebSdkEnabler builds card with componentHasSubmit=true", async () => {
-      const builder = await new NuveiWebSdkEnabler(makeEnablerOptions()).createComponentBuilder("card");
+      const builder = await new NuveiWebSdkEnabler(makeEnablerOptions()).createComponentBuilder(
+        "card",
+      );
 
       expect(builder.componentHasSubmit).toBe(true);
       expect(typeof builder.build).toBe("function");
@@ -195,8 +199,12 @@ describe("processor/enabler payment method contract parity", () => {
       expect(processorSupportedPaymentMethods).not.toContain("simply-connect");
       expect(processorSupportedPaymentMethods).not.toContain("web-sdk");
 
-      const simplyConnectBuilder = await new NuveiSimplyConnectEnabler(makeEnablerOptions()).createComponentBuilder("card");
-      const webSdkBuilder = await new NuveiWebSdkEnabler(makeEnablerOptions()).createComponentBuilder("card");
+      const simplyConnectBuilder = await new NuveiSimplyConnectEnabler(
+        makeEnablerOptions(),
+      ).createComponentBuilder("card");
+      const webSdkBuilder = await new NuveiWebSdkEnabler(
+        makeEnablerOptions(),
+      ).createComponentBuilder("card");
 
       expect(simplyConnectBuilder.componentHasSubmit).toBe(false);
       expect(webSdkBuilder.componentHasSubmit).toBe(true);
