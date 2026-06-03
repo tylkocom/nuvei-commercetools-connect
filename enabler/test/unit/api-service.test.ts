@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { apiService, confirmPaymentResult } from "../../src/services/api-service";
+import { apiService, confirmPaymentResult, type ConfirmPaymentResponse } from "../../src/services/api-service";
 import type { NuveiResult } from "../../src/services/simply-connect-sdk";
 
 describe("apiService", () => {
@@ -262,7 +262,7 @@ describe("confirmPaymentResult", () => {
     return { transactionStatus, sessionToken: "browser-session-token" };
   }
 
-  function makeApi(outcome: string) {
+  function makeApi(outcome: ConfirmPaymentResponse["outcome"]) {
     return {
       getConfig: vi.fn(),
       createPayment: vi.fn(),
@@ -295,7 +295,7 @@ describe("confirmPaymentResult", () => {
     expect(onPending).not.toHaveBeenCalled();
   });
 
-  it("calls safe onError and not onComplete or onPending when processor outcome is rejected (D-21)", async () => {
+  it("routes rejected processor outcome through onComplete failure, not onError", async () => {
     const mockApi = makeApi("rejected");
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -311,15 +311,61 @@ describe("confirmPaymentResult", () => {
       onPending,
     );
 
-    expect(onComplete).not.toHaveBeenCalled();
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      isSuccess: false,
+      paymentReference: "ref-123",
+    });
     expect(onPending).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledOnce();
-    const err = onError.mock.calls[0][0] as Error;
-    expect(err).toBeInstanceOf(Error);
-    expect(err.message).toContain("Payment was declined");
+    expect(onError).not.toHaveBeenCalled();
   });
 
-  it("calls onPending with pending result when processor outcome is pending (D-19, D-22)", async () => {
+  it("polls pending confirmation until approved and notifies onPending for pending observations", async () => {
+    const mockApi = {
+      getConfig: vi.fn(),
+      createPayment: vi.fn(),
+      confirmPayment: vi
+        .fn()
+        .mockResolvedValueOnce({ outcome: "pending" })
+        .mockResolvedValueOnce({ outcome: "approved" }),
+    };
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    const onPending = vi.fn();
+
+    await confirmPaymentResult(
+      makeResult("APPROVED"),
+      "ref-123",
+      "known-session-token",
+      mockApi,
+      onComplete,
+      onError,
+      onPending,
+      { retryDelaysMs: [0] },
+    );
+
+    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(2);
+    expect(mockApi.confirmPayment).toHaveBeenNthCalledWith(1, {
+      sessionToken: "known-session-token",
+      paymentReference: "ref-123",
+    });
+    expect(mockApi.confirmPayment).toHaveBeenNthCalledWith(2, {
+      sessionToken: "known-session-token",
+      paymentReference: "ref-123",
+    });
+    expect(onPending).toHaveBeenCalledOnce();
+    expect(onPending).toHaveBeenCalledWith({
+      paymentReference: "ref-123",
+    });
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      isSuccess: true,
+      paymentReference: "ref-123",
+    });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("exhausts persistent pending confirmation and reports a safe technical error", async () => {
     const mockApi = makeApi("pending");
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -333,14 +379,20 @@ describe("confirmPaymentResult", () => {
       onComplete,
       onError,
       onPending,
+      { retryDelaysMs: [0, 0] },
     );
 
-    expect(onPending).toHaveBeenCalledOnce();
+    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(3);
+    expect(onPending).toHaveBeenCalledTimes(3);
     expect(onPending).toHaveBeenCalledWith({
       paymentReference: "ref-123",
     });
     expect(onComplete).not.toHaveBeenCalled();
-    expect(onError).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledOnce();
+    const error = onError.mock.calls[0][0] as Error;
+    expect(error.message).toContain("still pending");
+    expect(error.message).not.toContain("known-session-token");
+    expect(onError.mock.calls[0][1]).toEqual({ paymentReference: "ref-123" });
   });
 
   it("does not leak session token when processor call throws (D-21 safe error path)", async () => {

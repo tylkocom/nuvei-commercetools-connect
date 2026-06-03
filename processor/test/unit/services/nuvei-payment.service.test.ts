@@ -747,6 +747,107 @@ describe("NuveiPaymentService", () => {
   // They FAIL against the current implementation (Task 1 RED).
   // -------------------------------------------------------------------------
   describe("confirmPayment() – tri-state outcome and canonical PPP identity", () => {
+    it("existing successful Authorization for planned amount returns approved without Nuvei lookup", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Success",
+              interactionId: "dmn-auth-success-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("existing successful Charge for planned amount returns approved without Nuvei lookup", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Charge",
+              state: "Success",
+              interactionId: "dmn-charge-success-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("existing failed Authorization for planned amount returns rejected without Nuvei lookup", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Failure",
+              interactionId: "dmn-auth-failure-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("approved official-shaped status without PPP remains pending when no CT terminal exists", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Authorization",
+              state: "Initial",
+              interactionId: "session-token-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "APPROVED",
+        transactionId: "fiscal-tx-1",
+        amount: "10.00",
+        currency: "USD",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "pending" });
+      expect(mockNuveiClientInstance.getPaymentStatus).toHaveBeenCalledWith({
+        sessionToken: "session-token-1",
+      });
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
     it("returns { outcome: 'approved' } for SUCCESS+APPROVED with canonical PPP_TransactionID (D-01, D-15)", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));

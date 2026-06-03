@@ -224,6 +224,43 @@ export class NuveiPaymentService extends AbstractPaymentService {
     );
   }
 
+  private transactionMatchesPlannedAmount(
+    payment: Payment,
+    transaction: Payment["transactions"][number],
+  ): boolean {
+    const amount = transaction.amount;
+    return (
+      amount !== undefined &&
+      amount.centAmount === payment.amountPlanned.centAmount &&
+      amount.currencyCode === payment.amountPlanned.currencyCode
+    );
+  }
+
+  private getExistingTerminalOutcome(
+    payment: Payment,
+  ): "approved" | "rejected" | undefined {
+    const transactions = payment.transactions ?? [];
+    const hasSuccessfulPayment = transactions.some(
+      (tx) =>
+        tx.state === "Success" &&
+        (tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE) &&
+        this.transactionMatchesPlannedAmount(payment, tx),
+    );
+
+    if (hasSuccessfulPayment) {
+      return "approved";
+    }
+
+    const hasFailedAuthorization = transactions.some(
+      (tx) =>
+        tx.state === "Failure" &&
+        tx.type === PaymentTransactions.AUTHORIZATION &&
+        this.transactionMatchesPlannedAmount(payment, tx),
+    );
+
+    return hasFailedAuthorization ? "rejected" : undefined;
+  }
+
   private async assertSessionPaymentAccess(
     paymentReference: string,
     sessionToken: string,
@@ -898,6 +935,18 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     const ctPayment = await this.ctPaymentService.getPayment({ id: paymentReference });
     await this.assertSessionPaymentAccess(paymentReference, sessionToken, ctPayment);
+
+    const existingTerminalOutcome = this.getExistingTerminalOutcome(ctPayment);
+    if (existingTerminalOutcome) {
+      log.info(
+        "CT terminal payment transaction already recorded – short-circuiting Nuvei status lookup.",
+        {
+          paymentReference,
+          outcome: existingTerminalOutcome,
+        },
+      );
+      return { outcome: existingTerminalOutcome };
+    }
 
     const paymentStatus = await nuveiClient().getPaymentStatus({ sessionToken });
     const statusBody = paymentStatus as Record<string, unknown>;

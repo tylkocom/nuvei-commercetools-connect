@@ -58,14 +58,26 @@ export type ConfirmPaymentRequest = {
   paymentReference: string;
 };
 
+const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const;
+
+export type ConfirmPaymentPollingOptions = {
+  retryDelaysMs?: readonly number[];
+  wait?: (delayMs: number) => Promise<void>;
+};
+
+function waitForNextConfirmAttempt(delayMs: number): Promise<void> {
+  if (delayMs <= 0) return Promise.resolve();
+  return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
+}
+
 /**
  * Confirms a payment via the processor and routes to the appropriate merchant
  * callback based on the authoritative processor outcome.
  *
- * The processor response is the single source of truth:
- * - `approved` → onComplete
- * - `rejected` → safe onError; does not call onComplete or onPending
- * - `pending`  → optional onPending; if omitted, onError receives a safe pending error
+ * The processor response is the single source of truth. Pending outcomes are
+ * observed via `onPending` and polled to a bounded terminal result. Business
+ * rejections are reported through `onComplete({ isSuccess: false })` for
+ * Checkout-template compatibility; `onError` is reserved for technical failures.
  */
 export async function confirmPaymentResult(
   result: NuveiResult,
@@ -75,49 +87,48 @@ export async function confirmPaymentResult(
   onComplete?: (result: PaymentResult) => void,
   onError?: (error: unknown, context?: { paymentReference?: string }) => void,
   onPending?: (result: PendingPaymentResult) => void,
+  pollingOptions: ConfirmPaymentPollingOptions = {},
 ): Promise<void> {
+  const retryDelaysMs = pollingOptions.retryDelaysMs ?? DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS;
+  const wait = pollingOptions.wait ?? waitForNextConfirmAttempt;
   void result;
 
-  let confirmRes: ConfirmPaymentResponse;
-  try {
-    confirmRes = await api.confirmPayment({ sessionToken: knownSessionToken, paymentReference });
-  } catch {
-    onError?.(new Error("Failed to confirm payment."), { paymentReference });
-    return;
-  }
+  for (let attempt = 0; ; attempt += 1) {
+    let confirmRes: ConfirmPaymentResponse;
+    try {
+      confirmRes = await api.confirmPayment({ sessionToken: knownSessionToken, paymentReference });
+    } catch {
+      onError?.(new Error("Failed to confirm payment."), { paymentReference });
+      return;
+    }
 
-  switch (confirmRes.outcome) {
-    case "approved":
-      onComplete?.({
-        isSuccess: true,
-        paymentReference,
-      });
-      break;
-
-    case "rejected":
-      onError?.(
-        new PaymentSetupError(
-          PublicPaymentErrorCode.REQUEST_MALFORMED,
-          "Payment was declined. Please try a different payment method.",
-        ),
-        { paymentReference },
-      );
-      break;
-
-    case "pending":
-      if (onPending) {
-        onPending({ paymentReference });
+    switch (confirmRes.outcome) {
+      case "approved":
+        onComplete?.({
+          isSuccess: true,
+          paymentReference,
+        });
         return;
-      }
 
-      onError?.(
-        new PaymentSetupError(
-          PublicPaymentErrorCode.REQUEST_MALFORMED,
-          "Payment is pending confirmation. Please wait for final payment status.",
-        ),
-        { paymentReference },
-      );
-      break;
+      case "rejected":
+        onComplete?.({
+          isSuccess: false,
+          paymentReference,
+        });
+        return;
+
+      case "pending":
+        onPending?.({ paymentReference });
+        const retryDelayMs = retryDelaysMs[attempt];
+        if (retryDelayMs !== undefined) {
+          await wait(retryDelayMs);
+          continue;
+        }
+        onError?.(new Error("Payment confirmation is still pending. Please wait for final payment status."), {
+          paymentReference,
+        });
+        return;
+    }
   }
 }
 
