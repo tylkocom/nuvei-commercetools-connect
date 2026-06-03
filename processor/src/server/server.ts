@@ -13,18 +13,6 @@ import { errorHandler } from "../libs/fastify/error-handler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function getMerchantCenterOrigin(jwtIssuer: string): string | undefined {
-  try {
-    const issuerUrl = new URL(jwtIssuer);
-    if (!issuerUrl.hostname.startsWith("mc-api.")) {
-      return undefined;
-    }
-
-    return `${issuerUrl.protocol}//${issuerUrl.hostname.replace(/^mc-api\./, "mc.")}`;
-  } catch {
-    return undefined;
-  }
-}
 
 /**
  * Setup Fastify server instance
@@ -61,46 +49,18 @@ export const setupFastify = async () => {
   // Setup error handler
   server.setErrorHandler(errorHandler);
 
-  // Enable CORS. When corsAllowedOrigins is exactly ["*"], register with origin: "*"
-  // so @fastify/cors handles OPTIONS preflights before any auth hook (template behaviour).
-  // Explicit allow-lists restrict to those origins only.
-  const configuredOrigins = config.corsAllowedOrigins.filter(Boolean);
-  const corsIsWildcardOnly = configuredOrigins.length === 1 && configuredOrigins[0] === "*";
-  if (corsIsWildcardOnly) {
-    await server.register(cors, {
-      methods: ["GET", "HEAD", "POST", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Correlation-ID",
-        "X-Request-ID",
-        "X-Session-ID",
-      ],
-      origin: "*",
-    });
-  } else {
-    const merchantCenterOrigin = getMerchantCenterOrigin(config.jwtIssuer);
-    const allowedOrigins = new Set(
-      [config.checkoutUrl, merchantCenterOrigin, ...configuredOrigins].filter(Boolean),
-    );
-    await server.register(cors, {
-      methods: ["GET", "HEAD", "POST", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Correlation-ID",
-        "X-Request-ID",
-        "X-Session-ID",
-      ],
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.has(origin)) {
-          callback(null, true);
-          return;
-        }
-        callback(new Error("CORS origin is not allowed"), false);
-      },
-    });
-  }
+  // CORS: allow all origins temporarily for debugging
+  await server.register(cors, {
+    methods: ["GET", "HEAD", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Correlation-ID",
+      "X-Request-ID",
+      "X-Session-ID",
+    ],
+    origin: true,
+  });
 
   // Add content type parser for the content type application/x-www-form-urlencoded
   await server.register(fastifyFormBody);
