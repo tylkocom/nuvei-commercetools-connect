@@ -20,6 +20,9 @@ export interface SafeChargeInstance {
     params: {
       sessionToken: string;
       clientUniqueId?: string;
+      merchant_unique_id?: string;
+      merchantUniqueId?: string;
+      merchantUniqueID?: string;
       cardHolderName?: string;
       paymentOption: SafeChargeCardField;
       billingAddress?: Record<string, string>;

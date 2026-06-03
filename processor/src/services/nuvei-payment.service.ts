@@ -40,11 +40,12 @@ import {
   NuveiEventConverter,
   type NuveiDmnUpdateData,
 } from "./converters/nuvei-event.converter.js";
-import type { Payment } from "@commercetools/platform-sdk";
+import type { Cart, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
   PublicPaymentErrorCode,
 } from "../dtos/operations/payment-errors.dto.js";
+import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
 
 export type NuveiPaymentServiceOptions = {
   ctCartService: CommercetoolsCartService;
@@ -1024,12 +1025,108 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return undefined;
   }
 
+  private isResourceNotFoundError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+
+    const maybeError = error as Error & {
+      code?: unknown;
+      httpErrorStatus?: unknown;
+      statusCode?: unknown;
+    };
+
+    return (
+      maybeError.code === "ResourceNotFound" ||
+      maybeError.httpErrorStatus === 404 ||
+      maybeError.statusCode === 404 ||
+      /Resource with ID .* was not found/i.test(error.message)
+    );
+  }
+
+  private getDmnPlannedAmount(body: Record<string, unknown>): { centAmount: number; currencyCode: string } | undefined {
+    const currencyCode = this.getOptionalDmnString(body, ["currency"]);
+    if (!currencyCode || body.totalAmount === undefined) {
+      return undefined;
+    }
+
+    return {
+      centAmount: this.parseAmountToCentAmount(body.totalAmount, currencyCode),
+      currencyCode,
+    };
+  }
+
+  private isNuveiPayment(payment: Payment): boolean {
+    return payment.paymentMethodInfo?.paymentInterface === NUVEI_PAYMENT_INTERFACE;
+  }
+
+  private paymentMatchesDmnAmount(
+    payment: Payment,
+    dmnAmount: { centAmount: number; currencyCode: string } | undefined,
+  ): boolean {
+    if (!dmnAmount) return true;
+    return (
+      payment.amountPlanned.centAmount === dmnAmount.centAmount &&
+      payment.amountPlanned.currencyCode === dmnAmount.currencyCode
+    );
+  }
+
+  private getCartPaymentIds(cart: Cart): string[] {
+    return (cart.paymentInfo?.payments ?? [])
+      .map((paymentRef) => paymentRef.id)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+  }
+
+  private async resolveDmnPaymentFromCartId(
+    cartId: string,
+    body: Record<string, unknown>,
+  ): Promise<Payment | undefined> {
+    let cart: Cart;
+    try {
+      cart = await this.ctCartService.getCart({ id: cartId });
+    } catch (error) {
+      if (this.isResourceNotFoundError(error)) {
+        return undefined;
+      }
+      throw error;
+    }
+
+    const paymentIds = this.getCartPaymentIds(cart);
+    if (paymentIds.length === 0) {
+      return undefined;
+    }
+
+    const dmnAmount = this.getDmnPlannedAmount(body);
+    const payments = await Promise.all(
+      paymentIds.map((id) => this.ctPaymentService.getPayment({ id })),
+    );
+    const candidates = payments.filter(
+      (payment) => this.isNuveiPayment(payment) && this.paymentMatchesDmnAmount(payment, dmnAmount),
+    );
+
+    if (candidates.length === 0) {
+      return undefined;
+    }
+
+    if (candidates.length > 1) {
+      throw new Error("Multiple candidate Nuvei Payments found for DMN cart reference");
+    }
+
+    log.warn("DMN merchant_unique_id resolved as cart ID; using linked Nuvei Payment.", {
+      cartId,
+      paymentId: candidates[0].id,
+    });
+
+    return candidates[0];
+  }
+
   private async resolveDmnPayment(body: Record<string, unknown>): Promise<Payment> {
     const merchantUniqueId = this.getOptionalDmnString(body, ["merchant_unique_id"]);
     const sessionToken = this.getOptionalDmnString(body, [
       "sessionToken",
       "session_token",
       "SessionToken",
+      "sessionId",
+      "session_id",
+      "SessionId",
     ]);
 
     if (merchantUniqueId) {
@@ -1037,12 +1134,15 @@ export class NuveiPaymentService extends AbstractPaymentService {
       try {
         payment = await this.ctPaymentService.getPayment({ id: merchantUniqueId });
       } catch (error) {
-        if (!sessionToken) {
+        if (sessionToken) {
+          log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
+            merchantUniqueId,
+          });
+        } else if (this.isResourceNotFoundError(error)) {
+          payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
+        } else {
           throw error;
         }
-        log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
-          merchantUniqueId,
-        });
       }
 
       if (payment) {

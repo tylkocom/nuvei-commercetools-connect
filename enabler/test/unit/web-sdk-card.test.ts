@@ -115,6 +115,7 @@ describe("WebSdkCardComponent", () => {
       expect.objectContaining({
         sessionToken: "session-token-1",
         clientUniqueId: "cart-1",
+        merchant_unique_id: "payment-ref-1",
         paymentOption: cardField,
         billingAddress: {
           email: "sandbox@example.com",

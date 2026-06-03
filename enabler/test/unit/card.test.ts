@@ -122,6 +122,7 @@ describe("SimplyConnectCardComponent", () => {
           merchantSiteId: "site-456",
           amount: "10.00",
           currency: "USD",
+          merchant_unique_id: "ref-123",
           renderTo: "#container",
         }),
       ),

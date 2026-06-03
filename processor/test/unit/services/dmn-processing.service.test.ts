@@ -626,6 +626,61 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
     });
 
+    it("resolves merchant_unique_id as cart ID when Nuvei does not send a session token", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-cart",
+        interfaceId: "nuvei-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: [{ typeId: "payment", id: "payment-from-cart" }] },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        if (id === "payment-from-cart") {
+          return payment;
+        }
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockGetCart).toHaveBeenCalledWith({ id: "cart-123" });
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "payment-from-cart" }),
+        1000,
+      );
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "payment-from-cart" }),
+      );
+    });
+
     it("rejects when merchant_unique_id payment conflicts with DMN sessionToken", async () => {
       const { service } = createService();
 

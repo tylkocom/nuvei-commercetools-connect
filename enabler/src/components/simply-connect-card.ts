@@ -93,6 +93,7 @@ class SimplyConnectCardComponent implements PaymentComponent {
 
     checkout({
       sessionToken: this.sessionToken,
+      merchant_unique_id: this.paymentReference,
       env: this.baseOptions.env === "test" ? "int" : "prod",
       merchantId: this.baseOptions.merchantId,
       merchantSiteId: this.baseOptions.merchantSiteId,

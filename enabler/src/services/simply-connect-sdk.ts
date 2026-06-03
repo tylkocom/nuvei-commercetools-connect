@@ -20,6 +20,9 @@ export interface CheckoutResult {
 
 export type CheckoutFunction = (config: {
   sessionToken: string;
+  merchant_unique_id?: string;
+  merchantUniqueId?: string;
+  merchantUniqueID?: string;
   env: "int" | "prod";
   merchantSiteId: string;
   merchantId: string;
