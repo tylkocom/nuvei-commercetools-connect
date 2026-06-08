@@ -35,6 +35,8 @@ export type CheckoutFunction = (config: {
   billingAddress?: Record<string, string>;
   renderTo: string;
   onResult: (result: CheckoutResult) => void;
+  onError?: (error: unknown) => void;
+  onPending?: (result?: CheckoutResult) => void;
 }) => void;
 
 declare global {

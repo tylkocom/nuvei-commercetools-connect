@@ -129,6 +129,22 @@ describe("NuveiWebSdkEnabler", () => {
     expect(builder.componentHasSubmit).toBe(true);
     expect(typeof builder.build).toBe("function");
   });
+
+  it("rejects unsupported component types before SDK or processor side effects", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
+    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
+    const enabler = new NuveiWebSdkEnabler(makeEnablerOptions());
+
+    await expect(enabler.createComponentBuilder("paypal")).rejects.toMatchObject({
+      code: pe.PublicPaymentErrorCode.METHOD_UNSUPPORTED,
+      message: expect.stringContaining("Supported methods: card"),
+    });
+    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
+    expect(loadWebSdkSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe("NuveiEnabler facade mode validation", () => {

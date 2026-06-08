@@ -1211,12 +1211,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
       try {
         payment = await this.ctPaymentService.getPayment({ id: merchantUniqueId });
       } catch (error) {
-        if (sessionToken) {
-          log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
-            merchantUniqueId,
-          });
-        } else if (this.isResourceNotFoundError(error)) {
-          payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
+        if (this.isResourceNotFoundError(error)) {
+          if (sessionToken) {
+            log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
+              merchantUniqueId,
+            });
+          } else {
+            payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
+          }
         } else {
           throw error;
         }

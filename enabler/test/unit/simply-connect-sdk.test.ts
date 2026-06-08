@@ -67,20 +67,31 @@ describe("loadSimplyConnectSdk", () => {
 
   it("resolves correctly when an existing script tag has already loaded", async () => {
     const mockCheckout = vi.fn();
-    vi.stubGlobal("window", { checkout: mockCheckout });
+    const windowStub: { checkout?: typeof mockCheckout } = {};
+    vi.stubGlobal("window", windowStub);
 
+    let onLoad: (() => void) | undefined;
+    const existingScript = {
+      addEventListener: vi.fn((event: string, listener: () => void) => {
+        if (event === "load") onLoad = listener;
+      }),
+    };
     const mockCreateElement = vi.fn();
     vi.stubGlobal("document", {
-      querySelector: vi.fn().mockReturnValue({ addEventListener: vi.fn() }),
+      querySelector: vi.fn().mockReturnValue(existingScript),
       createElement: mockCreateElement,
       head: { appendChild: vi.fn() },
     });
 
     // Dynamic import is required here to exercise module-level loader caching.
     const { loadSimplyConnectSdk } = await import("../../src/services/simply-connect-sdk");
-    const result = await loadSimplyConnectSdk();
+    const promise = loadSimplyConnectSdk();
+    windowStub.checkout = mockCheckout;
+    onLoad?.();
+    const result = await promise;
 
     expect(result).toBe(mockCheckout);
+    expect(existingScript.addEventListener).toHaveBeenCalledWith("load", expect.any(Function));
     expect(mockCreateElement).not.toHaveBeenCalled();
   });
 });

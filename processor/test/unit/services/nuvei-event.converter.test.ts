@@ -11,6 +11,34 @@ const baseDmn = {
 };
 
 describe("NuveiEventConverter", () => {
+  it("converts a valid authorization DMN into a payment update", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate(
+      {
+        ...baseDmn,
+        cardCompany: "Visa",
+        cardType: "Credit Card",
+      },
+      1000,
+    );
+
+    expect(update).toEqual({
+      id: "payment-1",
+      pspReference: "ppp-tx-1",
+      transactions: [
+        {
+          type: "Authorization",
+          interactionId: "ppp-tx-1",
+          amount: { centAmount: 1000, currencyCode: "USD" },
+          state: "Success",
+        },
+      ],
+      interfaceCode: "authorized",
+      paymentMethod: "Visa",
+      paymentMethodName: { en: "Credit Card" },
+      totalCentAmount: 1000,
+    });
+  });
+
   it("parses DMN amount using zero-decimal currency fraction digits", () => {
     const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
       ...baseDmn,

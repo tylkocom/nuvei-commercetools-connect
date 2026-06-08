@@ -66,6 +66,9 @@ describe("Checkout-facing Enabler", () => {
     await expect(enabler.createDropinBuilder("embedded")).rejects.toBeInstanceOf(
       PaymentSetupError,
     );
+    await expect(enabler.createDropinBuilder("dropin")).rejects.toBeInstanceOf(
+      PaymentSetupError,
+    );
     await expect(enabler.createExpressBuilder("sample")).rejects.toBeInstanceOf(PaymentSetupError);
     await expect(enabler.createStoredPaymentMethodBuilder("card")).rejects.toBeInstanceOf(
       PaymentSetupError,

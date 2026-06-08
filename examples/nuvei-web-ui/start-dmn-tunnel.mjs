@@ -19,6 +19,10 @@
  */
 
 import { spawn } from "node:child_process";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const EXAMPLE_DIR = dirname(fileURLToPath(import.meta.url));
 
 const PROCESSOR_WEBHOOK_PORT = process.env.PROCESSOR_WEBHOOK_PORT ?? "8080";
 const TUNNEL_PROVIDER = process.env.TUNNEL_PROVIDER ?? "localtunnel"; // "ngrok" or "localtunnel"
@@ -35,7 +39,7 @@ if (TUNNEL_PROVIDER === "ngrok") {
   console.log("");
 
   const ngrok = spawn("npx", ["ngrok", "http", PROCESSOR_WEBHOOK_PORT, "--url", "nuvei-dmn-test"], {
-    cwd: "/home/wykwit/Documents/PRIV/tylko-nuvei/examples/nuvei-web-ui",
+    cwd: EXAMPLE_DIR,
     stdio: "inherit",
   });
 

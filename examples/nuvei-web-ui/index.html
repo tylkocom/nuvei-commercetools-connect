@@ -319,14 +319,14 @@
         );
       });
 
-      payButton.addEventListener("click", () => {
+      payButton.addEventListener("click", async () => {
         if (!currentComponent || typeof currentComponent.submit !== "function") {
           appendLog("pay-error", "Pay is only available after mounting the Web SDK card.");
           return;
         }
 
         try {
-          currentComponent.submit();
+          await currentComponent.submit();
         } catch (error) {
           appendLog(
             "pay-error",

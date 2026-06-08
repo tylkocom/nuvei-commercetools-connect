@@ -28,6 +28,7 @@ class SimplyConnectCardComponent implements PaymentComponent {
   private sessionToken = "";
   private paymentReference = "";
   private initPromise: Promise<void> | undefined;
+  private container: Element | undefined;
 
   constructor(
     private readonly baseOptions: EnablerOptions,
@@ -90,6 +91,7 @@ class SimplyConnectCardComponent implements PaymentComponent {
     }
 
     container.innerHTML = "";
+    this.container = container;
 
     checkout({
       sessionToken: this.sessionToken,
@@ -102,12 +104,18 @@ class SimplyConnectCardComponent implements PaymentComponent {
       locale: this.baseOptions.locale,
       country: this.baseOptions.countryCode ?? "US",
       billingAddress: {
-        email: "sandbox@example.com",
+        ...(this.baseOptions.shopperEmail && { email: this.baseOptions.shopperEmail }),
         country: this.baseOptions.countryCode ?? "US",
       },
       renderTo: selector,
       onResult: (result: CheckoutResult) => {
         this.handleCheckoutResult(result);
+      },
+      onError: (error: unknown) => {
+        this.baseOptions.onError?.(error, { paymentReference: this.paymentReference });
+      },
+      onPending: () => {
+        this.baseOptions.onPending?.({ paymentReference: this.paymentReference });
       },
     });
 
@@ -115,15 +123,13 @@ class SimplyConnectCardComponent implements PaymentComponent {
   }
 
   private handleCheckoutResult(result: CheckoutResult): void {
-    const nuveiResult = {
-      transactionStatus: result.transactionStatus,
-      sessionToken: result.sessionToken,
-      errCode: result.errCode,
-      reason: result.reason,
-    };
+    if (result.cancelled) {
+      this.baseOptions.onComplete?.({ isSuccess: false, paymentReference: this.paymentReference });
+      this.cleanupCheckoutOverlay();
+      return;
+    }
 
     void confirmPaymentResult(
-      nuveiResult,
       this.paymentReference,
       this.sessionToken,
       this.api,
@@ -136,9 +142,8 @@ class SimplyConnectCardComponent implements PaymentComponent {
   }
 
   private cleanupCheckoutOverlay(): void {
-    const overlays = document.querySelectorAll(
-      '[id*="checkoutOverlay"], [class*="checkoutOverlay"]',
-    );
-    overlays.forEach((el) => el.remove());
+    this.container
+      ?.querySelectorAll('[id*="checkoutOverlay"], [class*="checkoutOverlay"]')
+      .forEach((el) => el.remove());
   }
 }

@@ -12,7 +12,6 @@ import {
   type PendingPaymentResult,
   type PublicPaymentError,
 } from "../payment-enabler/payment-enabler.js";
-import type { NuveiResult } from "./simply-connect-sdk.js";
 
 /** Shape of the response returned by `GET /operations/config`. */
 export type ProcessorConfigResponse = {
@@ -80,7 +79,6 @@ function waitForNextConfirmAttempt(delayMs: number): Promise<void> {
  * Checkout-template compatibility; `onError` is reserved for technical failures.
  */
 export async function confirmPaymentResult(
-  result: NuveiResult,
   paymentReference: string,
   knownSessionToken: string,
   api: Pick<ApiService, "confirmPayment">,
@@ -91,7 +89,6 @@ export async function confirmPaymentResult(
 ): Promise<void> {
   const retryDelaysMs = pollingOptions.retryDelaysMs ?? DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS;
   const wait = pollingOptions.wait ?? waitForNextConfirmAttempt;
-  void result;
 
   for (let attempt = 0; ; attempt += 1) {
     let confirmRes: ConfirmPaymentResponse;

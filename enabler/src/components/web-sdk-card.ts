@@ -65,7 +65,7 @@ class WebSdkCardComponent implements PaymentComponent {
     }
 
     const clickOptions = await this.componentOptions.onPayButtonClick?.();
-    void (clickOptions?.storePaymentDetails ?? options.storePaymentDetails);
+    const storePaymentDetails = clickOptions?.storePaymentDetails ?? options.storePaymentDetails;
 
     this.sfc.createPayment(
       {
@@ -74,9 +74,10 @@ class WebSdkCardComponent implements PaymentComponent {
         merchant_unique_id: this.paymentReference,
         paymentOption: this.scard,
         billingAddress: {
-          email: "sandbox@example.com",
+          ...(this.baseOptions.shopperEmail && { email: this.baseOptions.shopperEmail }),
           country: this.baseOptions.countryCode ?? "US",
         },
+        ...(storePaymentDetails !== undefined && { savePM: storePaymentDetails }),
       },
       (res: SafeChargeResult) => {
         void this.handleWebSdkResult(res);
@@ -126,13 +127,20 @@ class WebSdkCardComponent implements PaymentComponent {
   }
 
   private handleWebSdkResult(res: SafeChargeResult): void {
-    const normalized = {
-      transactionStatus: res.result,
-      errCode: res.errCode,
-    };
+    if (res.cancelled) {
+      this.baseOptions.onComplete?.({ isSuccess: false, paymentReference: this.paymentReference });
+      return;
+    }
+
+    if (res.result === "ERROR") {
+      this.baseOptions.onError?.(
+        new Error(res.errorDescription || "Nuvei Web SDK returned ERROR."),
+        { paymentReference: this.paymentReference },
+      );
+      return;
+    }
 
     void confirmPaymentResult(
-      normalized,
       this.paymentReference,
       this.sessionToken,
       this.api,

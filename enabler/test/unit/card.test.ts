@@ -42,7 +42,9 @@ function makeEnablerOptions(): EnablerOptions {
 
 function stubDocument() {
   vi.stubGlobal("document", {
-    querySelector: vi.fn().mockReturnValue({ innerHTML: "" }),
+    querySelector: vi
+      .fn()
+      .mockReturnValue({ innerHTML: "", querySelectorAll: vi.fn().mockReturnValue([]) }),
     createElement: vi.fn(),
     head: { appendChild: vi.fn() },
     querySelectorAll: vi.fn().mockReturnValue([]),
@@ -97,9 +99,11 @@ describe("SimplyConnectCardComponent", () => {
     });
   });
 
-  it("passes correct config to checkout()", async () => {
+  it("passes correct config and callback wiring to checkout()", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
+    const onError = vi.fn();
+    const onPending = vi.fn();
     mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockCreatePayment.mockResolvedValue({
       sessionToken: "st-123",
@@ -108,7 +112,7 @@ describe("SimplyConnectCardComponent", () => {
       currency: "USD",
     });
 
-    const builder = new SimplyConnectCardBuilder(makeEnablerOptions());
+    const builder = new SimplyConnectCardBuilder({ ...makeEnablerOptions(), onError, onPending });
     const component = builder.build({ showPayButton: true });
 
     await component.mount("#container");
@@ -124,8 +128,32 @@ describe("SimplyConnectCardComponent", () => {
           currency: "USD",
           merchant_unique_id: "ref-123",
           renderTo: "#container",
+          onResult: expect.any(Function),
+          onError: expect.any(Function),
+          onPending: expect.any(Function),
         }),
       ),
+    );
+
+    const checkoutConfig = mockCheckout.mock.calls[0][0] as {
+      onResult: (result: { transactionStatus: string }) => void;
+      onError: (error: unknown) => void;
+      onPending: () => void;
+    };
+    const sdkError = new Error("SDK error");
+    checkoutConfig.onError(sdkError);
+    checkoutConfig.onPending();
+    checkoutConfig.onResult({ transactionStatus: "APPROVED" });
+
+    expect(onError).toHaveBeenCalledWith(sdkError, { paymentReference: "ref-123" });
+    expect(onPending).toHaveBeenCalledWith({ paymentReference: "ref-123" });
+    expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
+      "ref-123",
+      "st-123",
+      expect.any(Object),
+      undefined,
+      onError,
+      onPending,
     );
   });
 
@@ -209,7 +237,7 @@ describe("SimplyConnectCardComponent", () => {
     await expect(component.isValid()).resolves.toBe(true);
   });
 
-  it("passes paymentRes.sessionToken (not result.sessionToken) as knownSessionToken to confirmPaymentResult (D-11)", async () => {
+  it("passes paymentRes.sessionToken as knownSessionToken to confirmPaymentResult (D-11)", async () => {
     stubDocument();
     const mockCheckout = vi.fn().mockImplementation((config) => {
       config.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-session-token" });
@@ -229,7 +257,6 @@ describe("SimplyConnectCardComponent", () => {
     await vi.waitFor(() => expect(mockConfirmPaymentResult).toHaveBeenCalled());
 
     expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionToken: "browser-session-token" }),
       "payment-ref-123",
       "known-session-token",
       expect.any(Object),

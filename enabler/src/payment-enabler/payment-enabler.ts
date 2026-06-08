@@ -176,6 +176,8 @@ export type CheckoutEnablerOptions = {
   locale?: string;
   /** Shopper country code forwarded to Nuvei when available. */
   countryCode?: string;
+  /** Shopper email forwarded to Nuvei when available; omitted otherwise. */
+  shopperEmail?: string;
   /** Called when additional payment action is required. */
   onActionRequired?: () => Promise<void>;
   /** Called when the processor confirms the payment is approved. */

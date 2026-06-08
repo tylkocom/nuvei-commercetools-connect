@@ -202,7 +202,7 @@ Run commands from the repository root with `--prefix`:
 | `npm run build --prefix processor` | Remove `processor/dist` and compile TypeScript. |
 | `npm start --prefix processor` | Start the built processor with `node dist/index.js`. |
 | `npm run test --prefix processor` | Run processor Vitest tests through `processor/scripts/run-vitest.mjs`. |
-| `npm start --prefix testing` | Start the local mocked commercetools test server. |
+| `npm start --prefix examples/nuvei-web-ui` | Start the local mocked commercetools test server and browser harness. |
 
 ## Testing
 

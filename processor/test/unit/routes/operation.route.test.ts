@@ -80,6 +80,7 @@ type RouteHandler = (request: unknown, reply: unknown) => Promise<unknown>;
 interface RouteEntry {
   method: string;
   url: string;
+  opts: unknown;
   handler: RouteHandler;
 }
 
@@ -99,11 +100,11 @@ function buildApp(): BuiltApp {
   const routes: RouteEntry[] = [];
 
   const fastify: TestFastify = {
-    get: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
-      routes.push({ method: "GET", url, handler });
+    get: vi.fn((url: string, opts: unknown, handler: RouteHandler) => {
+      routes.push({ method: "GET", url, opts, handler });
     }),
-    post: vi.fn((url: string, _opts: unknown, handler: RouteHandler) => {
-      routes.push({ method: "POST", url, handler });
+    post: vi.fn((url: string, opts: unknown, handler: RouteHandler) => {
+      routes.push({ method: "POST", url, opts, handler });
     }),
   };
 
@@ -229,6 +230,7 @@ describe("operation routes", () => {
     const healthRoute = app.routes.find((r) => r.url === "/health");
     expect(healthRoute).toBeDefined();
     expect(healthRoute!.method).toBe("GET");
+    expect(healthRoute!.opts).not.toHaveProperty("preHandler");
   });
 
   it("GET /health returns 200 with commit and ok status when all checks pass", async () => {

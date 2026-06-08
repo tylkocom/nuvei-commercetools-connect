@@ -6,7 +6,6 @@ app.use((_req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "*");
   res.setHeader("Access-Control-Allow-Headers", "*");
-  res.setHeader("Access-Control-Allow-Credentials", "true");
   if (_req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
@@ -242,7 +241,7 @@ app.get("/payment-components", (req, res) => {
   record("INBOUND", "Supported payment components", req);
   res.json({
     components: ["card"],
-    dropins: ["embedded"],
+    dropins: [],
   });
 });
 

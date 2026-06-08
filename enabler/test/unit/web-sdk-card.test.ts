@@ -118,14 +118,12 @@ describe("WebSdkCardComponent", () => {
         merchant_unique_id: "payment-ref-1",
         paymentOption: cardField,
         billingAddress: {
-          email: "sandbox@example.com",
           country: "US",
         },
       }),
       expect.any(Function),
     );
     expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
-      { transactionStatus: "DECLINED", errCode: 42 },
       "payment-ref-1",
       "session-token-1",
       expect.any(Object),
@@ -133,6 +131,98 @@ describe("WebSdkCardComponent", () => {
       undefined,
       undefined,
     );
+  });
+
+  it("calls onError for Web SDK ERROR without confirmation polling", async () => {
+    stubDocument();
+    const onError = vi.fn();
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
+      createPayment: vi.fn((_params, callback) => {
+        callback({ result: "ERROR", errorDescription: "Card validation failed" });
+      }),
+    };
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "USD",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const builder = new WebSdkCardBuilder(makeEnablerOptions({ onError }));
+    const component = builder.build({ showPayButton: true });
+    await component.mount("#container");
+    await component.submit();
+
+    expect(onError).toHaveBeenCalledWith(expect.any(Error), { paymentReference: "payment-ref-1" });
+    expect((onError.mock.calls[0][0] as Error).message).toBe("Card validation failed");
+    expect(mockConfirmPaymentResult).not.toHaveBeenCalled();
+  });
+
+  it("calls failed onComplete for Web SDK cancellation without confirmation polling", async () => {
+    stubDocument();
+    const onComplete = vi.fn();
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
+      createPayment: vi.fn((_params, callback) => {
+        callback({ result: "ERROR", cancelled: true });
+      }),
+    };
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "USD",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const builder = new WebSdkCardBuilder(makeEnablerOptions({ onComplete }));
+    const component = builder.build({ showPayButton: true });
+    await component.mount("#container");
+    await component.submit();
+
+    expect(onComplete).toHaveBeenCalledWith({ isSuccess: false, paymentReference: "payment-ref-1" });
+    expect(mockConfirmPaymentResult).not.toHaveBeenCalled();
+  });
+
+  it("routes declined Web SDK results through confirmation failure callback", async () => {
+    stubDocument();
+    const onComplete = vi.fn();
+    mockConfirmPaymentResult.mockImplementation((paymentReference, _sessionToken, _api, callback) => {
+      callback?.({ isSuccess: false, paymentReference });
+    });
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
+      createPayment: vi.fn((_params, callback) => {
+        callback({ result: "DECLINED", errCode: 42, transactionId: "tx-1" });
+      }),
+    };
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "USD",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const builder = new WebSdkCardBuilder(makeEnablerOptions({ onComplete }));
+    const component = builder.build({ showPayButton: true });
+    await component.mount("#container");
+    await component.submit();
+
+    expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
+      "payment-ref-1",
+      "session-token-1",
+      expect.any(Object),
+      onComplete,
+      undefined,
+      undefined,
+    );
+    expect(onComplete).toHaveBeenCalledWith({ isSuccess: false, paymentReference: "payment-ref-1" });
   });
 
   it("does not import the Simply Connect loader path", async () => {

@@ -26,6 +26,7 @@ export interface SafeChargeInstance {
       cardHolderName?: string;
       paymentOption: SafeChargeCardField;
       billingAddress?: Record<string, string>;
+      savePM?: boolean;
     },
     callback: (res: SafeChargeResult) => void,
   ): void;

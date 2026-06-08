@@ -190,7 +190,7 @@ async function testProcessorDmnWebhook(paymentReference) {
       dmnBody.responseTimeStamp,
       process.env.NUVEI_SECRET_KEY,
     ];
-    dmnBody.checksum = crypto.createHash("sha256").update(checksumFields.join("")).digest("hex");
+    dmnBody.advanceResponseChecksum = crypto.createHash("sha256").update(checksumFields.join("")).digest("hex");
   }
 
   const { status, body } = await request(`${PROCESSOR_URL}/webhooks/nuvei`, {
