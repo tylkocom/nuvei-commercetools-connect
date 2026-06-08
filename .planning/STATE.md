@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-06-08T11:59:22.517Z"
-last_activity: 2026-06-08 — Completed Phase 2 Plan 02 Stage A processor/Nuvei server-side capture against mock CT.
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-06-08T12:10:49.155Z"
+last_activity: 2026-06-08 — Completed Phase 2 Plan 03 Stage B dual-mode browser capture harness with validated blocker-path evidence.
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 89
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
-Plan: 3 of 5 (02-03-PLAN.md next)
-Status: Phase 2 Plan 02 complete; ready for Stage B dual-mode browser capture against local processor.
-Last activity: 2026-06-08 — Completed Plan 02-02 Stage A processor/Nuvei server-side capture against mock CT.
+Plan: 4 of 5 (02-04-PLAN.md next)
+Status: Phase 2 Plan 03 complete; ready for Stage C combined browser + processor + Nuvei DMN tunnel capture.
+Last activity: 2026-06-08 — Completed Plan 02-03 Stage B dual-mode browser capture harness with validated blocker-path evidence.
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 15
-- Average duration: latest plan 16 min
-- Total execution time: at least 39 min recorded
+- Total plans completed: 16
+- Average duration: latest plan 8 min
+- Total execution time: at least 47 min recorded
 
 **By Phase:**
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 83%
 | Phase 01.1.1-payment-confirmation-tri-state-outcome-correctness P02 | 5 | 2 tasks | 8 files |
 | Phase 02 P01 | 10min | 2 tasks | 13 files |
 | Phase 02 P02 | 16min | 2 tasks | 18 files |
+| Phase 02 P03 | 8min | 3 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02 Plan 02]: Keep Stage A capture package-local in examples/nuvei-web-ui with no new dependencies.
 - [Phase 02]: [Phase 02 Plan 02]: Allow local HTTP commercetools auth/api/session URLs only behind PHASE_02_STAGE_A_LOCAL_MOCK_CT=true and only for localhost/127.0.0.1 Stage A evidence capture.
 - [Phase 02]: [Phase 02 Plan 02]: Stage A NUV-01 server setup evidence does not complete NUV-01; browser authorization, DMN, and real Checkout proof remain later Phase 2 gates.
+- [Phase 02]: [Phase 02 Plan 03]: Keep Stage B browser capture package-local in examples/nuvei-web-ui with no new dependencies.
+- [Phase 02]: [Phase 02 Plan 03]: Treat Simply Connect as the primary Stage B row mode while recording Web SDK blockers/findings explicitly when no Web SDK browser export exists.
+- [Phase 02]: [Phase 02 Plan 03]: Do not infer or fake browser/Nuvei results in non-interactive execution; record exact blocker fixtures instead.
 
 ### Roadmap Evolution
 
@@ -113,6 +117,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-08T11:59:22.517Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-06-08T12:10:49.152Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None

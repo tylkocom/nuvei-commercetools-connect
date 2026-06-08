@@ -123,7 +123,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — Stage B dual-mode browser capture against local processor.
+- [x] 02-03-PLAN.md — Stage B dual-mode browser capture against local processor.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -244,7 +244,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Contract and Method Hardening | 3/3 | Complete | 2026-06-02 |
-| 2. Nuvei Sandbox Evidence and Checkout Validation | 2/5 | In Progress|  |
+| 2. Nuvei Sandbox Evidence and Checkout Validation | 3/5 | In Progress|  |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |
 | 5. Frontend Resilience and Security Hardening | 0/TBD | Not started | - |
@@ -257,7 +257,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 **Goal:** [To be planned]
 **Requirements**: TBD
 **Depends on:** Phase 8
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 
 Plans:
 
