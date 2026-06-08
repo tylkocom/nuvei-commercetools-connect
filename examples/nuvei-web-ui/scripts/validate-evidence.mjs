@@ -344,7 +344,7 @@ async function runSelfCheck() {
       findings: [],
     })),
   }, tempRoot, { emptyOk: true });
-  assert.ok(badIndexErrors.some((error) => error.includes('NUV-07-complete-checkout-success') && error.includes('real-commercetools-checkout')));
+  assert.ok(badIndexErrors.some((error) => error.includes('NUV-07-complete-checkout-success') && error.includes('real commercetools Checkout environment')));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

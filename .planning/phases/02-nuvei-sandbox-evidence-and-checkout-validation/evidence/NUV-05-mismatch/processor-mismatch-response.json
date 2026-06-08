@@ -6,7 +6,7 @@
   "environment": "nuvei-sandbox-local-mock-ct",
   "status": "blocked",
   "evidenceClassification": "stage-c-synthetic-blocked",
-  "syntheticLabel": "synthetic-derived-from-real-dmn",
+  "syntheticLabel": "not-synthetic-no-real-dmn-source",
   "recordedAt": "2026-06-08T12:19:10.712Z",
   "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
   "attemptedCommands": [
