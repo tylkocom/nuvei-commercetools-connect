@@ -221,7 +221,7 @@ Expected result:
 - `POST /payments/session` creates a Nuvei session and a CT Payment.
 - Frontend confirmation calls `POST /payments/confirm/:paymentId`.
 - CT Payment has an `Authorization` transaction with state `Success`.
-- Authorization `interactionId` is the canonical Nuvei `PPP_TransactionID` after confirmation.
+- Authorization `interactionId` prefers Nuvei `PPP_TransactionID`; when Nuvei status omits PPP, it uses Nuvei `TransactionID`/`transactionId` or the bound session token fallback.
 - Nuvei dashboard shows an approved authorization.
 - DMN processing does not create duplicate transactions.
 
@@ -244,8 +244,8 @@ Expected result:
 
 - Payment Only Checkout renders the enabler asset.
 - Payment authorization succeeds.
-- CT Payment has one successful `Authorization` with `interactionId` set to canonical Nuvei `PPP_TransactionID`.
-- DMN deduplication is based on `PPP_TransactionID`; a second DMN with the same value does not create a duplicate transaction.
+- CT Payment has one successful `Authorization` with an idempotent Nuvei interaction ID: `PPP_TransactionID` when present, otherwise Nuvei transaction ID or the bound session token fallback.
+- DMN processing does not create a duplicate terminal transaction when a later DMN provides a different PPP ID for an authorization already recorded from confirmation.
 
 ## Scenario 8: Declined Card
 
@@ -265,8 +265,8 @@ Expected result:
 
 - Shopper sees a safe payment failure message.
 - No raw Nuvei secret, checksum, or sensitive card data is shown.
-- `POST /payments/confirm/:paymentId` returns HTTP `402` with `{ "outcome": "rejected" }`. The enabler routes this to `onError` with a safe error.
-- CT Payment has an `Authorization` transaction with state `Failure` and `interactionId` set to canonical `PPP_TransactionID` only if `PPP_TransactionID` was present in the Nuvei status response; without it, no CT terminal transaction is written for the declined attempt.
+- `POST /payments/confirm/:paymentId` returns HTTP `402` with `{ "outcome": "rejected" }`. The enabler routes business rejection through Checkout-compatible completion failure.
+- CT Payment has an `Authorization` transaction with state `Failure` using Nuvei `PPP_TransactionID` when present, otherwise Nuvei transaction ID or the bound session token fallback.
 - Processor logs include useful redacted context.
 
 ## Scenario 9: 3DS Frictionless Approval
@@ -555,8 +555,8 @@ Steps:
 Expected result:
 
 - Valid `sessionToken -> Payment.interfaceId` fallback updates only the matching Payment.
-- Unknown `merchant_unique_id` falls back to session-token lookup only when exactly one Payment matches.
-- Missing session token, zero matches, and multiple matches are rejected safely.
+- Unknown `merchant_unique_id` falls back to session-token lookup when available.
+- Cart-ID `merchant_unique_id` resolves through linked cart Payments only when amount/currency plus Nuvei transaction identity or a single existing terminal Payment identifies one exact Nuvei Payment; otherwise zero or ambiguous matches are rejected safely.
 - No unrelated Payment is modified.
 
 ## Scenario 24: DMN Amount Or Currency Mismatch

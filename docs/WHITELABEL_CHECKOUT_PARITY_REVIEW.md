@@ -184,18 +184,18 @@ Recommendation:
 
 Define the Checkout-facing pending behavior explicitly before sandbox E2E. If Checkout cannot consume `onPending`, map pending to a documented template-compatible callback path that keeps the UI recoverable without misrepresenting the payment as terminally failed or approved.
 
-### F-09 — Mitigated: Nuvei DMN correlation now has a session-token fallback
+### F-09 — Mitigated: Nuvei DMN correlation has layered fallbacks
 
 Evidence:
 
-- Payment session creation calls `openOrder` with `clientUniqueId: cart.id`: `processor/src/services/nuvei-payment.service.ts:828-841`.
-- Web SDK browser submission sends `clientUniqueId` as the cart ID returned by `POST /payments/session`: `enabler/src/components/web-sdk-card.ts`.
-- CT Payment creation stores the Nuvei session token as `Payment.interfaceId`: `processor/src/services/ct-payment-creation.service.ts:38-67`.
-- DMN processing now resolves by `merchant_unique_id` when it is a CT Payment ID, otherwise falls back to `sessionToken -> Payment.interfaceId`; zero or multiple matches are rejected: `processor/src/services/nuvei-payment.service.ts`.
+- Payment session creation calls `openOrder` with `clientUniqueId: cart.id`: `processor/src/services/nuvei-payment.service.ts`.
+- Web SDK browser submission sends `clientUniqueId` as the cart ID and sends the CT Payment reference through Nuvei merchant-reference aliases: `enabler/src/components/web-sdk-card.ts`.
+- CT Payment creation stores the Nuvei session token as `Payment.interfaceId`: `processor/src/services/ct-payment-creation.service.ts`.
+- DMN processing resolves by `merchant_unique_id` when it is a CT Payment ID, by `sessionToken -> Payment.interfaceId` when available, and by linked cart Payments plus existing Nuvei transaction identity when Nuvei sends the cart ID as `merchant_unique_id`: `processor/src/services/nuvei-payment.service.ts`.
 
 Impact:
 
-This removes the unsafe overloading where `clientUniqueId` tried to be both cart ID and CT Payment ID. Cart/session correlation stays on `clientUniqueId`; exact Payment correlation uses `merchant_unique_id` when Nuvei provides it as a CT Payment ID, with session-token lookup as the boring-safe fallback.
+This removes the unsafe overloading where `clientUniqueId` tried to be both cart ID and CT Payment ID. Cart/session correlation stays on `clientUniqueId`; exact Payment correlation uses the CT Payment reference when Nuvei echoes it, then session-token lookup, then transaction-identity disambiguation for cart-referenced DMNs left by earlier or Nuvei-normalized flows.
 
 Follow-up:
 
