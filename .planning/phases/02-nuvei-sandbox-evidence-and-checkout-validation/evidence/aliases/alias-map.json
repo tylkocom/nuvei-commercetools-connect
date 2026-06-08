@@ -1,0 +1,33 @@
+{
+  "version": "phase-02-v1",
+  "rawWorkspace": ".planning/tmp/phase-02-raw/",
+  "classes": {
+    "cartId": {},
+    "paymentId": {},
+    "sessionToken": {},
+    "pppTransactionId": {},
+    "transactionId": {},
+    "orderId": {},
+    "requestId": {},
+    "clientUniqueId": {},
+    "merchantUniqueId": {}
+  },
+  "counters": {
+    "cartId": 0,
+    "paymentId": 0,
+    "sessionToken": 0,
+    "pppTransactionId": 0,
+    "transactionId": 0,
+    "orderId": 0,
+    "requestId": 0,
+    "clientUniqueId": 0,
+    "merchantUniqueId": 0
+  },
+  "redactions": {
+    "checksum": "[redacted-checksum]",
+    "secret": "[redacted-secret]",
+    "cardData": "[redacted-card-data]",
+    "pii": "[redacted-pii]",
+    "rawBody": "[redacted-raw-body]"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phase 2 Field Matrix",
+  "type": "object",
+  "required": [
+    "$schema",
+    "version",
+    "identityModel",
+    "scenarios"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "scenarioId",
+          "frontendMode",
+          "environment",
+          "ct",
+          "nuvei",
+          "identityModelAssessment"
+        ]
+      }
+    }
+  }
+}

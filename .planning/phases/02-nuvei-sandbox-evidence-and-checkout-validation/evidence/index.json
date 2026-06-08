@@ -1,0 +1,1019 @@
+{
+  "$schema": "./schema/evidence-index.schema.json",
+  "version": "phase-02-v1",
+  "generatedAt": "2026-06-08T00:00:00.000Z",
+  "rawWorkspace": ".planning/tmp/phase-02-raw/",
+  "evidenceRoot": ".planning/phases/02-nuvei-sandbox-evidence-and-checkout-validation/evidence/",
+  "stageOrder": [
+    "stage-a-local-processor-mock-ct",
+    "stage-b-local-browser-processor",
+    "stage-c-local-browser-processor-dmn",
+    "stage-d-real-commercetools-checkout"
+  ],
+  "allowedEnvironments": [
+    "not-captured",
+    "local-mock-ct",
+    "nuvei-sandbox-local-mock-ct",
+    "real-commercetools-checkout"
+  ],
+  "allowedFrontendModes": [
+    "not-captured",
+    "simply-connect",
+    "web-sdk",
+    "checkout-hosted"
+  ],
+  "scenarios": [
+    {
+      "id": "NUV-01-success-auth",
+      "scenarioFolder": "NUV-01-success-auth",
+      "requirements": [
+        "NUV-01",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "openOrder-response.json",
+          "path": "NUV-01-success-auth/openOrder-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-01-success-auth/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "getPaymentStatus-response.json",
+          "path": "NUV-01-success-auth/getPaymentStatus-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-auth.json",
+          "path": "NUV-01-success-auth/dmn-auth.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-before.json",
+          "path": "NUV-01-success-auth/ct-payment-before.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-confirm.json",
+          "path": "NUV-01-success-auth/ct-payment-after-confirm.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-dmn.json",
+          "path": "NUV-01-success-auth/ct-payment-after-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-01-success-auth/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-02-decline-auth",
+      "scenarioFolder": "NUV-02-decline-auth",
+      "requirements": [
+        "NUV-02",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "openOrder-response.json",
+          "path": "NUV-02-decline-auth/openOrder-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-02-decline-auth/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "getPaymentStatus-response.json",
+          "path": "NUV-02-decline-auth/getPaymentStatus-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-decline.json",
+          "path": "NUV-02-decline-auth/dmn-decline.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-confirm.json",
+          "path": "NUV-02-decline-auth/ct-payment-after-confirm.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-02-decline-auth/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-03-3ds-frictionless",
+      "scenarioFolder": "NUV-03-3ds-frictionless",
+      "requirements": [
+        "NUV-03",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "openOrder-response.json",
+          "path": "NUV-03-3ds-frictionless/openOrder-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-03-3ds-frictionless/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "getPaymentStatus-response.json",
+          "path": "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-3ds-frictionless.json",
+          "path": "NUV-03-3ds-frictionless/dmn-3ds-frictionless.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-dmn.json",
+          "path": "NUV-03-3ds-frictionless/ct-payment-after-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-03-3ds-frictionless/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-04-3ds-stepup-success",
+      "scenarioFolder": "NUV-04-3ds-stepup-success",
+      "requirements": [
+        "NUV-04",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "openOrder-response.json",
+          "path": "NUV-04-3ds-stepup-success/openOrder-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-04-3ds-stepup-success/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "getPaymentStatus-response.json",
+          "path": "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-3ds-stepup-success.json",
+          "path": "NUV-04-3ds-stepup-success/dmn-3ds-stepup-success.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-dmn.json",
+          "path": "NUV-04-3ds-stepup-success/ct-payment-after-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-04-3ds-stepup-success/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-04-3ds-stepup-failure-or-abandonment",
+      "scenarioFolder": "NUV-04-3ds-stepup-failure-or-abandonment",
+      "requirements": [
+        "NUV-04",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "openOrder-response.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/openOrder-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "getPaymentStatus-response.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-3ds-stepup-failure.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/dmn-3ds-stepup-failure.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-dmn.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-05-capture",
+      "scenarioFolder": "NUV-05-capture",
+      "requirements": [
+        "NUV-05",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "payment-intent-capture-request.json",
+          "path": "NUV-05-capture/payment-intent-capture-request.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "payment-intent-capture-response.json",
+          "path": "NUV-05-capture/payment-intent-capture-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-settle-response.json",
+          "path": "NUV-05-capture/nuvei-settle-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-capture.json",
+          "path": "NUV-05-capture/dmn-capture.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-capture.json",
+          "path": "NUV-05-capture/ct-payment-after-capture.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-05-capture/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-05-cancel-authorization",
+      "scenarioFolder": "NUV-05-cancel-authorization",
+      "requirements": [
+        "NUV-05",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "payment-intent-cancel-request.json",
+          "path": "NUV-05-cancel-authorization/payment-intent-cancel-request.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "payment-intent-cancel-response.json",
+          "path": "NUV-05-cancel-authorization/payment-intent-cancel-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-void-response.json",
+          "path": "NUV-05-cancel-authorization/nuvei-void-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-cancel.json",
+          "path": "NUV-05-cancel-authorization/dmn-cancel.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-cancel.json",
+          "path": "NUV-05-cancel-authorization/ct-payment-after-cancel.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-05-cancel-authorization/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-05-refund",
+      "scenarioFolder": "NUV-05-refund",
+      "requirements": [
+        "NUV-05",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "payment-intent-refund-request.json",
+          "path": "NUV-05-refund/payment-intent-refund-request.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "payment-intent-refund-response.json",
+          "path": "NUV-05-refund/payment-intent-refund-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-refund-response.json",
+          "path": "NUV-05-refund/nuvei-refund-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-refund.json",
+          "path": "NUV-05-refund/dmn-refund.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-refund.json",
+          "path": "NUV-05-refund/ct-payment-after-refund.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-05-refund/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-05-duplicate-dmn",
+      "scenarioFolder": "NUV-05-duplicate-dmn",
+      "requirements": [
+        "NUV-05",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "dmn-original.json",
+          "path": "NUV-05-duplicate-dmn/dmn-original.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-replay.json",
+          "path": "NUV-05-duplicate-dmn/dmn-replay.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-duplicate-response.json",
+          "path": "NUV-05-duplicate-dmn/processor-duplicate-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-duplicate.json",
+          "path": "NUV-05-duplicate-dmn/ct-payment-after-duplicate.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-05-duplicate-dmn/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-05-mismatch",
+      "scenarioFolder": "NUV-05-mismatch",
+      "requirements": [
+        "NUV-05",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-c-local-browser-processor-dmn",
+      "allowedStages": [
+        "stage-a-local-processor-mock-ct",
+        "stage-b-local-browser-processor",
+        "stage-c-local-browser-processor-dmn"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": false,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "dmn-mismatch-request.json",
+          "path": "NUV-05-mismatch/dmn-mismatch-request.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-mismatch-response.json",
+          "path": "NUV-05-mismatch/processor-mismatch-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-payment-after-mismatch.json",
+          "path": "NUV-05-mismatch/ct-payment-after-mismatch.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-05-mismatch/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-07-complete-checkout-success",
+      "scenarioFolder": "NUV-07-complete-checkout-success",
+      "requirements": [
+        "NUV-07",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-d-real-commercetools-checkout",
+      "allowedStages": [
+        "stage-d-real-commercetools-checkout"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": true,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "checkout-ui-note.json",
+          "path": "NUV-07-complete-checkout-success/checkout-ui-note.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-cart-payment-order-ledger.json",
+          "path": "NUV-07-complete-checkout-success/ct-cart-payment-order-ledger.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-07-complete-checkout-success/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-dashboard-or-dmn.json",
+          "path": "NUV-07-complete-checkout-success/nuvei-dashboard-or-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-07-complete-checkout-success/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    },
+    {
+      "id": "NUV-08-payment-only-success",
+      "scenarioFolder": "NUV-08-payment-only-success",
+      "requirements": [
+        "NUV-08",
+        "NUV-06"
+      ],
+      "requiredStage": "stage-d-real-commercetools-checkout",
+      "allowedStages": [
+        "stage-d-real-commercetools-checkout"
+      ],
+      "frontendMode": "not-captured",
+      "allowedFrontendModes": [
+        "not-captured",
+        "simply-connect",
+        "web-sdk",
+        "checkout-hosted"
+      ],
+      "environment": "not-captured",
+      "requiresRealCommercetoolsCheckout": true,
+      "status": "pending-capture",
+      "synthetic": false,
+      "evidenceClassification": "empty-manifest",
+      "fixtures": [
+        {
+          "name": "checkout-ui-note.json",
+          "path": "NUV-08-payment-only-success/checkout-ui-note.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "ct-cart-payment-ledger.json",
+          "path": "NUV-08-payment-only-success/ct-cart-payment-ledger.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "browser-result.json",
+          "path": "NUV-08-payment-only-success/browser-result.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-dashboard-or-dmn.json",
+          "path": "NUV-08-payment-only-success/nuvei-dashboard-or-dmn.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "processor-log.ndjson",
+          "path": "NUV-08-payment-only-success/processor-log.ndjson",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        }
+      ],
+      "aliases": {
+        "cartIds": [],
+        "paymentIds": [],
+        "sessionTokens": [],
+        "pppTransactionIds": [],
+        "transactionIds": [],
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
+      },
+      "conclusion": {
+        "state": "pending",
+        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "evidenceSatisfiesRequirements": false
+      },
+      "blockers": [],
+      "findings": []
+    }
+  ]
+}

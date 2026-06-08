@@ -1,0 +1,5 @@
+{
+  "$schema": "./schema/findings.schema.json",
+  "version": "phase-02-v1",
+  "findings": []
+}

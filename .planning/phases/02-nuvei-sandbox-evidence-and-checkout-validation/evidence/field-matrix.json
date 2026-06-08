@@ -1,0 +1,486 @@
+{
+  "$schema": "./schema/field-matrix.schema.json",
+  "version": "phase-02-v1",
+  "identityModel": {
+    "paymentInterfaceIdEqualsSessionToken": "Payment.interfaceId=sessionToken",
+    "terminalInteractionIdEqualsPpp": "terminal transactions[].interactionId=PPP_TransactionID",
+    "clientUniqueIdEqualsCartId": "clientUniqueId=cartId",
+    "transactionIdSecondaryOnly": "TransactionID is secondary only"
+  },
+  "allowedAssessments": [
+    "confirmed",
+    "contradicted",
+    "unresolved",
+    "blocked"
+  ],
+  "scenarios": [
+    {
+      "scenarioId": "NUV-01-success-auth",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-02-decline-auth",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-03-3ds-frictionless",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-04-3ds-stepup-success",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-04-3ds-stepup-failure-or-abandonment",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-05-capture",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-05-cancel-authorization",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-05-refund",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-05-duplicate-dmn",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-05-mismatch",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-07-complete-checkout-success",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    },
+    {
+      "scenarioId": "NUV-08-payment-only-success",
+      "frontendMode": "not-captured",
+      "environment": "not-captured",
+      "evidenceRefs": [],
+      "ct": {
+        "cartId": "unobserved",
+        "paymentId": "unobserved",
+        "paymentInterfaceId": "unobserved",
+        "cartPaymentRefs": [],
+        "orderId": "unobserved",
+        "transactionInteractionIds": []
+      },
+      "nuvei": {
+        "sessionToken": "unobserved",
+        "pppTransactionId": "unobserved",
+        "pppTransactionField": "unobserved",
+        "transactionId": "unobserved",
+        "transactionIdField": "unobserved",
+        "clientUniqueId": "unobserved",
+        "merchantUniqueId": "unobserved",
+        "amount": {
+          "value": "unobserved",
+          "currency": "unobserved"
+        },
+        "status": {
+          "ppp_status": "unobserved",
+          "Status": "unobserved",
+          "transactionStatus": "unobserved"
+        }
+      },
+      "identityModelAssessment": {
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
+      },
+      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+    }
+  ]
+}
