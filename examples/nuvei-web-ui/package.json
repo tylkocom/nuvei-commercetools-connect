@@ -15,7 +15,10 @@
     "capture:stage-a": "node scripts/capture-stage-a.mjs",
     "capture:stage-b": "node scripts/capture-stage-b.mjs",
     "capture:dmn-proxy": "node scripts/capture-dmn-proxy.mjs",
-    "capture:stage-c": "node scripts/capture-stage-c.mjs"
+    "capture:stage-c": "node scripts/capture-stage-c.mjs",
+    "capture:real-checkout": "node scripts/capture-real-checkout.mjs",
+    "validate:phase-2-gate": "node scripts/capture-real-checkout.mjs --validate",
+    "real-checkout:self-check": "node scripts/real-checkout-gate-self-check.mjs"
   },
   "dependencies": {
     "express": "^4.18.3"
