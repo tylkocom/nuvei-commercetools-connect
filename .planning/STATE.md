@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-06-08T12:22:32.950Z"
-last_activity: 2026-06-08 — Completed Phase 2 Plan 04 Stage C DMN/tunnel/operation blocker capture with validated evidence rows.
+status: blocked
+stopped_at: Completed 02-05-PLAN.md with NUV-07/NUV-08 blocked
+last_updated: "2026-06-08T12:35:38.853Z"
+last_activity: 2026-06-08 — Completed Phase 2 Plan 05 Stage D real Checkout gate; NUV-07/NUV-08 blocked because no verified real CT raw proof was available.
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 94
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
-Plan: 5 of 5 (02-05-PLAN.md next)
-Status: Phase 2 Plan 04 complete; ready for real Complete Checkout and Payment Only smoke gate.
-Last activity: 2026-06-08 — Completed Plan 02-04 Stage C DMN/tunnel/operation blocker capture with validated evidence rows.
+Plan: 5 of 5 (02-05-PLAN.md executed with blockers)
+Status: Phase 2 blocked-incomplete; NUV-07 and NUV-08 still require real Complete Checkout and Payment Only evidence.
+Last activity: 2026-06-08 — Completed Plan 02-05 Stage D real Checkout gate with exact blockers and no false CT evidence claim.
 
 Progress: [█████████░] 94%
 
@@ -36,7 +36,7 @@ Progress: [█████████░] 94%
 
 **Velocity:**
 
-- Total plans completed: 16
+- Total plans completed: 18
 - Average duration: latest plan 8 min
 - Total execution time: at least 47 min recorded
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 94%
 | Phase 02 P02 | 16min | 2 tasks | 18 files |
 | Phase 02 P03 | 8min | 3 tasks | 31 files |
 | Phase 02 P04 | 8min | 3 tasks | 51 files |
+| Phase 02 P05 | 8min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02 Plan 04]: Use installed ngrok or NGROK_BIN for tunnel startup; localtunnel is allowed only when already installed, and npx/runtime package downloads are refused.
 - [Phase 02]: [Phase 02 Plan 04]: Record exact Stage C blocker fixtures instead of fake DMN, operation, duplicate, or mismatch evidence when Nuvei dashboard/browser/DMN access is unavailable.
 - [Phase 02]: [Phase 02 Plan 04]: Synthetic mismatch evidence remains blocked unless derived from real raw DMN material and labeled synthetic-derived-from-real-dmn.
+- [Phase 02]: [Phase 02 Plan 05]: Stage D real Checkout rows use detailed environment labels for Complete Checkout and Payment Only; local mock evidence cannot pass NUV-07 or NUV-08.
+- [Phase 02]: [Phase 02 Plan 05]: Phase 2 remains blocked-incomplete until validate:phase-2-gate -- --require-real-checkout passes with real CT Checkout proof.
 
 ### Roadmap Evolution
 
@@ -111,6 +114,7 @@ None yet.
 - Production rollout remains out of scope until sandbox E2E, reconciliation, fixtures, CI, and operational runbooks are complete.
 - Docs were pruned after ingest: canonical docs were regenerated/verified, migrated/stale docs were removed, and remaining checksum policy cleanup is tracked by OPS-07.
 - Security-review findings were imported as planning refinements: unsigned DMN field revalidation, replay protection, HTTPS processorUrl, return URL allowlist, payment creation idempotency, and money-moving amount bounds.
+- Phase 2 NUV-07/NUV-08 blocked: no verified real commercetools Checkout raw exports under .planning/tmp/phase-02-raw/stage-d/, so Complete Checkout and Payment Only pass evidence was not claimed.
 
 ## Deferred Items
 
@@ -122,6 +126,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-08T12:22:32.947Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-06-08T12:35:38.849Z
+Stopped at: Completed 02-05-PLAN.md with NUV-07/NUV-08 blocked
 Resume file: None

@@ -131,7 +131,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-05-PLAN.md — Real Complete Checkout and Payment Only smoke gate plus final evidence handoff.
+- [x] 02-05-PLAN.md — Real Complete Checkout and Payment Only smoke gate plus final evidence handoff (blocked: NUV-07/NUV-08 require real CT Checkout proof).
 
 **UI hint**: yes
 
@@ -244,7 +244,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Contract and Method Hardening | 3/3 | Complete | 2026-06-02 |
-| 2. Nuvei Sandbox Evidence and Checkout Validation | 4/5 | In Progress|  |
+| 2. Nuvei Sandbox Evidence and Checkout Validation | 5/5 | Blocked - NUV-07/NUV-08 require real CT Checkout evidence |  |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |
 | 5. Frontend Resilience and Security Hardening | 0/TBD | Not started | - |
