@@ -111,7 +111,28 @@ Plans:
   3. Operator can inspect sanitized sandbox payload evidence for capture, cancel authorization, refund, duplicate DMN, and mismatch cases.
   4. Operator can identify the canonical Nuvei DMN field that maps each event to exactly one commercetools Payment.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Evidence schema, raw capture isolation, sanitizer, validator, and source audit.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Stage A processor/Nuvei server-side capture against mock CT ledger.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-03-PLAN.md — Stage B dual-mode browser capture against local processor.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-04-PLAN.md — Stage C combined browser + processor + Nuvei DMN tunnel, operations, duplicate, and mismatch evidence.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-05-PLAN.md — Real Complete Checkout and Payment Only smoke gate plus final evidence handoff.
+
 **UI hint**: yes
 
 ### Phase 3: Processor Reconciliation Correctness
@@ -133,7 +154,7 @@ Plans:
 
 ### Phase 4: Checkout Data and Metadata Correctness
 
-**Goal**: Card payment creation uses validated Checkout, cart, shopper, and enabler data and stores only safe native commercetools Payment metadata.
+**Goal**: Card payment creation uses validated Checkout, cart, shopper, and enabler data and stores only safe native Payment metadata.
 **Mode:** mvp
 **Depends on**: Phase 3
 **Requirements**: DATA-01, DATA-02, DATA-03, DATA-04, DATA-05, DATA-06
@@ -223,7 +244,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Contract and Method Hardening | 3/3 | Complete | 2026-06-02 |
-| 2. Nuvei Sandbox Evidence and Checkout Validation | 0/TBD | Not started | - |
+| 2. Nuvei Sandbox Evidence and Checkout Validation | 0/5 | Not started | - |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |
 | 5. Frontend Resilience and Security Hardening | 0/TBD | Not started | - |

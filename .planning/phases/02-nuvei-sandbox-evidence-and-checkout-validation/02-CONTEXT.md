@@ -22,6 +22,9 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 - **D-04:** Use local tunnel/mock harness first for maximum visibility into processor requests, Nuvei DMNs, and mock CT ledger state.
 - **D-05:** After local evidence capture is working, validate real commercetools Checkout flows in both Complete Checkout and Payment Only modes.
 - **D-06:** The local mock/tunnel path is allowed for fast Nuvei evidence and debugging, but it does not satisfy `NUV-07` or `NUV-08` by itself; those require real commercetools Checkout evidence.
+- **D-06a:** Evidence capture should be automated and reproducible before manual sandbox runs are accepted as phase evidence. The plan should build local scripts/harness stages that can be rerun to capture/sanitize fixtures deterministically.
+- **D-06b:** Stage evidence capture local-first: first exercise processor/Nuvei/server-side flows against a mock commercetools ledger, then exercise enabler/browser flows against the local processor, then run both sides together end-to-end with Nuvei DMNs through a tunnel.
+- **D-06c:** Local mock commercetools data shapes are acceptable for automated evidence and should model the commercetools Cart/Payment/transaction structures closely enough for Phase 3 planning. This does not replace NUV-07/NUV-08; a later minimal real commercetools Checkout smoke remains the Phase 2 completion gate.
 
 ### Evidence artifacts
 - **D-07:** The primary deliverable is a sanitized fixture bundle plus an index. Narrative prose is secondary; downstream Phase 3 needs machine-readable fixtures.
@@ -62,6 +65,7 @@ Phase 2 gathers real Nuvei sandbox and commercetools Checkout evidence for card-
 - Planner may choose exact JSON schema for the evidence index and fixture metadata as long as D-07 through D-20 are satisfied.
 - Planner may choose the exact local tunnel tool and raw workspace naming if it remains gitignored and documented.
 - Planner may decide whether to add small helper scripts for sanitization/index validation if they reduce evidence mistakes without expanding into full test automation.
+- Planner may add small automation scripts for staged evidence capture, sanitization, fixture indexing, and schema validation when they make evidence reproducible. Keep them boring and local; do not build a new test framework if package-local npm scripts plus Node scripts are sufficient.
 
 </decisions>
 
