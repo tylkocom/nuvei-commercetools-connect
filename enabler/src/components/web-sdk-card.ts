@@ -72,6 +72,8 @@ class WebSdkCardComponent implements PaymentComponent {
         sessionToken: this.sessionToken,
         clientUniqueId: this.cartId,
         merchant_unique_id: this.paymentReference,
+        merchantUniqueId: this.paymentReference,
+        merchantUniqueID: this.paymentReference,
         paymentOption: this.scard,
         billingAddress: {
           ...(this.baseOptions.shopperEmail && { email: this.baseOptions.shopperEmail }),

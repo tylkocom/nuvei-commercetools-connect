@@ -127,6 +127,8 @@ describe("SimplyConnectCardComponent", () => {
           amount: "10.00",
           currency: "USD",
           merchant_unique_id: "ref-123",
+          merchantUniqueId: "ref-123",
+          merchantUniqueID: "ref-123",
           renderTo: "#container",
           onResult: expect.any(Function),
           onError: expect.any(Function),

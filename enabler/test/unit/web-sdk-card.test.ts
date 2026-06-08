@@ -116,6 +116,8 @@ describe("WebSdkCardComponent", () => {
         sessionToken: "session-token-1",
         clientUniqueId: "cart-1",
         merchant_unique_id: "payment-ref-1",
+        merchantUniqueId: "payment-ref-1",
+        merchantUniqueID: "payment-ref-1",
         paymentOption: cardField,
         billingAddress: {
           country: "US",
@@ -132,6 +134,7 @@ describe("WebSdkCardComponent", () => {
       undefined,
     );
   });
+
 
   it("calls onError for Web SDK ERROR without confirmation polling", async () => {
     stubDocument();
@@ -224,7 +227,6 @@ describe("WebSdkCardComponent", () => {
     );
     expect(onComplete).toHaveBeenCalledWith({ isSuccess: false, paymentReference: "payment-ref-1" });
   });
-
   it("does not import the Simply Connect loader path", async () => {
     stubDocument();
     const simplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
