@@ -107,37 +107,82 @@ app.use(
   }),
 );
 
-const ledger = {
-  cart: {
-    id: "cart-local-001",
+const PROJECT_KEY = "payment-integration";
+const SESSION_ID = "session-local-001";
+const CART_ID = "cart-local-001";
+const INITIAL_PAYMENT_ID = "payment-local-001";
+const LOCAL_OAUTH_TOKEN = "mock-ct-access-token";
+const OAUTH_SCOPE = "manage_project manage_checkout_payment_intents manage_checkout_transactions introspect_oauth_tokens view_sessions manage_payments";
+
+function money(centAmount = 1000, currencyCode = "EUR", fractionDigits = 2) {
+  return { centAmount, currencyCode, fractionDigits };
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createSession() {
+  return {
+    id: SESSION_ID,
+    version: 1,
+    state: "ACTIVE",
+    activeCart: {
+      cartRef: { id: CART_ID, typeId: "cart" },
+    },
+    metadata: {
+      allowedPaymentMethods: ["card"],
+      processorUrl: process.env.PROCESSOR_URL ?? "http://localhost:8080",
+      paymentInterface: "nuvei",
+      merchantReturnUrl: "http://localhost:8089/return",
+      correlationId: "correlation-local-001",
+    },
+  };
+}
+
+function createCart() {
+  return {
+    id: CART_ID,
+    version: 1,
+    cartState: "Active",
     paymentInfo: {
-      payments: [{ id: "payment-local-001", typeId: "payment" }],
+      payments: [{ id: INITIAL_PAYMENT_ID, typeId: "payment" }],
     },
-    totalPrice: {
-      centAmount: 1000,
-      currencyCode: "EUR",
-      fractionDigits: 2,
-    },
-  },
-  payment: {
-    id: "payment-local-001",
-    interfaceId: null,
-    amountPlanned: {
-      centAmount: 1000,
-      currencyCode: "EUR",
-      fractionDigits: 2,
-    },
-    paymentMethodInfo: {
+    totalPrice: money(),
+  };
+}
+
+function createPayment({ id = INITIAL_PAYMENT_ID, interfaceId = null, amountPlanned = money(), paymentMethodInfo, transactions = [] } = {}) {
+  return {
+    id,
+    version: 1,
+    interfaceId,
+    amountPlanned: clone(amountPlanned),
+    paymentMethodInfo: paymentMethodInfo ?? {
       paymentInterface: "nuvei",
       method: "card",
+      name: { en: "Card" },
     },
-    transactions: [],
+    transactions: clone(transactions),
     paymentStatus: {
       interfaceCode: "pending",
     },
-  },
-  lastRequests: [],
-};
+  };
+}
+
+function createLedger() {
+  const payment = createPayment();
+  return {
+    session: createSession(),
+    cart: createCart(),
+    payment,
+    payments: { [payment.id]: payment },
+    paymentSequence: 1,
+    lastRequests: [],
+  };
+}
+
+let ledger = createLedger();
 
 function record(direction, label, req, extra = {}) {
   const entry = {
@@ -177,8 +222,91 @@ function transactionIdFromBody(body) {
 }
 
 function upsertTransaction(transaction) {
-  const existing = ledger.payment.transactions.find(
-    (candidate) => candidate.interactionId === transaction.interactionId,
+  return upsertTransactionOnPayment(ledger.payment, transaction);
+}
+
+
+function paymentReference(id) {
+  return { id, typeId: "payment" };
+}
+
+function nextPaymentId() {
+  ledger.paymentSequence += 1;
+  return `payment-local-${String(ledger.paymentSequence).padStart(3, "0")}`;
+}
+
+function ensureProject(req, res) {
+  if (req.params.projectKey !== undefined && req.params.projectKey !== PROJECT_KEY) {
+    res.status(404).json({ message: "Project not found" });
+    return false;
+  }
+  return true;
+}
+
+function getPaymentOr404(id, res) {
+  const payment = ledger.payments[id];
+  if (!payment) {
+    res.status(404).json({ message: "Payment not found" });
+    return undefined;
+  }
+  return payment;
+}
+
+function attachPaymentToCart(paymentId) {
+  const payments = ledger.cart.paymentInfo.payments;
+  if (!payments.some((ref) => ref.id === paymentId)) {
+    payments.push(paymentReference(paymentId));
+    ledger.cart.version += 1;
+  }
+}
+
+function applyCartActions(cart, actions = []) {
+  for (const action of actions) {
+    if (action.action === "addPayment" && action.payment?.id) {
+      attachPaymentToCart(action.payment.id);
+    }
+  }
+  return cart;
+}
+
+function applyPaymentActions(payment, actions = []) {
+  for (const action of actions) {
+    if (action.action === "setInterfaceId") {
+      payment.interfaceId = action.interfaceId;
+    } else if (action.action === "setMethodInfoMethod") {
+      payment.paymentMethodInfo.method = action.method;
+    } else if (action.action === "setMethodInfoName") {
+      payment.paymentMethodInfo.name = action.name;
+    } else if (action.action === "setMethodInfoInterface") {
+      payment.paymentMethodInfo.paymentInterface = action.interface;
+    } else if (action.action === "setMethodInfoToken") {
+      payment.paymentMethodInfo.token = action.token;
+    } else if (action.action === "addTransaction" && action.transaction) {
+      upsertTransactionOnPayment(payment, {
+        ...action.transaction,
+        id: action.transaction.id ?? crypto.randomUUID(),
+      });
+    } else if (action.action === "changeTransactionState") {
+      const tx = payment.transactions.find((candidate) => candidate.id === action.transactionId);
+      if (tx) tx.state = action.state;
+    } else if (action.action === "changeTransactionInteractionId") {
+      const tx = payment.transactions.find((candidate) => candidate.id === action.transactionId);
+      if (tx) tx.interactionId = action.interactionId;
+    } else if (action.action === "setTransactionInterfaceId") {
+      const tx = payment.transactions.find((candidate) => candidate.id === action.transactionId);
+      if (tx) tx.interfaceId = action.interfaceId;
+    } else if (action.action === "addInterfaceInteraction") {
+      payment.interfaceInteractions = payment.interfaceInteractions ?? [];
+      payment.interfaceInteractions.push({ ...action, action: undefined });
+    }
+  }
+  payment.version += 1;
+  return payment;
+}
+
+function upsertTransactionOnPayment(payment, transaction) {
+  const existing = payment.transactions.find(
+    (candidate) => candidate.interactionId && candidate.interactionId === transaction.interactionId,
   );
 
   if (existing) {
@@ -186,10 +314,21 @@ function upsertTransaction(transaction) {
     return { inserted: false, transaction: existing };
   }
 
-  ledger.payment.transactions.push(transaction);
+  payment.transactions.push(transaction);
   return { inserted: true, transaction };
 }
 
+function findPayments(where) {
+  const payments = Object.values(ledger.payments);
+  if (!where) return payments;
+
+  const interfaceMatch = String(where).match(/interfaceId\s*=\s*"([^"]+)"/);
+  if (interfaceMatch) {
+    return payments.filter((payment) => payment.interfaceId === interfaceMatch[1]);
+  }
+
+  return payments;
+}
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "mock-ct" });
 });
@@ -221,11 +360,97 @@ app.get("/ledger", (req, res) => {
 
 app.post("/reset", (req, res) => {
   record("INBOUND", "Reset mock CT ledger", req);
-  ledger.payment.interfaceId = null;
-  ledger.payment.transactions = [];
-  ledger.payment.paymentStatus.interfaceCode = "pending";
-  ledger.lastRequests = [];
+  ledger = createLedger();
   res.json({ ok: true, ledger });
+});
+
+app.post("/oauth/token", (req, res) => {
+  record("INBOUND", "Mock CT OAuth token", req);
+  res.json({
+    access_token: LOCAL_OAUTH_TOKEN,
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope: OAUTH_SCOPE,
+  });
+});
+
+app.post("/oauth/introspect", (req, res) => {
+  record("INBOUND", "Mock CT OAuth introspect", req);
+  res.json({
+    active: true,
+    client_id: process.env.CTP_CLIENT_ID ?? "local-client",
+    scope: OAUTH_SCOPE,
+  });
+});
+
+app.get("/payment-integration/sessions/:sessionId", (req, res) => {
+  record("INBOUND", "Mock CT get session", req);
+  if (!ensureProject(req, res)) return;
+  if (req.params.sessionId !== SESSION_ID) {
+    res.status(404).json({ message: "Session not found" });
+    return;
+  }
+  res.json(ledger.session);
+});
+
+app.get("/payment-integration/carts/:id", (req, res) => {
+  record("INBOUND", "Mock CT get cart", req);
+  if (!ensureProject(req, res)) return;
+  if (req.params.id !== ledger.cart.id) {
+    res.status(404).json({ message: "Cart not found" });
+    return;
+  }
+  res.json(ledger.cart);
+});
+
+app.post("/payment-integration/carts/:id", (req, res) => {
+  record("INBOUND", "Mock CT update cart", req);
+  if (!ensureProject(req, res)) return;
+  if (req.params.id !== ledger.cart.id) {
+    res.status(404).json({ message: "Cart not found" });
+    return;
+  }
+  applyCartActions(ledger.cart, req.body?.actions ?? []);
+  res.json(ledger.cart);
+});
+
+app.get("/payment-integration/payments", (req, res) => {
+  record("INBOUND", "Mock CT query payments", req);
+  if (!ensureProject(req, res)) return;
+  const results = findPayments(req.query.where);
+  res.json({ count: results.length, total: results.length, offset: 0, results });
+});
+
+app.post("/payment-integration/payments", (req, res) => {
+  record("INBOUND", "Mock CT create payment", req);
+  if (!ensureProject(req, res)) return;
+  const payment = createPayment({
+    id: nextPaymentId(),
+    interfaceId: req.body?.interfaceId ?? null,
+    amountPlanned: req.body?.amountPlanned ?? ledger.cart.totalPrice,
+    paymentMethodInfo: req.body?.paymentMethodInfo,
+    transactions: req.body?.transactions ?? [],
+  });
+  ledger.payments[payment.id] = payment;
+  ledger.payment = payment;
+  res.status(201).json(payment);
+});
+
+app.get("/payment-integration/payments/:id", (req, res) => {
+  record("INBOUND", "Mock CT get payment", req);
+  if (!ensureProject(req, res)) return;
+  const payment = getPaymentOr404(req.params.id, res);
+  if (!payment) return;
+  res.json(payment);
+});
+
+app.post("/payment-integration/payments/:id", (req, res) => {
+  record("INBOUND", "Mock CT update payment", req);
+  if (!ensureProject(req, res)) return;
+  const payment = getPaymentOr404(req.params.id, res);
+  if (!payment) return;
+  applyPaymentActions(payment, req.body?.actions ?? []);
+  res.json(payment);
 });
 
 app.get("/config", (req, res) => {

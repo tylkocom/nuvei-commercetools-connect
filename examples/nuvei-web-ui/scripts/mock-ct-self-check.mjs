@@ -56,7 +56,7 @@ async function request(pathname, options = {}) {
 
 async function assertOk(pathname, options) {
   const { response, body } = await request(pathname, options);
-  assert.equal(response.status, 200, `${pathname} returned ${response.status}: ${JSON.stringify(body)}`);
+  assert.ok(response.status === 200 || response.status === 201, `${pathname} returned ${response.status}: ${JSON.stringify(body)}`);
   return body;
 }
 
