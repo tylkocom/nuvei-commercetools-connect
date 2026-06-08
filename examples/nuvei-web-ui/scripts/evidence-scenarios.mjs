@@ -9,7 +9,7 @@ export const STAGES = [
 ];
 
 export const FRONTEND_MODES = ['not-captured', 'simply-connect', 'web-sdk', 'checkout-hosted'];
-export const ENVIRONMENTS = ['not-captured', 'local-mock-ct', 'nuvei-sandbox-local-mock-ct', 'real-commercetools-checkout'];
+export const ENVIRONMENTS = ['not-captured', 'local-mock-ct', 'nuvei-sandbox-local-mock-ct', 'real-commercetools-checkout', 'commercetools-sandbox-complete-checkout', 'commercetools-sandbox-payment-only'];
 
 export const EVIDENCE_SCENARIOS = [
   { id: 'NUV-01-success-auth', requirements: ['NUV-01', 'NUV-06'], requiredStage: 'stage-c-local-browser-processor-dmn', fixtureNames: ['openOrder-response.json', 'browser-result.json', 'getPaymentStatus-response.json', 'dmn-auth.json', 'ct-payment-before.json', 'ct-payment-after-confirm.json', 'ct-payment-after-dmn.json', 'processor-log.ndjson'], frontendModes: ['not-captured', 'simply-connect', 'web-sdk'] },
@@ -22,8 +22,8 @@ export const EVIDENCE_SCENARIOS = [
   { id: 'NUV-05-refund', requirements: ['NUV-05', 'NUV-06'], requiredStage: 'stage-c-local-browser-processor-dmn', fixtureNames: ['payment-intent-refund-request.json', 'payment-intent-refund-response.json', 'nuvei-refund-response.json', 'dmn-refund.json', 'ct-payment-after-refund.json', 'processor-log.ndjson'], frontendModes: ['not-captured'] },
   { id: 'NUV-05-duplicate-dmn', requirements: ['NUV-05', 'NUV-06'], requiredStage: 'stage-c-local-browser-processor-dmn', fixtureNames: ['dmn-original.json', 'dmn-replay.json', 'processor-duplicate-response.json', 'ct-payment-after-duplicate.json', 'processor-log.ndjson'], frontendModes: ['not-captured'] },
   { id: 'NUV-05-mismatch', requirements: ['NUV-05', 'NUV-06'], requiredStage: 'stage-c-local-browser-processor-dmn', fixtureNames: ['dmn-mismatch-request.json', 'processor-mismatch-response.json', 'ct-payment-after-mismatch.json', 'processor-log.ndjson'], frontendModes: ['not-captured'] },
-  { id: 'NUV-07-complete-checkout-success', requirements: ['NUV-07', 'NUV-06'], requiredStage: 'stage-d-real-commercetools-checkout', fixtureNames: ['checkout-ui-note.json', 'ct-cart-payment-order-ledger.json', 'browser-result.json', 'nuvei-dashboard-or-dmn.json', 'processor-log.ndjson'], frontendModes: ['not-captured', 'checkout-hosted', 'simply-connect', 'web-sdk'], requiresRealCommercetoolsCheckout: true },
-  { id: 'NUV-08-payment-only-success', requirements: ['NUV-08', 'NUV-06'], requiredStage: 'stage-d-real-commercetools-checkout', fixtureNames: ['checkout-ui-note.json', 'ct-cart-payment-ledger.json', 'browser-result.json', 'nuvei-dashboard-or-dmn.json', 'processor-log.ndjson'], frontendModes: ['not-captured', 'checkout-hosted', 'simply-connect', 'web-sdk'], requiresRealCommercetoolsCheckout: true },
+  { id: 'NUV-07-complete-checkout-success', requirements: ['NUV-07', 'NUV-06'], requiredStage: 'stage-d-real-commercetools-checkout', fixtureNames: ['checkout-ui-evidence.json', 'ct-cart-after-checkout.json', 'ct-payment-after-checkout.json', 'ct-order-after-checkout.json', 'processor-session-response.json', 'processor-confirm-response.json', 'nuvei-dashboard-transaction.json', 'dmn-auth.json'], frontendModes: ['not-captured', 'checkout-hosted', 'simply-connect', 'web-sdk'], requiresRealCommercetoolsCheckout: true },
+  { id: 'NUV-08-payment-only-success', requirements: ['NUV-08', 'NUV-06'], requiredStage: 'stage-d-real-commercetools-checkout', fixtureNames: ['checkout-ui-evidence.json', 'ct-cart-after-payment-only.json', 'ct-payment-after-payment-only.json', 'processor-session-response.json', 'processor-confirm-response.json', 'nuvei-dashboard-transaction.json', 'dmn-auth.json'], frontendModes: ['not-captured', 'checkout-hosted', 'simply-connect', 'web-sdk'], requiresRealCommercetoolsCheckout: true }
 ];
 
 export const SCENARIO_IDS = EVIDENCE_SCENARIOS.map((scenario) => scenario.id);

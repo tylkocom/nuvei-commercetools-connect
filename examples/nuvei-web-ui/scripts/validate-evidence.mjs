@@ -181,7 +181,8 @@ function validateIndex(index, evidenceRoot, { emptyOk, stage, allowPendingHumanC
       if (!slot.present && !emptyOk && !stage && row.status !== 'blocked') errors.push(`${scenario.id}: fixture ${fixtureName} missing; use --empty-ok only before capture`);
     }
     if ((scenario.id.startsWith('NUV-07') || scenario.id.startsWith('NUV-08')) && row.status === 'passed') {
-      if (row.environment !== 'real-commercetools-checkout') errors.push(`${scenario.id}: passed real Checkout row must use real-commercetools-checkout environment`);
+      const realCheckoutEnvironments = new Set(['real-commercetools-checkout', 'commercetools-sandbox-complete-checkout', 'commercetools-sandbox-payment-only']);
+      if (!realCheckoutEnvironments.has(row.environment)) errors.push(`${scenario.id}: passed real Checkout row must use a real commercetools Checkout environment`);
       if (row.requiredStage !== 'stage-d-real-commercetools-checkout') errors.push(`${scenario.id}: passed real Checkout row must use stage-d-real-commercetools-checkout`);
     }
     if (row.status === 'passed' && row.conclusion?.evidenceSatisfiesRequirements !== true) errors.push(`${scenario.id}: passed row must set conclusion.evidenceSatisfiesRequirements=true`);
