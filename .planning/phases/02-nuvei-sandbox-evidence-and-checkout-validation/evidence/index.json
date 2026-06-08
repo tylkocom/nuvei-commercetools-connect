@@ -36,7 +36,7 @@
         "stage-b-local-browser-processor",
         "stage-c-local-browser-processor-dmn"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
@@ -45,9 +45,9 @@
       ],
       "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-a-server-captured",
+      "evidenceClassification": "stage-b-browser-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -60,15 +60,15 @@
           "name": "browser-result.json",
           "path": "NUV-01-success-auth/browser-result.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "getPaymentStatus-response.json",
           "path": "NUV-01-success-auth/getPaymentStatus-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-auth.json",
@@ -88,8 +88,8 @@
           "name": "ct-payment-after-confirm.json",
           "path": "NUV-01-success-auth/ct-payment-after-confirm.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-dmn.json",
@@ -125,6 +125,13 @@
           "required": false,
           "present": true,
           "source": "raw-workspace"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-01-success-auth/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
@@ -132,26 +139,50 @@
           "cart-001"
         ],
         "paymentIds": [
-          "payment-001"
+          "payment-001",
+          "payment-002"
         ],
         "sessionTokens": [
           "sessionToken-001"
         ],
         "pppTransactionIds": [],
         "transactionIds": [],
-        "clientUniqueIds": [
-          "cart-001"
-        ],
-        "merchantUniqueIds": [
-          "payment-001"
-        ]
+        "clientUniqueIds": [],
+        "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "stage-a-captured",
-        "summary": "Stage A server-side session/openOrder setup captured through local processor and mock CT; browser authorization and DMN evidence remain pending for later plans.",
+        "state": "blocked",
+        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-b-NUV-01-success-auth-simply-connect-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "simply-connect",
+          "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.141Z",
+          "evidenceRefs": [
+            "NUV-01-success-auth/metadata.json",
+            "NUV-01-success-auth/browser-result.json",
+            "NUV-01-success-auth/getPaymentStatus-response.json",
+            "NUV-01-success-auth/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-b-NUV-01-success-auth-web-sdk-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "web-sdk",
+          "reason": "Web SDK was not exercised separately because No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.141Z",
+          "evidenceRefs": [
+            "NUV-01-success-auth/metadata.json",
+            "NUV-01-success-auth/browser-result.json",
+            "NUV-01-success-auth/getPaymentStatus-response.json",
+            "NUV-01-success-auth/ct-payment-after-confirm.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -167,18 +198,18 @@
         "stage-b-local-browser-processor",
         "stage-c-local-browser-processor-dmn"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-b-browser-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -191,15 +222,15 @@
           "name": "browser-result.json",
           "path": "NUV-02-decline-auth/browser-result.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "getPaymentStatus-response.json",
           "path": "NUV-02-decline-auth/getPaymentStatus-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-decline.json",
@@ -212,8 +243,8 @@
           "name": "ct-payment-after-confirm.json",
           "path": "NUV-02-decline-auth/ct-payment-after-confirm.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -221,23 +252,64 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-02-decline-auth/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-b-NUV-02-decline-auth-simply-connect-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "simply-connect",
+          "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.285Z",
+          "evidenceRefs": [
+            "NUV-02-decline-auth/metadata.json",
+            "NUV-02-decline-auth/browser-result.json",
+            "NUV-02-decline-auth/getPaymentStatus-response.json",
+            "NUV-02-decline-auth/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-b-NUV-02-decline-auth-web-sdk-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "web-sdk",
+          "reason": "Web SDK was not exercised separately because No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.285Z",
+          "evidenceRefs": [
+            "NUV-02-decline-auth/metadata.json",
+            "NUV-02-decline-auth/browser-result.json",
+            "NUV-02-decline-auth/getPaymentStatus-response.json",
+            "NUV-02-decline-auth/ct-payment-after-confirm.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -253,18 +325,18 @@
         "stage-b-local-browser-processor",
         "stage-c-local-browser-processor-dmn"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-b-browser-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -277,15 +349,15 @@
           "name": "browser-result.json",
           "path": "NUV-03-3ds-frictionless/browser-result.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "getPaymentStatus-response.json",
           "path": "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-3ds-frictionless.json",
@@ -307,23 +379,71 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-03-3ds-frictionless/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
+        },
+        {
+          "name": "ct-payment-after-confirm.json",
+          "path": "NUV-03-3ds-frictionless/ct-payment-after-confirm.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-b-NUV-03-3ds-frictionless-simply-connect-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "simply-connect",
+          "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.426Z",
+          "evidenceRefs": [
+            "NUV-03-3ds-frictionless/metadata.json",
+            "NUV-03-3ds-frictionless/browser-result.json",
+            "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
+            "NUV-03-3ds-frictionless/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-b-NUV-03-3ds-frictionless-web-sdk-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "web-sdk",
+          "reason": "Web SDK was not exercised separately because No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.426Z",
+          "evidenceRefs": [
+            "NUV-03-3ds-frictionless/metadata.json",
+            "NUV-03-3ds-frictionless/browser-result.json",
+            "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
+            "NUV-03-3ds-frictionless/ct-payment-after-confirm.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -339,18 +459,18 @@
         "stage-b-local-browser-processor",
         "stage-c-local-browser-processor-dmn"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-b-browser-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -363,15 +483,15 @@
           "name": "browser-result.json",
           "path": "NUV-04-3ds-stepup-success/browser-result.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "getPaymentStatus-response.json",
           "path": "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-3ds-stepup-success.json",
@@ -393,23 +513,71 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-04-3ds-stepup-success/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
+        },
+        {
+          "name": "ct-payment-after-confirm.json",
+          "path": "NUV-04-3ds-stepup-success/ct-payment-after-confirm.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-b-NUV-04-3ds-stepup-success-simply-connect-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "simply-connect",
+          "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.569Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-success/metadata.json",
+            "NUV-04-3ds-stepup-success/browser-result.json",
+            "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
+            "NUV-04-3ds-stepup-success/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-b-NUV-04-3ds-stepup-success-web-sdk-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "web-sdk",
+          "reason": "Web SDK was not exercised separately because No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.569Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-success/metadata.json",
+            "NUV-04-3ds-stepup-success/browser-result.json",
+            "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
+            "NUV-04-3ds-stepup-success/ct-payment-after-confirm.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -425,18 +593,18 @@
         "stage-b-local-browser-processor",
         "stage-c-local-browser-processor-dmn"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-b-browser-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -449,15 +617,15 @@
           "name": "browser-result.json",
           "path": "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "getPaymentStatus-response.json",
           "path": "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-3ds-stepup-failure.json",
@@ -479,23 +647,71 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
+        },
+        {
+          "name": "ct-payment-after-confirm.json",
+          "path": "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-confirm.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-b-NUV-04-3ds-stepup-failure-or-abandonment-simply-connect-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "simply-connect",
+          "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.709Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-b-NUV-04-3ds-stepup-failure-or-abandonment-web-sdk-browser-capture-blocked",
+          "stage": "stage-b-local-browser-processor",
+          "frontendMode": "web-sdk",
+          "reason": "Web SDK was not exercised separately because No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+          "recordedAt": "2026-06-08T12:08:39.709Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-confirm.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {

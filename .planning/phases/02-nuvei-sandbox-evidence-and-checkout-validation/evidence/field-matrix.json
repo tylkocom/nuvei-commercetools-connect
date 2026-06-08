@@ -16,13 +16,17 @@
   "scenarios": [
     {
       "scenarioId": "NUV-01-success-auth",
-      "frontendMode": "not-captured",
+      "frontendMode": "simply-connect",
       "environment": "nuvei-sandbox-local-mock-ct",
       "evidenceRefs": [
         "NUV-01-success-auth/openOrder-response.json",
+        "NUV-01-success-auth/browser-result.json",
+        "NUV-01-success-auth/getPaymentStatus-response.json",
+        "NUV-01-success-auth/ct-payment-after-confirm.json",
         "NUV-01-success-auth/processor-session-response.json",
         "NUV-01-success-auth/ct-cart-after-session.json",
-        "NUV-01-success-auth/ct-payment-after-session.json"
+        "NUV-01-success-auth/ct-payment-after-session.json",
+        "NUV-01-success-auth/metadata.json"
       ],
       "ct": {
         "cartId": "cart-001",
@@ -56,18 +60,23 @@
         }
       },
       "identityModelAssessment": {
-        "paymentInterfaceIdEqualsSessionToken": "confirmed",
-        "terminalInteractionIdEqualsPpp": "unresolved",
-        "clientUniqueIdEqualsCartId": "confirmed",
-        "transactionIdSecondaryOnly": "unresolved"
+        "paymentInterfaceIdEqualsSessionToken": "blocked",
+        "terminalInteractionIdEqualsPpp": "blocked",
+        "clientUniqueIdEqualsCartId": "blocked",
+        "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Stage A captured processor session/openOrder setup only; terminal PPP, browser authorization, getPaymentStatus, and DMN identity remain unresolved for later stages."
+      "notes": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked."
     },
     {
       "scenarioId": "NUV-02-decline-auth",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "simply-connect",
+      "environment": "nuvei-sandbox-local-mock-ct",
+      "evidenceRefs": [
+        "NUV-02-decline-auth/browser-result.json",
+        "NUV-02-decline-auth/getPaymentStatus-response.json",
+        "NUV-02-decline-auth/ct-payment-after-confirm.json",
+        "NUV-02-decline-auth/metadata.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
@@ -100,13 +109,18 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked."
     },
     {
       "scenarioId": "NUV-03-3ds-frictionless",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "simply-connect",
+      "environment": "nuvei-sandbox-local-mock-ct",
+      "evidenceRefs": [
+        "NUV-03-3ds-frictionless/browser-result.json",
+        "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
+        "NUV-03-3ds-frictionless/metadata.json",
+        "NUV-03-3ds-frictionless/ct-payment-after-confirm.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
@@ -139,13 +153,18 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked."
     },
     {
       "scenarioId": "NUV-04-3ds-stepup-success",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "simply-connect",
+      "environment": "nuvei-sandbox-local-mock-ct",
+      "evidenceRefs": [
+        "NUV-04-3ds-stepup-success/browser-result.json",
+        "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
+        "NUV-04-3ds-stepup-success/metadata.json",
+        "NUV-04-3ds-stepup-success/ct-payment-after-confirm.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
@@ -178,13 +197,18 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked."
     },
     {
       "scenarioId": "NUV-04-3ds-stepup-failure-or-abandonment",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "simply-connect",
+      "environment": "nuvei-sandbox-local-mock-ct",
+      "evidenceRefs": [
+        "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json",
+        "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
+        "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+        "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-confirm.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
@@ -217,7 +241,7 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked."
     },
     {
       "scenarioId": "NUV-05-capture",

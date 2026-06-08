@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "phase-02-stage-b-blocker-v1",
+  "stage": "stage-b-local-browser-processor",
+  "scenarioId": "NUV-04-3ds-stepup-failure-or-abandonment",
+  "frontendMode": "simply-connect",
+  "environment": "nuvei-sandbox-local-mock-ct",
+  "status": "blocked",
+  "recordedAt": "2026-06-08T12:08:39.709Z",
+  "reason": "No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+  "attemptedCommand": "npm --prefix examples/nuvei-web-ui run capture:stage-b -- --scenario NUV-04-3ds-stepup-failure-or-abandonment --frontend-mode simply-connect --record-blocker --blocker-reason No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+  "expectedRawDir": ".planning/tmp/phase-02-raw/stage-b/NUV-04-3ds-stepup-failure-or-abandonment/simply-connect",
+  "expectedRawFiles": [
+    "browser-export.json",
+    "processor-confirm-response.json or getPaymentStatus-response.json",
+    "ct-payment-after-confirm.json or ledger.json"
+  ],
+  "finding": "No browser/Nuvei result is inferred or faked. This fixture records only the unavailable local browser capture path."
+}

@@ -1,5 +1,71 @@
 {
   "$schema": "./schema/findings.schema.json",
   "version": "phase-02-v1",
-  "findings": []
+  "findings": [
+    {
+      "id": "stage-b-NUV-01-success-auth-web-sdk-not-exercised",
+      "scenarioId": "NUV-01-success-auth",
+      "severity": "medium",
+      "observed": "No local Web SDK browser export was available during Stage B execution; Web SDK lifecycle evidence was not inferred from Simply Connect.",
+      "expected": "A Web SDK browser export or an exact Web SDK blocker must be recorded for local dual-mode evidence.",
+      "targetPhase": "Phase 2 Plan 02-03",
+      "evidenceRefs": [
+        "NUV-01-success-auth/metadata.json",
+        "NUV-01-success-auth/browser-result.json"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "stage-b-NUV-02-decline-auth-web-sdk-not-exercised",
+      "scenarioId": "NUV-02-decline-auth",
+      "severity": "medium",
+      "observed": "No local Web SDK browser export was available during Stage B execution; Web SDK lifecycle evidence was not inferred from Simply Connect.",
+      "expected": "A Web SDK browser export or an exact Web SDK blocker must be recorded for local dual-mode evidence.",
+      "targetPhase": "Phase 2 Plan 02-03",
+      "evidenceRefs": [
+        "NUV-02-decline-auth/metadata.json",
+        "NUV-02-decline-auth/browser-result.json"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "stage-b-NUV-03-3ds-frictionless-web-sdk-not-exercised",
+      "scenarioId": "NUV-03-3ds-frictionless",
+      "severity": "medium",
+      "observed": "No local Web SDK browser export was available during Stage B execution; Web SDK lifecycle evidence was not inferred from Simply Connect.",
+      "expected": "A Web SDK browser export or an exact Web SDK blocker must be recorded for local dual-mode evidence.",
+      "targetPhase": "Phase 2 Plan 02-03",
+      "evidenceRefs": [
+        "NUV-03-3ds-frictionless/metadata.json",
+        "NUV-03-3ds-frictionless/browser-result.json"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "stage-b-NUV-04-3ds-stepup-success-web-sdk-not-exercised",
+      "scenarioId": "NUV-04-3ds-stepup-success",
+      "severity": "medium",
+      "observed": "No local Web SDK browser export was available during Stage B execution; Web SDK lifecycle evidence was not inferred from Simply Connect.",
+      "expected": "A Web SDK browser export or an exact Web SDK blocker must be recorded for local dual-mode evidence.",
+      "targetPhase": "Phase 2 Plan 02-03",
+      "evidenceRefs": [
+        "NUV-04-3ds-stepup-success/metadata.json",
+        "NUV-04-3ds-stepup-success/browser-result.json"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "stage-b-NUV-04-3ds-stepup-failure-or-abandonment-web-sdk-not-exercised",
+      "scenarioId": "NUV-04-3ds-stepup-failure-or-abandonment",
+      "severity": "medium",
+      "observed": "No local Web SDK browser export was available during Stage B execution; Web SDK lifecycle evidence was not inferred from Simply Connect.",
+      "expected": "A Web SDK browser export or an exact Web SDK blocker must be recorded for local dual-mode evidence.",
+      "targetPhase": "Phase 2 Plan 02-03",
+      "evidenceRefs": [
+        "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+        "NUV-04-3ds-stepup-failure-or-abandonment/browser-result.json"
+      ],
+      "status": "open"
+    }
+  ]
 }
