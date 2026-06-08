@@ -170,9 +170,11 @@ function validateIndex(index, evidenceRoot, { emptyOk, stage, allowPendingHumanC
     if (!ENVIRONMENTS.includes(row.environment)) errors.push(`${scenario.id}: invalid environment ${row.environment}`);
     if (!ALLOWED_STATUSES.has(row.status)) errors.push(`${scenario.id}: invalid status ${row.status}`);
     if (!Array.isArray(row.fixtures)) errors.push(`${scenario.id}: fixtures must be an array`);
+    const validatingDifferentStage = Boolean(stage) && row.requiredStage !== stage;
     for (const fixtureName of scenario.fixtureNames) {
       const slot = row.fixtures?.find((fixture) => fixture.name === fixtureName);
       if (!slot) {
+        if (validatingDifferentStage) continue;
         errors.push(`${scenario.id}: missing fixture slot ${fixtureName}`);
         continue;
       }
