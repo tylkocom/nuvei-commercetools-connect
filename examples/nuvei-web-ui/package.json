@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node mock-commercetools-server.mjs",
     "test:api": "node api-e2e-test.mjs",
-    "tunnel:dmn": "node start-dmn-tunnel.mjs"
+    "tunnel:dmn": "node start-dmn-tunnel.mjs",
+    "sanitize:evidence": "node scripts/sanitize-evidence.mjs",
+    "validate:evidence": "node scripts/validate-evidence.mjs",
+    "evidence:self-check": "node scripts/validate-evidence.mjs --self-check"
   },
   "dependencies": {
     "express": "^4.18.3"
