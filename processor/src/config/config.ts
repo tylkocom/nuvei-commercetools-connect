@@ -61,11 +61,22 @@ export const config = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   buildCommit: resolveBuildCommit(),
+  phase02StageALocalMockCt: process.env.PHASE_02_STAGE_A_LOCAL_MOCK_CT === "true",
 };
 
 export const getConfig = () => {
   return config;
 };
+
+function isStageALocalCtUrl(key: string, url: URL): boolean {
+  const allowedKeys = new Set(["CTP_AUTH_URL", "CTP_API_URL", "CTP_SESSION_URL"]);
+  return (
+    config.phase02StageALocalMockCt &&
+    allowedKeys.has(key) &&
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+  );
+}
 
 export function validateConfig(): void {
   const requiredValues = {
@@ -112,7 +123,7 @@ export function validateConfig(): void {
 
   for (const [key, value] of Object.entries(httpsUrls)) {
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:") {
+    if (parsed.protocol !== "https:" && !isStageALocalCtUrl(key, parsed)) {
       throw new Error(`${key} must use HTTPS`);
     }
   }

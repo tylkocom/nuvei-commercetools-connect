@@ -17,27 +17,37 @@
     {
       "scenarioId": "NUV-01-success-auth",
       "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "environment": "nuvei-sandbox-local-mock-ct",
+      "evidenceRefs": [
+        "NUV-01-success-auth/openOrder-response.json",
+        "NUV-01-success-auth/processor-session-response.json",
+        "NUV-01-success-auth/ct-cart-after-session.json",
+        "NUV-01-success-auth/ct-payment-after-session.json"
+      ],
       "ct": {
-        "cartId": "unobserved",
-        "paymentId": "unobserved",
-        "paymentInterfaceId": "unobserved",
-        "cartPaymentRefs": [],
+        "cartId": "cart-001",
+        "paymentId": "payment-001",
+        "paymentInterfaceId": "sessionToken-001",
+        "cartPaymentRefs": [
+          "payment-002",
+          "payment-001"
+        ],
         "orderId": "unobserved",
-        "transactionInteractionIds": []
+        "transactionInteractionIds": [
+          "sessionToken-001"
+        ]
       },
       "nuvei": {
-        "sessionToken": "unobserved",
+        "sessionToken": "sessionToken-001",
         "pppTransactionId": "unobserved",
         "pppTransactionField": "unobserved",
         "transactionId": "unobserved",
         "transactionIdField": "unobserved",
-        "clientUniqueId": "unobserved",
-        "merchantUniqueId": "unobserved",
+        "clientUniqueId": "cart-001",
+        "merchantUniqueId": "payment-001",
         "amount": {
-          "value": "unobserved",
-          "currency": "unobserved"
+          "value": "10.00",
+          "currency": "EUR"
         },
         "status": {
           "ppp_status": "unobserved",
@@ -46,12 +56,12 @@
         }
       },
       "identityModelAssessment": {
-        "paymentInterfaceIdEqualsSessionToken": "blocked",
-        "terminalInteractionIdEqualsPpp": "blocked",
-        "clientUniqueIdEqualsCartId": "blocked",
-        "transactionIdSecondaryOnly": "blocked"
+        "paymentInterfaceIdEqualsSessionToken": "confirmed",
+        "terminalInteractionIdEqualsPpp": "unresolved",
+        "clientUniqueIdEqualsCartId": "confirmed",
+        "transactionIdSecondaryOnly": "unresolved"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Stage A captured processor session/openOrder setup only; terminal PPP, browser authorization, getPaymentStatus, and DMN identity remain unresolved for later stages."
     },
     {
       "scenarioId": "NUV-02-decline-auth",

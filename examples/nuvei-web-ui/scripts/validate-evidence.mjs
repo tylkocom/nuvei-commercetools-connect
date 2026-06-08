@@ -19,6 +19,7 @@ const PII_KEYS = new Set(['email', 'billingEmail', 'phone', 'phoneNumber', 'ip',
 const SESSION_KEYS = new Set(['sessionToken', 'paymentInterfaceId', 'interfaceId']);
 const PPP_KEYS = new Set(['PPP_TransactionID', 'PPP_TransactionId', 'ppp_TransactionID', 'pppTransactionId']);
 const TRANSACTION_KEYS = new Set(['TransactionID', 'TransactionId', 'transactionId']);
+const INTERACTION_KEYS = new Set(['interactionId']);
 const ALLOWED_STATUSES = new Set(['pending-capture', 'passed', 'blocked', 'failed', 'not-applicable']);
 const ALLOWED_ASSESSMENTS = new Set(['confirmed', 'contradicted', 'unresolved', 'blocked']);
 
@@ -27,7 +28,17 @@ function parseArgs(args) {
     emptyOk: args.includes('--empty-ok'),
     selfCheck: args.includes('--self-check'),
     evidenceRoot: valueAfter(args, '--evidence-root') ?? EVIDENCE_ABS_ROOT,
+    stage: normalizeStage(valueAfter(args, '--stage')),
   };
+}
+
+function normalizeStage(value) {
+  if (!value) return undefined;
+  if (value === 'stage-a') return 'stage-a-local-processor-mock-ct';
+  if (value === 'stage-b') return 'stage-b-local-browser-processor';
+  if (value === 'stage-c') return 'stage-c-local-browser-processor-dmn';
+  if (value === 'stage-d') return 'stage-d-real-commercetools-checkout';
+  return value;
 }
 
 function valueAfter(args, flag) {
@@ -95,6 +106,7 @@ function scanParsedValue(value, filePath, errors, parents = []) {
     if (SESSION_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'sessionToken')) addError(errors, filePath, 'session-token', `${location} contains a raw session token or interfaceId`);
     if (PPP_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'ppp')) addError(errors, filePath, 'ppp-transaction', `${location} contains a raw PPP transaction id`);
     if (TRANSACTION_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'transaction')) addError(errors, filePath, 'transaction-id', `${location} contains a raw fiscal transaction id`);
+    if (INTERACTION_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'sessionToken') && !isAlias(child, 'ppp') && !isAlias(child, 'transaction')) addError(errors, filePath, 'interaction-id', `${location} contains a raw interaction id`);
     scanParsedValue(child, filePath, errors, [...parents, key]);
   }
 }
@@ -134,7 +146,7 @@ function validateSchemasExist(evidenceRoot, errors) {
   }
 }
 
-function validateIndex(index, evidenceRoot, { emptyOk }) {
+function validateIndex(index, evidenceRoot, { emptyOk, stage }) {
   const errors = [];
   if (!index || typeof index !== 'object') return ['index is not an object'];
   if (index.rawWorkspace !== RAW_WORKSPACE) errors.push(`index.rawWorkspace must be ${RAW_WORKSPACE}`);
@@ -161,14 +173,20 @@ function validateIndex(index, evidenceRoot, { emptyOk }) {
       }
       if (slot.path !== `${scenario.id}/${fixtureName}`) errors.push(`${scenario.id}: fixture ${fixtureName} must stay under its scenario folder`);
       if (slot.present && !fs.existsSync(path.join(evidenceRoot, slot.path))) errors.push(`${scenario.id}: fixture marked present but missing: ${slot.path}`);
-      if (!slot.present && !emptyOk && row.status !== 'blocked') errors.push(`${scenario.id}: fixture ${fixtureName} missing; use --empty-ok only before capture`);
+      if (!slot.present && !emptyOk && !stage && row.status !== 'blocked') errors.push(`${scenario.id}: fixture ${fixtureName} missing; use --empty-ok only before capture`);
     }
     if ((scenario.id.startsWith('NUV-07') || scenario.id.startsWith('NUV-08')) && row.status === 'passed') {
       if (row.environment !== 'real-commercetools-checkout') errors.push(`${scenario.id}: passed real Checkout row must use real-commercetools-checkout environment`);
       if (row.requiredStage !== 'stage-d-real-commercetools-checkout') errors.push(`${scenario.id}: passed real Checkout row must use stage-d-real-commercetools-checkout`);
     }
     if (row.status === 'passed' && row.conclusion?.evidenceSatisfiesRequirements !== true) errors.push(`${scenario.id}: passed row must set conclusion.evidenceSatisfiesRequirements=true`);
-    if (!emptyOk && row.status === 'pending-capture') errors.push(`${scenario.id}: pending-capture is only valid with --empty-ok`);
+    if (!emptyOk && !stage && row.status === 'pending-capture') errors.push(`${scenario.id}: pending-capture is only valid with --empty-ok`);
+  }
+  if (stage === 'stage-a-local-processor-mock-ct') {
+    const stageRow = rows.get('NUV-01-success-auth');
+    const hasStageACapture = stageRow?.evidenceClassification === 'stage-a-server-captured';
+    const hasStageABlocker = stageRow?.status === 'blocked' && Array.isArray(stageRow.blockers) && stageRow.blockers.length > 0;
+    if (!hasStageACapture && !hasStageABlocker) errors.push('stage-a: NUV-01-success-auth must be captured or blocked with blocker metadata');
   }
   return errors;
 }

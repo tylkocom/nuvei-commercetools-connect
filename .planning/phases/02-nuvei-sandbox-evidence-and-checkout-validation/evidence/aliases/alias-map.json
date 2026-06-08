@@ -1,10 +1,18 @@
 {
   "version": "phase-02-v1",
   "rawWorkspace": ".planning/tmp/phase-02-raw/",
+  "hashAlgorithm": "sha256",
   "classes": {
-    "cartId": {},
-    "paymentId": {},
-    "sessionToken": {},
+    "cartId": {
+      "36f1c2f9f22d216866240f28d214b16a656d14ed9f8b59ffc341572f6e047e28": "cart-001"
+    },
+    "paymentId": {
+      "d906b54dc3c40ff984e9add1368a45907218f6cdfb27b343e61b534c69490ad5": "payment-001",
+      "7b5e0423c655141107c0781e6eaa96a9787ddee26546a5c254e65386a0c55429": "payment-002"
+    },
+    "sessionToken": {
+      "2fe1379217f43ada59d2efc2867cbe7eacd4ee1e56c082faa275caeff5dac0d7": "sessionToken-001"
+    },
     "pppTransactionId": {},
     "transactionId": {},
     "orderId": {},
@@ -13,15 +21,33 @@
     "merchantUniqueId": {}
   },
   "counters": {
-    "cartId": 0,
-    "paymentId": 0,
-    "sessionToken": 0,
+    "cartId": 1,
+    "paymentId": 2,
+    "sessionToken": 1,
     "pppTransactionId": 0,
     "transactionId": 0,
     "orderId": 0,
     "requestId": 0,
     "clientUniqueId": 0,
     "merchantUniqueId": 0
+  },
+  "aliases": {
+    "cart-001": {
+      "class": "cartId",
+      "rawSha256": "36f1c2f9f22d216866240f28d214b16a656d14ed9f8b59ffc341572f6e047e28"
+    },
+    "sessionToken-001": {
+      "class": "sessionToken",
+      "rawSha256": "2fe1379217f43ada59d2efc2867cbe7eacd4ee1e56c082faa275caeff5dac0d7"
+    },
+    "payment-001": {
+      "class": "paymentId",
+      "rawSha256": "d906b54dc3c40ff984e9add1368a45907218f6cdfb27b343e61b534c69490ad5"
+    },
+    "payment-002": {
+      "class": "paymentId",
+      "rawSha256": "7b5e0423c655141107c0781e6eaa96a9787ddee26546a5c254e65386a0c55429"
+    }
   },
   "redactions": {
     "checksum": "[redacted-checksum]",

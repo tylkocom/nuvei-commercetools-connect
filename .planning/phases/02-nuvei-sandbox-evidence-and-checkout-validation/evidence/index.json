@@ -1,7 +1,7 @@
 {
   "$schema": "./schema/evidence-index.schema.json",
   "version": "phase-02-v1",
-  "generatedAt": "2026-06-08T00:00:00.000Z",
+  "generatedAt": "2026-06-08T11:55:53.470Z",
   "rawWorkspace": ".planning/tmp/phase-02-raw/",
   "evidenceRoot": ".planning/phases/02-nuvei-sandbox-evidence-and-checkout-validation/evidence/",
   "stageOrder": [
@@ -43,18 +43,18 @@
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
       "status": "pending-capture",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-a-server-captured",
       "fixtures": [
         {
           "name": "openOrder-response.json",
           "path": "NUV-01-success-auth/openOrder-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "raw-workspace"
         },
         {
           "name": "browser-result.json",
@@ -104,20 +104,51 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "processor-session-response.json",
+          "path": "NUV-01-success-auth/processor-session-response.json",
+          "required": false,
+          "present": true,
+          "source": "raw-workspace"
+        },
+        {
+          "name": "ct-cart-after-session.json",
+          "path": "NUV-01-success-auth/ct-cart-after-session.json",
+          "required": false,
+          "present": true,
+          "source": "raw-workspace"
+        },
+        {
+          "name": "ct-payment-after-session.json",
+          "path": "NUV-01-success-auth/ct-payment-after-session.json",
+          "required": false,
+          "present": true,
+          "source": "raw-workspace"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
-        "clientUniqueIds": [],
-        "merchantUniqueIds": []
+        "clientUniqueIds": [
+          "cart-001"
+        ],
+        "merchantUniqueIds": [
+          "payment-001"
+        ]
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "stage-a-captured",
+        "summary": "Stage A server-side session/openOrder setup captured through local processor and mock CT; browser authorization and DMN evidence remain pending for later plans.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [],

@@ -118,10 +118,13 @@ function semanticAliasClass(key, parents, value, aliasMap) {
   if (TRANSACTION_FIELDS.has(key)) return 'transactionId';
   if (key === 'orderId') return 'orderId';
   if (key === 'clientRequestId' || key === 'internalRequestId' || key === 'requestId') return 'requestId';
-  if (key === 'sessionToken') return 'sessionToken';
+  if (key === 'sessionToken' || key === 'interactionId') {
+    const existing = existingAliasForRaw(aliasMap, value, ['sessionToken', 'pppTransactionId', 'transactionId']);
+    return existing ? { existing } : 'sessionToken';
+  }
   if (key === 'interfaceId' || key === 'paymentInterfaceId') return 'sessionToken';
   if ((key === 'id' && parents.at(-1) === 'cart') || key === 'cartId') return 'cartId';
-  if ((key === 'id' && parents.at(-1) === 'payment') || key === 'paymentId' || key === 'paymentReference') return 'paymentId';
+  if ((key === 'id' && (parents.at(-1) === 'payment' || parents.includes('payments') || parents.includes('payment'))) || key === 'paymentId' || key === 'paymentReference') return 'paymentId';
   if (key === 'clientUniqueId') {
     const existing = existingAliasForRaw(aliasMap, value, ['cartId']);
     return existing ? { existing } : 'clientUniqueId';

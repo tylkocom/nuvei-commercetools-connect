@@ -1,0 +1,8 @@
+{
+  "cartId": "cart-001",
+  "sessionToken": "sessionToken-001",
+  "paymentReference": "payment-001",
+  "merchantReturnUrl": "http://localhost:8089/return",
+  "amount": "10.00",
+  "currency": "EUR"
+}
