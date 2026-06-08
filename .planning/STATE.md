@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-06-08T11:39:35.545Z"
-last_activity: 2026-06-08 — Completed Phase 2 Plan 01 evidence schema, raw isolation, sanitizer, and validator.
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-06-08T11:59:22.517Z"
+last_activity: 2026-06-08 — Completed Phase 2 Plan 02 Stage A processor/Nuvei server-side capture against mock CT.
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
-Plan: 2 of 5 (02-02-PLAN.md next)
-Status: Phase 2 Plan 01 complete; ready for Stage A processor/Nuvei server-side capture.
-Last activity: 2026-06-08 — Completed Plan 02-01 evidence schema, raw isolation, sanitizer, and validator.
+Plan: 3 of 5 (02-03-PLAN.md next)
+Status: Phase 2 Plan 02 complete; ready for Stage B dual-mode browser capture against local processor.
+Last activity: 2026-06-08 — Completed Plan 02-02 Stage A processor/Nuvei server-side capture against mock CT.
 
-Progress: [████████░░] 78%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 14
-- Average duration: at least 5 min recorded for latest plan
-- Total execution time: at least 23 min recorded
+- Total plans completed: 15
+- Average duration: latest plan 16 min
+- Total execution time: at least 39 min recorded
 
 **By Phase:**
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 78%
 | Phase 01.1-processor-api-design-cleanup-and-health-endpoint P02 | 5 min | 2 tasks | 10 files |
 | Phase 01.1.1-payment-confirmation-tri-state-outcome-correctness P02 | 5 | 2 tasks | 8 files |
 | Phase 02 P01 | 10min | 2 tasks | 13 files |
+| Phase 02 P02 | 16min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02 Plan 01]: Keep evidence helpers package-local in examples/nuvei-web-ui with no new dependencies.
 - [Phase 02]: [Phase 02 Plan 01]: Committed alias metadata stores raw SHA-256 hashes and aliases, not raw Nuvei/commercetools/session values.
 - [Phase 02]: [Phase 02 Plan 01]: NUV-01 through NUV-08 remain pending after the evidence contract plan; later Phase 2 plans must provide the actual sandbox and real Checkout evidence.
+- [Phase 02]: [Phase 02 Plan 02]: Keep Stage A capture package-local in examples/nuvei-web-ui with no new dependencies.
+- [Phase 02]: [Phase 02 Plan 02]: Allow local HTTP commercetools auth/api/session URLs only behind PHASE_02_STAGE_A_LOCAL_MOCK_CT=true and only for localhost/127.0.0.1 Stage A evidence capture.
+- [Phase 02]: [Phase 02 Plan 02]: Stage A NUV-01 server setup evidence does not complete NUV-01; browser authorization, DMN, and real Checkout proof remain later Phase 2 gates.
 
 ### Roadmap Evolution
 
@@ -109,6 +113,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-08T11:39:35.542Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-06-08T11:59:22.517Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
