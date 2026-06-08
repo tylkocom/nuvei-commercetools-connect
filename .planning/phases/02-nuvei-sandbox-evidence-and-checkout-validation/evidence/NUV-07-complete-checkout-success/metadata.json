@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "phase-02-stage-d-v1",
+  "stage": "stage-d-real-commercetools-checkout",
+  "scenarioId": "NUV-07-complete-checkout-success",
+  "requirement": "NUV-07",
+  "checkoutMode": "Complete Checkout",
+  "frontendMode": "checkout-hosted",
+  "environment": "commercetools-sandbox-complete-checkout",
+  "status": "blocked",
+  "source": "blocker-record",
+  "sanitizedAt": "2026-06-08T12:31:19.281Z",
+  "aliases": {
+    "cartIds": [
+      "cart-001"
+    ],
+    "paymentIds": [
+      "payment-001",
+      "payment-002"
+    ],
+    "sessionTokens": [
+      "sessionToken-001"
+    ],
+    "pppTransactionIds": [],
+    "transactionIds": [],
+    "clientUniqueIds": [],
+    "merchantUniqueIds": []
+  },
+  "reason": "Complete Checkout real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
+  "noFakeEvidencePolicy": "No local mock, synthetic, inferred, or placeholder evidence can satisfy NUV-07 or NUV-08. Rows remain blocked until real commercetools Checkout UI, CT ledger, and Nuvei/DMN/processor proof are captured and sanitized."
+}

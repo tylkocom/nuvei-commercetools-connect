@@ -162,6 +162,7 @@ function rowById(document, id) {
 
 function ensureRealCheckoutFixtureSlots(row, scenarioId) {
   const fixtureNames = SCENARIOS[scenarioId].fixtures.map(([name]) => name);
+  const extras = (row.fixtures ?? []).filter((fixture) => !fixtureNames.includes(fixture.name));
   row.fixtures = fixtureNames.map((name) => {
     const existing = row.fixtures?.find((fixture) => fixture.name === name);
     return existing ?? {
@@ -172,11 +173,16 @@ function ensureRealCheckoutFixtureSlots(row, scenarioId) {
       source: 'not-captured',
     };
   });
+  row.fixtures.push(...extras);
 }
 
 function markFixture(row, scenarioId, fixtureName, source) {
   ensureRealCheckoutFixtureSlots(row, scenarioId);
-  const fixture = row.fixtures.find((candidate) => candidate.name === fixtureName);
+  let fixture = row.fixtures.find((candidate) => candidate.name === fixtureName);
+  if (!fixture) {
+    fixture = { name: fixtureName, path: `${scenarioId}/${fixtureName}`, required: false, present: false, source: 'not-captured' };
+    row.fixtures.push(fixture);
+  }
   fixture.present = true;
   fixture.source = source;
   fixture.path = `${scenarioId}/${fixtureName}`;
@@ -434,8 +440,9 @@ function recordBlockerForScenario({ scenarioId, reason, rawDir, docs }) {
     noFakeEvidencePolicy: NO_FAKE_EVIDENCE_POLICY,
   };
   upsertBlocker(row, blocker);
-  updateMatrixBlocked(matrixRow, row, scenarioId, reason);
   writeMetadata({ scenarioId, status: 'blocked', reason, source: 'blocker-record', aliases: row.aliases });
+  markFixture(row, scenarioId, 'metadata.json', 'blocker-record');
+  updateMatrixBlocked(matrixRow, row, scenarioId, reason);
   upsertFinding(docs.findings, {
     id: `stage-d-${scenarioId}-real-checkout-blocked`,
     scenarioId,
@@ -485,8 +492,9 @@ function captureScenario({ scenarioId, rawDir, docs }) {
     summary: `${config.mode} real commercetools Checkout smoke has sanitized UI, CT ledger, Nuvei/DMN, and processor proof.`,
     evidenceSatisfiesRequirements: true,
   };
-  updateMatrixCaptured(matrixRow, row, scenarioId, sanitizedFixtures);
   writeMetadata({ scenarioId, status: 'passed', reason: row.conclusion.summary, source: 'raw-workspace', aliases: row.aliases });
+  markFixture(row, scenarioId, 'metadata.json', 'raw-workspace');
+  updateMatrixCaptured(matrixRow, row, scenarioId, sanitizedFixtures);
 }
 
 function validateRealCheckoutRows(index, options) {

@@ -1,7 +1,7 @@
 {
   "$schema": "./schema/evidence-index.schema.json",
   "version": "phase-02-v1",
-  "generatedAt": "2026-06-08T11:55:53.470Z",
+  "generatedAt": "2026-06-08T12:31:19.281Z",
   "rawWorkspace": ".planning/tmp/phase-02-raw/",
   "evidenceRoot": ".planning/phases/02-nuvei-sandbox-evidence-and-checkout-validation/evidence/",
   "stageOrder": [
@@ -14,7 +14,9 @@
     "not-captured",
     "local-mock-ct",
     "nuvei-sandbox-local-mock-ct",
-    "real-commercetools-checkout"
+    "real-commercetools-checkout",
+    "commercetools-sandbox-complete-checkout",
+    "commercetools-sandbox-payment-only"
   ],
   "allowedFrontendModes": [
     "not-captured",
@@ -1325,70 +1327,143 @@
       "allowedStages": [
         "stage-d-real-commercetools-checkout"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "checkout-hosted",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "commercetools-sandbox-complete-checkout",
       "requiresRealCommercetoolsCheckout": true,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-d-real-checkout-blocked",
       "fixtures": [
         {
-          "name": "checkout-ui-note.json",
-          "path": "NUV-07-complete-checkout-success/checkout-ui-note.json",
+          "name": "checkout-ui-evidence.json",
+          "path": "NUV-07-complete-checkout-success/checkout-ui-evidence.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "ct-cart-payment-order-ledger.json",
-          "path": "NUV-07-complete-checkout-success/ct-cart-payment-order-ledger.json",
+          "name": "ct-cart-after-checkout.json",
+          "path": "NUV-07-complete-checkout-success/ct-cart-after-checkout.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "browser-result.json",
-          "path": "NUV-07-complete-checkout-success/browser-result.json",
+          "name": "ct-payment-after-checkout.json",
+          "path": "NUV-07-complete-checkout-success/ct-payment-after-checkout.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "nuvei-dashboard-or-dmn.json",
-          "path": "NUV-07-complete-checkout-success/nuvei-dashboard-or-dmn.json",
+          "name": "ct-order-after-checkout.json",
+          "path": "NUV-07-complete-checkout-success/ct-order-after-checkout.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "processor-log.ndjson",
-          "path": "NUV-07-complete-checkout-success/processor-log.ndjson",
+          "name": "processor-session-response.json",
+          "path": "NUV-07-complete-checkout-success/processor-session-response.json",
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "processor-confirm-response.json",
+          "path": "NUV-07-complete-checkout-success/processor-confirm-response.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "nuvei-dashboard-transaction.json",
+          "path": "NUV-07-complete-checkout-success/nuvei-dashboard-transaction.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-auth.json",
+          "path": "NUV-07-complete-checkout-success/dmn-auth.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-07-complete-checkout-success/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Complete Checkout real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-d-NUV-07-complete-checkout-success-real-checkout-unavailable",
+          "stage": "stage-d-real-commercetools-checkout",
+          "environment": "commercetools-sandbox-complete-checkout",
+          "blockerType": "missing-real-commercetools-checkout-evidence",
+          "recordedAt": "2026-06-08T12:31:19.280Z",
+          "reason": "Complete Checkout real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
+          "missingEnvironmentVariables": [],
+          "attemptedCommands": [
+            "npm --prefix examples/nuvei-web-ui run validate:evidence -- --stage stage-c --require-scenarios NUV-01-success-auth,NUV-05-capture,NUV-05-cancel-authorization,NUV-05-refund,NUV-05-duplicate-dmn,NUV-05-mismatch",
+            "npm --prefix examples/nuvei-web-ui run capture:real-checkout -- --scenario NUV-07-complete-checkout-success",
+            "npm --prefix examples/nuvei-web-ui run validate:phase-2-gate -- --require-real-checkout"
+          ],
+          "expectedRawDirectory": ".planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success",
+          "requiredProofClasses": [
+            "ui",
+            "ctLedger",
+            "processor",
+            "nuveiDmn"
+          ],
+          "requiredFixtureFiles": [
+            "checkout-ui-evidence.json",
+            "ct-cart-after-checkout.json",
+            "ct-payment-after-checkout.json",
+            "ct-order-after-checkout.json",
+            "processor-session-response.json",
+            "processor-confirm-response.json",
+            "nuvei-dashboard-transaction.json",
+            "dmn-auth.json"
+          ],
+          "dashboardPrerequisites": [
+            "commercetools Merchant Center Checkout application/session for the Nuvei connector",
+            "Complete Checkout real sandbox cart/session with non-zero physical-goods payment",
+            "Nuvei sandbox dashboard/control panel transaction and DMN visibility for the same attempt"
+          ],
+          "noFakeEvidencePolicy": "No local mock, synthetic, inferred, or placeholder evidence can satisfy NUV-07 or NUV-08. Rows remain blocked until real commercetools Checkout UI, CT ledger, and Nuvei/DMN/processor proof are captured and sanitized."
+        }
+      ],
       "findings": []
     },
     {
@@ -1402,70 +1477,135 @@
       "allowedStages": [
         "stage-d-real-commercetools-checkout"
       ],
-      "frontendMode": "not-captured",
+      "frontendMode": "checkout-hosted",
       "allowedFrontendModes": [
         "not-captured",
         "simply-connect",
         "web-sdk",
         "checkout-hosted"
       ],
-      "environment": "not-captured",
+      "environment": "commercetools-sandbox-payment-only",
       "requiresRealCommercetoolsCheckout": true,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-d-real-checkout-blocked",
       "fixtures": [
         {
-          "name": "checkout-ui-note.json",
-          "path": "NUV-08-payment-only-success/checkout-ui-note.json",
+          "name": "checkout-ui-evidence.json",
+          "path": "NUV-08-payment-only-success/checkout-ui-evidence.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "ct-cart-payment-ledger.json",
-          "path": "NUV-08-payment-only-success/ct-cart-payment-ledger.json",
+          "name": "ct-cart-after-payment-only.json",
+          "path": "NUV-08-payment-only-success/ct-cart-after-payment-only.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "browser-result.json",
-          "path": "NUV-08-payment-only-success/browser-result.json",
+          "name": "ct-payment-after-payment-only.json",
+          "path": "NUV-08-payment-only-success/ct-payment-after-payment-only.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "nuvei-dashboard-or-dmn.json",
-          "path": "NUV-08-payment-only-success/nuvei-dashboard-or-dmn.json",
+          "name": "processor-session-response.json",
+          "path": "NUV-08-payment-only-success/processor-session-response.json",
           "required": true,
           "present": false,
           "source": "not-captured"
         },
         {
-          "name": "processor-log.ndjson",
-          "path": "NUV-08-payment-only-success/processor-log.ndjson",
+          "name": "processor-confirm-response.json",
+          "path": "NUV-08-payment-only-success/processor-confirm-response.json",
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "nuvei-dashboard-transaction.json",
+          "path": "NUV-08-payment-only-success/nuvei-dashboard-transaction.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "dmn-auth.json",
+          "path": "NUV-08-payment-only-success/dmn-auth.json",
+          "required": true,
+          "present": false,
+          "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-08-payment-only-success/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Payment Only real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-08-payment-only-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-d-NUV-08-payment-only-success-real-checkout-unavailable",
+          "stage": "stage-d-real-commercetools-checkout",
+          "environment": "commercetools-sandbox-payment-only",
+          "blockerType": "missing-real-commercetools-checkout-evidence",
+          "recordedAt": "2026-06-08T12:31:19.281Z",
+          "reason": "Payment Only real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-08-payment-only-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
+          "missingEnvironmentVariables": [],
+          "attemptedCommands": [
+            "npm --prefix examples/nuvei-web-ui run validate:evidence -- --stage stage-c --require-scenarios NUV-01-success-auth,NUV-05-capture,NUV-05-cancel-authorization,NUV-05-refund,NUV-05-duplicate-dmn,NUV-05-mismatch",
+            "npm --prefix examples/nuvei-web-ui run capture:real-checkout -- --scenario NUV-08-payment-only-success",
+            "npm --prefix examples/nuvei-web-ui run validate:phase-2-gate -- --require-real-checkout"
+          ],
+          "expectedRawDirectory": ".planning/tmp/phase-02-raw/stage-d/NUV-08-payment-only-success",
+          "requiredProofClasses": [
+            "ui",
+            "ctLedger",
+            "processor",
+            "nuveiDmn"
+          ],
+          "requiredFixtureFiles": [
+            "checkout-ui-evidence.json",
+            "ct-cart-after-payment-only.json",
+            "ct-payment-after-payment-only.json",
+            "processor-session-response.json",
+            "processor-confirm-response.json",
+            "nuvei-dashboard-transaction.json",
+            "dmn-auth.json"
+          ],
+          "dashboardPrerequisites": [
+            "commercetools Merchant Center Checkout application/session for the Nuvei connector",
+            "Payment Only real sandbox cart/session with non-zero physical-goods payment",
+            "Nuvei sandbox dashboard/control panel transaction and DMN visibility for the same attempt"
+          ],
+          "noFakeEvidencePolicy": "No local mock, synthetic, inferred, or placeholder evidence can satisfy NUV-07 or NUV-08. Rows remain blocked until real commercetools Checkout UI, CT ledger, and Nuvei/DMN/processor proof are captured and sanitized."
+        }
+      ],
       "findings": []
     }
   ]

@@ -481,9 +481,11 @@
     },
     {
       "scenarioId": "NUV-07-complete-checkout-success",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "checkout-hosted",
+      "environment": "commercetools-sandbox-complete-checkout",
+      "evidenceRefs": [
+        "NUV-07-complete-checkout-success/metadata.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
@@ -516,19 +518,21 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Complete Checkout real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence."
     },
     {
       "scenarioId": "NUV-08-payment-only-success",
-      "frontendMode": "not-captured",
-      "environment": "not-captured",
-      "evidenceRefs": [],
+      "frontendMode": "checkout-hosted",
+      "environment": "commercetools-sandbox-payment-only",
+      "evidenceRefs": [
+        "NUV-08-payment-only-success/metadata.json"
+      ],
       "ct": {
         "cartId": "unobserved",
         "paymentId": "unobserved",
         "paymentInterfaceId": "unobserved",
         "cartPaymentRefs": [],
-        "orderId": "unobserved",
+        "orderId": "not-applicable",
         "transactionInteractionIds": []
       },
       "nuvei": {
@@ -555,7 +559,7 @@
         "clientUniqueIdEqualsCartId": "blocked",
         "transactionIdSecondaryOnly": "blocked"
       },
-      "notes": "Pending capture; assessment is blocked until sanitized evidence exists."
+      "notes": "Payment Only real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-08-payment-only-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence."
     }
   ]
 }

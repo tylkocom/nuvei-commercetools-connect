@@ -217,6 +217,30 @@
         "NUV-05-mismatch/ct-payment-after-mismatch.json"
       ],
       "status": "open"
+    },
+    {
+      "id": "stage-d-NUV-07-complete-checkout-success-real-checkout-blocked",
+      "scenarioId": "NUV-07-complete-checkout-success",
+      "severity": "high",
+      "observed": "Complete Checkout real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-07-complete-checkout-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
+      "expected": "Complete Checkout row has real Checkout UI, CT ledger, Nuvei dashboard/DMN, and processor proof before being marked passed.",
+      "targetPhase": "Phase 2 Plan 02-05",
+      "evidenceRefs": [
+        "NUV-07-complete-checkout-success/metadata.json"
+      ],
+      "status": "open"
+    },
+    {
+      "id": "stage-d-NUV-08-payment-only-success-real-checkout-blocked",
+      "scenarioId": "NUV-08-payment-only-success",
+      "severity": "high",
+      "observed": "Payment Only real commercetools Checkout smoke was not run because this executor has no verified real Checkout raw export directory at .planning/tmp/phase-02-raw/stage-d/NUV-08-payment-only-success. No UI, CT ledger, Nuvei dashboard/DMN, or processor proof was inferred from local mock evidence.",
+      "expected": "Payment Only row has real Checkout UI, CT ledger, Nuvei dashboard/DMN, and processor proof before being marked passed.",
+      "targetPhase": "Phase 2 Plan 02-05",
+      "evidenceRefs": [
+        "NUV-08-payment-only-success/metadata.json"
+      ],
+      "status": "open"
     }
   ]
 }
