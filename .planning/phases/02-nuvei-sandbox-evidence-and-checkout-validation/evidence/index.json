@@ -47,7 +47,7 @@
       "requiresRealCommercetoolsCheckout": false,
       "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-b-browser-blocked",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -74,8 +74,8 @@
           "name": "dmn-auth.json",
           "path": "NUV-01-success-auth/dmn-auth.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-before.json",
@@ -95,8 +95,8 @@
           "name": "ct-payment-after-dmn.json",
           "path": "NUV-01-success-auth/ct-payment-after-dmn.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -152,7 +152,7 @@
       },
       "conclusion": {
         "state": "blocked",
-        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+        "summary": "Stage C NUV-01-success-auth capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [
@@ -180,6 +180,18 @@
             "NUV-01-success-auth/browser-result.json",
             "NUV-01-success-auth/getPaymentStatus-response.json",
             "NUV-01-success-auth/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-c-NUV-01-success-auth-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "simply-connect",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.687Z",
+          "evidenceRefs": [
+            "NUV-01-success-auth/metadata.json",
+            "NUV-01-success-auth/dmn-auth.json",
+            "NUV-01-success-auth/ct-payment-after-dmn.json"
           ]
         }
       ],
@@ -209,7 +221,7 @@
       "requiresRealCommercetoolsCheckout": false,
       "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-b-browser-blocked",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -236,8 +248,8 @@
           "name": "dmn-decline.json",
           "path": "NUV-02-decline-auth/dmn-decline.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-confirm.json",
@@ -279,7 +291,7 @@
       },
       "conclusion": {
         "state": "blocked",
-        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+        "summary": "Stage C NUV-02-decline-auth capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [
@@ -307,6 +319,17 @@
             "NUV-02-decline-auth/browser-result.json",
             "NUV-02-decline-auth/getPaymentStatus-response.json",
             "NUV-02-decline-auth/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-c-NUV-02-decline-auth-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "simply-connect",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.691Z",
+          "evidenceRefs": [
+            "NUV-02-decline-auth/metadata.json",
+            "NUV-02-decline-auth/dmn-decline.json"
           ]
         }
       ],
@@ -336,7 +359,7 @@
       "requiresRealCommercetoolsCheckout": false,
       "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-b-browser-blocked",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -363,15 +386,15 @@
           "name": "dmn-3ds-frictionless.json",
           "path": "NUV-03-3ds-frictionless/dmn-3ds-frictionless.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-dmn.json",
           "path": "NUV-03-3ds-frictionless/ct-payment-after-dmn.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -413,7 +436,7 @@
       },
       "conclusion": {
         "state": "blocked",
-        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+        "summary": "Stage C NUV-03-3ds-frictionless capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [
@@ -441,6 +464,18 @@
             "NUV-03-3ds-frictionless/browser-result.json",
             "NUV-03-3ds-frictionless/getPaymentStatus-response.json",
             "NUV-03-3ds-frictionless/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-c-NUV-03-3ds-frictionless-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "simply-connect",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.700Z",
+          "evidenceRefs": [
+            "NUV-03-3ds-frictionless/metadata.json",
+            "NUV-03-3ds-frictionless/dmn-3ds-frictionless.json",
+            "NUV-03-3ds-frictionless/ct-payment-after-dmn.json"
           ]
         }
       ],
@@ -470,7 +505,7 @@
       "requiresRealCommercetoolsCheckout": false,
       "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-b-browser-blocked",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -497,15 +532,15 @@
           "name": "dmn-3ds-stepup-success.json",
           "path": "NUV-04-3ds-stepup-success/dmn-3ds-stepup-success.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-dmn.json",
           "path": "NUV-04-3ds-stepup-success/ct-payment-after-dmn.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -547,7 +582,7 @@
       },
       "conclusion": {
         "state": "blocked",
-        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+        "summary": "Stage C NUV-04-3ds-stepup-success capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [
@@ -575,6 +610,18 @@
             "NUV-04-3ds-stepup-success/browser-result.json",
             "NUV-04-3ds-stepup-success/getPaymentStatus-response.json",
             "NUV-04-3ds-stepup-success/ct-payment-after-confirm.json"
+          ]
+        },
+        {
+          "id": "stage-c-NUV-04-3ds-stepup-success-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "simply-connect",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.701Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-success/metadata.json",
+            "NUV-04-3ds-stepup-success/dmn-3ds-stepup-success.json",
+            "NUV-04-3ds-stepup-success/ct-payment-after-dmn.json"
           ]
         }
       ],
@@ -604,7 +651,7 @@
       "requiresRealCommercetoolsCheckout": false,
       "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "stage-b-browser-blocked",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "openOrder-response.json",
@@ -631,15 +678,15 @@
           "name": "dmn-3ds-stepup-failure.json",
           "path": "NUV-04-3ds-stepup-failure-or-abandonment/dmn-3ds-stepup-failure.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-dmn.json",
           "path": "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-dmn.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -681,7 +728,7 @@
       },
       "conclusion": {
         "state": "blocked",
-        "summary": "Stage B simply-connect browser capture blocked: No interactive browser automation tool or operator-provided browser export is available in this executor environment, and no raw Stage B export files exist under the expected raw workspace; live Nuvei browser behavior is therefore not inferred or faked.",
+        "summary": "Stage C NUV-04-3ds-stepup-failure-or-abandonment capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
       "blockers": [
@@ -710,6 +757,18 @@
             "NUV-04-3ds-stepup-failure-or-abandonment/getPaymentStatus-response.json",
             "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-confirm.json"
           ]
+        },
+        {
+          "id": "stage-c-NUV-04-3ds-stepup-failure-or-abandonment-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "simply-connect",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.702Z",
+          "evidenceRefs": [
+            "NUV-04-3ds-stepup-failure-or-abandonment/metadata.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/dmn-3ds-stepup-failure.json",
+            "NUV-04-3ds-stepup-failure-or-abandonment/ct-payment-after-dmn.json"
+          ]
         }
       ],
       "findings": []
@@ -731,46 +790,46 @@
       "allowedFrontendModes": [
         "not-captured"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "payment-intent-capture-request.json",
           "path": "NUV-05-capture/payment-intent-capture-request.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "payment-intent-capture-response.json",
           "path": "NUV-05-capture/payment-intent-capture-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "nuvei-settle-response.json",
           "path": "NUV-05-capture/nuvei-settle-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-capture.json",
           "path": "NUV-05-capture/dmn-capture.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-capture.json",
           "path": "NUV-05-capture/ct-payment-after-capture.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -778,23 +837,53 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-05-capture/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage C NUV-05-capture capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-c-NUV-05-capture-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "not-captured",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.703Z",
+          "evidenceRefs": [
+            "NUV-05-capture/metadata.json",
+            "NUV-05-capture/payment-intent-capture-request.json",
+            "NUV-05-capture/payment-intent-capture-response.json",
+            "NUV-05-capture/nuvei-settle-response.json",
+            "NUV-05-capture/dmn-capture.json",
+            "NUV-05-capture/ct-payment-after-capture.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -814,46 +903,46 @@
       "allowedFrontendModes": [
         "not-captured"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "payment-intent-cancel-request.json",
           "path": "NUV-05-cancel-authorization/payment-intent-cancel-request.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "payment-intent-cancel-response.json",
           "path": "NUV-05-cancel-authorization/payment-intent-cancel-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "nuvei-void-response.json",
           "path": "NUV-05-cancel-authorization/nuvei-void-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-cancel.json",
           "path": "NUV-05-cancel-authorization/dmn-cancel.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-cancel.json",
           "path": "NUV-05-cancel-authorization/ct-payment-after-cancel.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -861,23 +950,53 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-05-cancel-authorization/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage C NUV-05-cancel-authorization capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-c-NUV-05-cancel-authorization-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "not-captured",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.705Z",
+          "evidenceRefs": [
+            "NUV-05-cancel-authorization/metadata.json",
+            "NUV-05-cancel-authorization/payment-intent-cancel-request.json",
+            "NUV-05-cancel-authorization/payment-intent-cancel-response.json",
+            "NUV-05-cancel-authorization/nuvei-void-response.json",
+            "NUV-05-cancel-authorization/dmn-cancel.json",
+            "NUV-05-cancel-authorization/ct-payment-after-cancel.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -897,46 +1016,46 @@
       "allowedFrontendModes": [
         "not-captured"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "payment-intent-refund-request.json",
           "path": "NUV-05-refund/payment-intent-refund-request.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "payment-intent-refund-response.json",
           "path": "NUV-05-refund/payment-intent-refund-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "nuvei-refund-response.json",
           "path": "NUV-05-refund/nuvei-refund-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-refund.json",
           "path": "NUV-05-refund/dmn-refund.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-refund.json",
           "path": "NUV-05-refund/ct-payment-after-refund.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -944,23 +1063,53 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-05-refund/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage C NUV-05-refund capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-c-NUV-05-refund-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "not-captured",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.707Z",
+          "evidenceRefs": [
+            "NUV-05-refund/metadata.json",
+            "NUV-05-refund/payment-intent-refund-request.json",
+            "NUV-05-refund/payment-intent-refund-response.json",
+            "NUV-05-refund/nuvei-refund-response.json",
+            "NUV-05-refund/dmn-refund.json",
+            "NUV-05-refund/ct-payment-after-refund.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -980,39 +1129,39 @@
       "allowedFrontendModes": [
         "not-captured"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "dmn-original.json",
           "path": "NUV-05-duplicate-dmn/dmn-original.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "dmn-replay.json",
           "path": "NUV-05-duplicate-dmn/dmn-replay.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-duplicate-response.json",
           "path": "NUV-05-duplicate-dmn/processor-duplicate-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-duplicate.json",
           "path": "NUV-05-duplicate-dmn/ct-payment-after-duplicate.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -1020,23 +1169,52 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-05-duplicate-dmn/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage C NUV-05-duplicate-dmn capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-c-NUV-05-duplicate-dmn-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "not-captured",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.710Z",
+          "evidenceRefs": [
+            "NUV-05-duplicate-dmn/metadata.json",
+            "NUV-05-duplicate-dmn/dmn-original.json",
+            "NUV-05-duplicate-dmn/dmn-replay.json",
+            "NUV-05-duplicate-dmn/processor-duplicate-response.json",
+            "NUV-05-duplicate-dmn/ct-payment-after-duplicate.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {
@@ -1056,32 +1234,32 @@
       "allowedFrontendModes": [
         "not-captured"
       ],
-      "environment": "not-captured",
+      "environment": "nuvei-sandbox-local-mock-ct",
       "requiresRealCommercetoolsCheckout": false,
-      "status": "pending-capture",
+      "status": "blocked",
       "synthetic": false,
-      "evidenceClassification": "empty-manifest",
+      "evidenceClassification": "stage-c-blocked",
       "fixtures": [
         {
           "name": "dmn-mismatch-request.json",
           "path": "NUV-05-mismatch/dmn-mismatch-request.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-mismatch-response.json",
           "path": "NUV-05-mismatch/processor-mismatch-response.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "ct-payment-after-mismatch.json",
           "path": "NUV-05-mismatch/ct-payment-after-mismatch.json",
           "required": true,
-          "present": false,
-          "source": "not-captured"
+          "present": true,
+          "source": "blocker-record"
         },
         {
           "name": "processor-log.ndjson",
@@ -1089,23 +1267,51 @@
           "required": true,
           "present": false,
           "source": "not-captured"
+        },
+        {
+          "name": "metadata.json",
+          "path": "NUV-05-mismatch/metadata.json",
+          "required": false,
+          "present": true,
+          "source": "blocker-record"
         }
       ],
       "aliases": {
-        "cartIds": [],
-        "paymentIds": [],
-        "sessionTokens": [],
+        "cartIds": [
+          "cart-001"
+        ],
+        "paymentIds": [
+          "payment-001",
+          "payment-002"
+        ],
+        "sessionTokens": [
+          "sessionToken-001"
+        ],
         "pppTransactionIds": [],
         "transactionIds": [],
         "clientUniqueIds": [],
         "merchantUniqueIds": []
       },
       "conclusion": {
-        "state": "pending",
-        "summary": "Scenario slot initialized before raw capture; no evidence has been captured yet.",
+        "state": "blocked",
+        "summary": "Stage C NUV-05-mismatch capture blocked: Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
         "evidenceSatisfiesRequirements": false
       },
-      "blockers": [],
+      "blockers": [
+        {
+          "id": "stage-c-NUV-05-mismatch-dmn-operation-capture-blocked",
+          "stage": "stage-c-local-browser-processor-dmn",
+          "frontendMode": "not-captured",
+          "reason": "Nuvei sandbox dashboard/control panel credentials and browser operation access were unavailable to this executor; tunnel dry-run produced only the URL shape https://<ngrok-public-host>/webhooks/nuvei, and no real Nuvei DMN delivery was observed under .planning/tmp/phase-02-raw/stage-c/dmn. Synthetic duplicate and mismatch rows are therefore blocked instead of derived or faked.",
+          "recordedAt": "2026-06-08T12:19:10.712Z",
+          "evidenceRefs": [
+            "NUV-05-mismatch/metadata.json",
+            "NUV-05-mismatch/dmn-mismatch-request.json",
+            "NUV-05-mismatch/processor-mismatch-response.json",
+            "NUV-05-mismatch/ct-payment-after-mismatch.json"
+          ]
+        }
+      ],
       "findings": []
     },
     {

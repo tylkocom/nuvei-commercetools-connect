@@ -207,6 +207,19 @@ function validateIndex(index, evidenceRoot, { emptyOk, stage, allowPendingHumanC
       if (row.frontendMode === 'not-captured') errors.push(`stage-b: ${scenarioId} must label frontendMode`);
     }
   }
+  if (stage === 'stage-c-local-browser-processor-dmn' && !allowPendingHumanCapture) {
+    for (const scenarioId of requireScenarios) {
+      const row = rows.get(scenarioId);
+      if (!row) {
+        errors.push(`stage-c: missing required scenario ${scenarioId}`);
+        continue;
+      }
+      const hasStageCCapture = typeof row.evidenceClassification === 'string' && row.evidenceClassification.startsWith('stage-c-') && row.status !== 'pending-capture';
+      const hasStageCBlocker = row.status === 'blocked' && Array.isArray(row.blockers) && row.blockers.some((blocker) => blocker.stage === 'stage-c-local-browser-processor-dmn');
+      if (!hasStageCCapture && !hasStageCBlocker) errors.push(`stage-c: ${scenarioId} must have DMN/operation evidence or exact blocker metadata`);
+      if (row.environment !== 'nuvei-sandbox-local-mock-ct') errors.push(`stage-c: ${scenarioId} must use nuvei-sandbox-local-mock-ct environment`);
+    }
+  }
   return errors;
 }
 
