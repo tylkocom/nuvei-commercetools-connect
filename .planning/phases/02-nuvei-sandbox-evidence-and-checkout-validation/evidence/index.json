@@ -1,7 +1,7 @@
 {
   "$schema": "./schema/evidence-index.schema.json",
   "version": "phase-02-v1",
-  "generatedAt": "2026-06-08T12:31:19.281Z",
+  "generatedAt": "2026-06-08T12:32:06.815Z",
   "rawWorkspace": ".planning/tmp/phase-02-raw/",
   "evidenceRoot": ".planning/phases/02-nuvei-sandbox-evidence-and-checkout-validation/evidence/",
   "stageOrder": [
@@ -1464,7 +1464,9 @@
           "noFakeEvidencePolicy": "No local mock, synthetic, inferred, or placeholder evidence can satisfy NUV-07 or NUV-08. Rows remain blocked until real commercetools Checkout UI, CT ledger, and Nuvei/DMN/processor proof are captured and sanitized."
         }
       ],
-      "findings": []
+      "findings": [
+        "stage-d-NUV-07-complete-checkout-success-real-checkout-blocked"
+      ]
     },
     {
       "id": "NUV-08-payment-only-success",
@@ -1606,7 +1608,22 @@
           "noFakeEvidencePolicy": "No local mock, synthetic, inferred, or placeholder evidence can satisfy NUV-07 or NUV-08. Rows remain blocked until real commercetools Checkout UI, CT ledger, and Nuvei/DMN/processor proof are captured and sanitized."
         }
       ],
-      "findings": []
+      "findings": [
+        "stage-d-NUV-08-payment-only-success-real-checkout-blocked"
+      ]
     }
-  ]
+  ],
+  "phaseGate": {
+    "stage": "stage-d-real-commercetools-checkout",
+    "status": "blocked-incomplete",
+    "evaluatedAt": "2026-06-08T12:32:06.815Z",
+    "phaseComplete": false,
+    "reason": "NUV-07 and NUV-08 require real commercetools Checkout evidence and remain blocked; local mock evidence is not accepted.",
+    "blockedRequirements": [
+      "NUV-07",
+      "NUV-08"
+    ],
+    "passedRequirements": [],
+    "noFakeEvidencePolicy": "No Complete Checkout or Payment Only pass is claimed without real CT UI, CT ledger, Nuvei dashboard/DMN, and processor proof."
+  }
 }
