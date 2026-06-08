@@ -250,8 +250,10 @@ export class NuveiClient {
     const totalAmount = String(body.totalAmount ?? "");
     const currency = String(body.currency ?? "");
     const responseTimeStamp = String(body.responseTimeStamp ?? "");
-    const pppTransactionId = String(body.PPP_TransactionID ?? body.PPP_TransactionId ?? "");
-    const status = String(body.Status ?? "");
+    const pppTransactionId = String(
+      body.PPP_TransactionID ?? body.PPP_TransactionId ?? body.ppp_TransactionID ?? "",
+    );
+    const status = String(body.Status ?? body.status ?? "");
     const productId = String(body.productId ?? "");
 
     const checksumInput =
@@ -264,7 +266,13 @@ export class NuveiClient {
       productId;
 
     const computedChecksum = crypto.createHash(algorithm).update(checksumInput).digest("hex");
-    const receivedChecksum = String(body.advanceResponseChecksum ?? "");
+    const receivedChecksum = String(
+      body.advanceResponseChecksum ??
+        body.responseChecksum ??
+        body.responsechecksum ??
+        body.ResponseChecksum ??
+        "",
+    );
 
     return this.timingSafeHexEqual(computedChecksum, receivedChecksum);
   }

@@ -53,6 +53,30 @@ describe("NuveiClient", () => {
       expect(result).toBe(true);
     });
 
+    it("accepts lower-case ppp_TransactionID and responsechecksum aliases", () => {
+      const body: Record<string, unknown> = {
+        totalAmount: "10.00",
+        currency: "USD",
+        responseTimeStamp: "2025-01-01T00:00:00",
+        ppp_TransactionID: "12345",
+        status: "APPROVED",
+        productId: "prod-1",
+      };
+
+      const checksumInput =
+        TEST_SECRET +
+        String(body.totalAmount) +
+        String(body.currency) +
+        String(body.responseTimeStamp) +
+        String(body.ppp_TransactionID) +
+        String(body.status) +
+        String(body.productId);
+
+      body.responsechecksum = crypto.createHash("sha256").update(checksumInput).digest("hex");
+
+      expect(client.validateDmnChecksum(body)).toBe(true);
+    });
+
     it("returns false for invalid checksum", () => {
       const body: Record<string, unknown> = {
         totalAmount: "10.00",
