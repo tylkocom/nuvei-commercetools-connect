@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-06-08T12:10:49.155Z"
-last_activity: 2026-06-08 — Completed Phase 2 Plan 03 Stage B dual-mode browser capture harness with validated blocker-path evidence.
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-06-08T12:22:32.950Z"
+last_activity: 2026-06-08 — Completed Phase 2 Plan 04 Stage C DMN/tunnel/operation blocker capture with validated evidence rows.
 progress:
   total_phases: 12
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 94
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
-Plan: 4 of 5 (02-04-PLAN.md next)
-Status: Phase 2 Plan 03 complete; ready for Stage C combined browser + processor + Nuvei DMN tunnel capture.
-Last activity: 2026-06-08 — Completed Plan 02-03 Stage B dual-mode browser capture harness with validated blocker-path evidence.
+Plan: 5 of 5 (02-05-PLAN.md next)
+Status: Phase 2 Plan 04 complete; ready for real Complete Checkout and Payment Only smoke gate.
+Last activity: 2026-06-08 — Completed Plan 02-04 Stage C DMN/tunnel/operation blocker capture with validated evidence rows.
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [█████████░] 89%
 | Phase 02 P01 | 10min | 2 tasks | 13 files |
 | Phase 02 P02 | 16min | 2 tasks | 18 files |
 | Phase 02 P03 | 8min | 3 tasks | 31 files |
+| Phase 02 P04 | 8min | 3 tasks | 51 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,10 @@ Recent decisions affecting current work:
 - [Phase 02]: [Phase 02 Plan 03]: Keep Stage B browser capture package-local in examples/nuvei-web-ui with no new dependencies.
 - [Phase 02]: [Phase 02 Plan 03]: Treat Simply Connect as the primary Stage B row mode while recording Web SDK blockers/findings explicitly when no Web SDK browser export exists.
 - [Phase 02]: [Phase 02 Plan 03]: Do not infer or fake browser/Nuvei results in non-interactive execution; record exact blocker fixtures instead.
+- [Phase 02]: [Phase 02 Plan 04]: Keep Stage C evidence tooling package-local in examples/nuvei-web-ui with no new dependencies.
+- [Phase 02]: [Phase 02 Plan 04]: Use installed ngrok or NGROK_BIN for tunnel startup; localtunnel is allowed only when already installed, and npx/runtime package downloads are refused.
+- [Phase 02]: [Phase 02 Plan 04]: Record exact Stage C blocker fixtures instead of fake DMN, operation, duplicate, or mismatch evidence when Nuvei dashboard/browser/DMN access is unavailable.
+- [Phase 02]: [Phase 02 Plan 04]: Synthetic mismatch evidence remains blocked unless derived from real raw DMN material and labeled synthetic-derived-from-real-dmn.
 
 ### Roadmap Evolution
 
@@ -117,6 +122,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-08T12:10:49.152Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-06-08T12:22:32.947Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None
