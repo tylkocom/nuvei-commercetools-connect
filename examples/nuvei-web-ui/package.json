@@ -11,7 +11,8 @@
     "sanitize:evidence": "node scripts/sanitize-evidence.mjs",
     "validate:evidence": "node scripts/validate-evidence.mjs",
     "evidence:self-check": "node scripts/validate-evidence.mjs --self-check",
-    "mock:ct:self-check": "node scripts/mock-ct-self-check.mjs"
+    "mock:ct:self-check": "node scripts/mock-ct-self-check.mjs",
+    "capture:stage-a": "node scripts/capture-stage-a.mjs"
   },
   "dependencies": {
     "express": "^4.18.3"
