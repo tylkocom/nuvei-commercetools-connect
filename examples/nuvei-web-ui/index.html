@@ -158,6 +158,31 @@
         </div>
       </section>
 
+      <section class="panel" aria-labelledby="scenario-heading">
+        <h2 id="scenario-heading">Stage B scenario</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="scenario-id">scenarioId</label>
+            <select id="scenario-id" name="scenario-id">
+              <option value="NUV-01-success-auth" selected>NUV-01 success authorization</option>
+              <option value="NUV-02-decline-auth">NUV-02 declined authorization</option>
+              <option value="NUV-03-3ds-frictionless">NUV-03 3DS frictionless</option>
+              <option value="NUV-04-3ds-stepup-success">NUV-04 3DS step-up success</option>
+              <option value="NUV-04-3ds-stepup-failure-or-abandonment">NUV-04 3DS step-up failure or abandonment</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="operator-notes">operatorNotes</label>
+            <textarea
+              id="operator-notes"
+              name="operator-notes"
+              rows="3"
+              placeholder="Record sandbox card profile, 3DS path, blocker, or browser setup notes. Do not enter sensitive payment data."
+            ></textarea>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" aria-labelledby="config-heading">
         <h2 id="config-heading">Configuration</h2>
         <div class="grid">
@@ -209,6 +234,7 @@
         <div class="actions">
           <button id="mount-card" type="button">Mount card</button>
           <button id="pay-button" class="secondary" type="button" hidden>Pay</button>
+          <button id="export-evidence" class="secondary" type="button">Export Evidence</button>
         </div>
       </section>
 
@@ -221,6 +247,11 @@
         <h2 id="log-heading">Result log</h2>
         <div id="result-log"></div>
       </section>
+
+      <section class="panel" aria-labelledby="evidence-heading">
+        <h2 id="evidence-heading">Structured evidence buffer</h2>
+        <textarea id="evidence-output" rows="12" readonly></textarea>
+      </section>
     </main>
 
     <script type="module">
@@ -230,22 +261,86 @@
         NuveiWebSdkEnabler,
       } from "../../enabler/public/connector-enabler.es.js?cb=1";
 
+      const STAGE_B_SCENARIOS = new Set([
+        "NUV-01-success-auth",
+        "NUV-02-decline-auth",
+        "NUV-03-3ds-frictionless",
+        "NUV-04-3ds-stepup-success",
+        "NUV-04-3ds-stepup-failure-or-abandonment",
+      ]);
+
       const processorUrlInput = document.getElementById("processor-url");
       const sessionIdInput = document.getElementById("session-id");
       const merchantIdInput = document.getElementById("merchant-id");
       const merchantSiteIdInput = document.getElementById("merchant-site-id");
       const envInput = document.getElementById("env");
+      const scenarioIdInput = document.getElementById("scenario-id");
+      const operatorNotesInput = document.getElementById("operator-notes");
       const mountButton = document.getElementById("mount-card");
       const payButton = document.getElementById("pay-button");
+      const exportButton = document.getElementById("export-evidence");
       const paymentContainer = document.getElementById("payment-container");
       const resultLog = document.getElementById("result-log");
+      const evidenceOutput = document.getElementById("evidence-output");
 
       let currentComponent = null;
       let mountedMode = null;
+      let browserEvents = [];
+
+      function nowIso() {
+        return new Date().toISOString();
+      }
 
       function selectedMode() {
         const chosen = document.querySelector('input[name="mode"]:checked');
         return chosen ? chosen.value : "simply-connect";
+      }
+
+      function selectedScenarioId() {
+        const scenarioId = scenarioIdInput.value;
+        if (!STAGE_B_SCENARIOS.has(scenarioId)) throw new Error(`Unsupported Stage B scenario: ${scenarioId}`);
+        return scenarioId;
+      }
+
+      function processorUrlClass(value) {
+        try {
+          const url = new URL(value);
+          if ((url.hostname === "localhost" || url.hostname === "127.0.0.1") && url.protocol === "http:") return "local-http";
+          if ((url.hostname === "localhost" || url.hostname === "127.0.0.1") && url.protocol === "https:") return "local-https";
+          if (url.protocol === "https:") return "https";
+          return "other";
+        } catch (_error) {
+          return "invalid";
+        }
+      }
+
+      function sdkScriptUrlClass() {
+        for (const script of document.scripts) {
+          const src = script.src || "";
+          if (src.includes("checkout.js")) return "checkout.js";
+          if (src.includes("safecharge.js")) return "safecharge.js";
+        }
+        return "not-observed";
+      }
+
+      function sessionIdAliasCandidate(value) {
+        return {
+          present: value.trim().length > 0,
+          length: value.trim().length,
+          valueClass: value.startsWith("session-") ? "session-like" : "opaque",
+        };
+      }
+
+      function appendEvidence(type, payload = {}) {
+        browserEvents.push({
+          type,
+          timestamp: nowIso(),
+          scenarioId: selectedScenarioId(),
+          frontendMode: selectedMode(),
+          scriptUrlClass: sdkScriptUrlClass(),
+          ...payload,
+        });
+        renderEvidenceOutput();
       }
 
       function appendLog(label, payload) {
@@ -263,6 +358,20 @@
         payButton.disabled = !visible;
       }
 
+      function callbackErrorPayload(error) {
+        return error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { name: "NonError", message: String(error) };
+      }
+
+      function callbackResultPayload(result) {
+        return {
+          isSuccess: Boolean(result?.isSuccess),
+          paymentReference: typeof result?.paymentReference === "string" ? result.paymentReference : undefined,
+          outcome: typeof result?.outcome === "string" ? result.outcome : undefined,
+        };
+      }
+
       function readOptions() {
         return {
           processorUrl: processorUrlInput.value.trim(),
@@ -272,31 +381,86 @@
           env: envInput.value,
           locale: "en",
           onComplete: (result) => {
-            appendLog("onComplete", {
-              isSuccess: result.isSuccess,
-              paymentReference: result.paymentReference,
-            });
+            const payload = callbackResultPayload(result);
+            appendEvidence("callback:onComplete", { payload });
+            appendLog("onComplete", payload);
           },
           onError: (error) => {
-            appendLog(
-              "onError",
-              error instanceof Error ? { name: error.name, message: error.message } : String(error),
-            );
+            const payload = callbackErrorPayload(error);
+            appendEvidence("callback:onError", { payload });
+            appendLog("onError", payload);
           },
           onPending: (result) => {
-            appendLog("onPending", result);
+            const payload = callbackResultPayload(result);
+            appendEvidence("callback:onPending", { payload });
+            appendLog("onPending", payload);
           },
         };
       }
+
+      function evidenceDocument() {
+        const processorUrl = processorUrlInput.value.trim();
+        return {
+          schemaVersion: "phase-02-stage-b-browser-export-v1",
+          capturedAt: nowIso(),
+          scenarioId: selectedScenarioId(),
+          frontendMode: selectedMode(),
+          environment: "nuvei-sandbox-local-mock-ct",
+          processorUrlClass: processorUrlClass(processorUrl),
+          sessionIdAliasCandidate: sessionIdAliasCandidate(sessionIdInput.value),
+          scriptUrlObserved: sdkScriptUrlClass(),
+          browserEvents,
+          operatorNotes: operatorNotesInput.value.trim(),
+        };
+      }
+
+      function renderEvidenceOutput() {
+        evidenceOutput.value = JSON.stringify(evidenceDocument(), null, 2);
+      }
+
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const requestUrl = typeof input === "string" ? input : input?.url ?? "";
+        const response = await originalFetch(input, init);
+        if (requestUrl.includes("/payments/session") || requestUrl.includes("/payments/confirm/")) {
+          const cloned = response.clone();
+          cloned
+            .json()
+            .then((body) => {
+              const route = requestUrl.includes("/payments/session") ? "payments-session" : "payments-confirm";
+              const payload = route === "payments-session"
+                ? {
+                    route,
+                    httpStatus: response.status,
+                    hasSessionToken: typeof body?.sessionToken === "string" && body.sessionToken.length > 0,
+                    sessionTokenLength: typeof body?.sessionToken === "string" ? body.sessionToken.length : 0,
+                    cartId: body?.cartId,
+                    paymentReference: body?.paymentReference,
+                    amount: body?.amount,
+                    currency: body?.currency,
+                  }
+                : { route, httpStatus: response.status, outcome: body?.outcome };
+              appendEvidence(route === "payments-session" ? "payment-session-created" : "processor-confirm-response", { payload });
+            })
+            .catch((error) => appendEvidence("processor-response-read-error", { payload: callbackErrorPayload(error) }));
+        }
+        return response;
+      };
+
       async function mountCard() {
         clearLog();
         paymentContainer.textContent = "";
         currentComponent = null;
         mountedMode = null;
+        browserEvents = [];
         setPayButtonVisible(false);
 
         const options = readOptions();
         const mode = selectedMode();
+        appendEvidence("mount-start", {
+          processorUrlClass: processorUrlClass(options.processorUrl),
+          sessionIdAliasCandidate: sessionIdAliasCandidate(options.sessionId),
+        });
         const enabler =
           mode === "web-sdk"
             ? new NuveiWebSdkEnabler(options)
@@ -304,22 +468,23 @@
 
         const builder = await enabler.createComponentBuilder("card");
         currentComponent = builder.build({});
-        currentComponent.mount("#payment-container");
+        await currentComponent.mount("#payment-container");
         mountedMode = mode;
         setPayButtonVisible(mode === "web-sdk");
+        appendEvidence("mounted", { hostPayButtonVisible: mode === "web-sdk" });
         appendLog("mounted", { mode });
       }
 
       mountButton.addEventListener("click", () => {
-        mountCard().catch((error) =>
-          appendLog(
-            "mount-error",
-            error instanceof Error ? { name: error.name, message: error.message } : String(error),
-          ),
-        );
+        mountCard().catch((error) => {
+          const payload = callbackErrorPayload(error);
+          appendEvidence("mount-error", { payload });
+          appendLog("mount-error", payload);
+        });
       });
 
       payButton.addEventListener("click", async () => {
+        appendEvidence("pay-click", { hostPayButtonVisible: !payButton.hidden });
         if (!currentComponent || typeof currentComponent.submit !== "function") {
           appendLog("pay-error", "Pay is only available after mounting the Web SDK card.");
           return;
@@ -328,11 +493,25 @@
         try {
           await currentComponent.submit();
         } catch (error) {
-          appendLog(
-            "pay-error",
-            error instanceof Error ? { name: error.name, message: error.message } : String(error),
-          );
+          const payload = callbackErrorPayload(error);
+          appendEvidence("pay-error", { payload });
+          appendLog("pay-error", payload);
         }
+      });
+
+      exportButton.addEventListener("click", async () => {
+        const json = JSON.stringify(evidenceDocument(), null, 2);
+        evidenceOutput.value = json;
+        const fileName = `${selectedScenarioId()}-${selectedMode()}-browser-export.json`;
+        const blob = new Blob([`${json}\n`], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = fileName;
+        link.click();
+        URL.revokeObjectURL(url);
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(json);
+        appendLog("exported", { fileName });
       });
 
       document.querySelectorAll('input[name="mode"]').forEach((input) => {
@@ -342,10 +521,14 @@
               mountedMode === "web-sdk" &&
               currentComponent !== null,
           );
+          renderEvidenceOutput();
         });
       });
 
+      scenarioIdInput.addEventListener("change", renderEvidenceOutput);
+      operatorNotesInput.addEventListener("input", renderEvidenceOutput);
       setPayButtonVisible(false);
+      renderEvidenceOutput();
     </script>
   </body>
 </html>
