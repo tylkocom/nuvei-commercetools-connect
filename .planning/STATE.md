@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 1.2 complete
-last_updated: "2026-06-03T02:09:52.231Z"
-last_activity: 2026-06-03 — Completed Phase 1.2 enabler dual-mode frontend integration.
+status: in_progress
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-06-08T11:39:35.545Z"
+last_activity: 2026-06-08 — Completed Phase 2 Plan 01 evidence schema, raw isolation, sanitizer, and validator.
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
-  percent: 36
+  total_plans: 18
+  completed_plans: 14
+  percent: 78
 ---
 
 # Project State
@@ -26,19 +26,19 @@ See: .planning/PROJECT.md (updated 2026-06-02)
 ## Current Position
 
 Phase: 2 of 11 (Nuvei Sandbox Evidence and Checkout Validation)
-Plan: context gathered; ready for Phase 2 planning
-Status: Phase 1.2 complete; ready for Phase 2 planning
-Last activity: 2026-06-03 — Completed Phase 1.2 enabler dual-mode frontend integration.
+Plan: 2 of 5 (02-02-PLAN.md next)
+Status: Phase 2 Plan 01 complete; ready for Stage A processor/Nuvei server-side capture.
+Last activity: 2026-06-08 — Completed Plan 02-01 evidence schema, raw isolation, sanitizer, and validator.
 
-Progress: [████░░░░░░] 36%
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 4
+- Total plans completed: 14
 - Average duration: at least 5 min recorded for latest plan
-- Total execution time: at least 13 min recorded
+- Total execution time: at least 23 min recorded
 
 **By Phase:**
 
@@ -55,6 +55,7 @@ Progress: [████░░░░░░] 36%
 | Phase 01.1 P01 | 5 min | 3 tasks | 10 files |
 | Phase 01.1-processor-api-design-cleanup-and-health-endpoint P02 | 5 min | 2 tasks | 10 files |
 | Phase 01.1.1-payment-confirmation-tri-state-outcome-correctness P02 | 5 | 2 tasks | 8 files |
+| Phase 02 P01 | 10min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Added unauthenticated GET /health as a config-only 200 response that exposes no config values. — Infrastructure probes need a lightweight endpoint without Checkout JWTs or live CT/Nuvei network calls.
 - [Phase 01.1-processor-api-design-cleanup-and-health-endpoint]: [Phase 01.1 Plan 02]: Removed getPayment from the enabler API contract after GET /payments was dropped. — Enabler callers now use POST /payments/session and POST /payments/confirm/:id exclusively.
 - [Phase 01.1-processor-api-design-cleanup-and-health-endpoint]: [Phase 01.1 Plan 02]: Local mock and manual test docs mirror the renamed processor routes. — Route stale checks now cover enabler, testing, and docs for old confirmPayments and bare POST /payments references.
+- [Phase 02]: [Phase 02 Plan 01]: Keep evidence helpers package-local in examples/nuvei-web-ui with no new dependencies.
+- [Phase 02]: [Phase 02 Plan 01]: Committed alias metadata stores raw SHA-256 hashes and aliases, not raw Nuvei/commercetools/session values.
+- [Phase 02]: [Phase 02 Plan 01]: NUV-01 through NUV-08 remain pending after the evidence contract plan; later Phase 2 plans must provide the actual sandbox and real Checkout evidence.
 
 ### Roadmap Evolution
 
@@ -105,6 +109,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-03T00:25:25.690Z
-Stopped at: Phase 1.2 context gathered
-Resume file: .planning/phases/01.2-enabler-dual-mode-nuvei-frontend-integration/01.2-CONTEXT.md
+Last session: 2026-06-08T11:39:35.542Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None

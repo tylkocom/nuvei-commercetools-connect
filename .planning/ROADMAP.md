@@ -115,7 +115,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Evidence schema, raw capture isolation, sanitizer, validator, and source audit.
+- [x] 02-01-PLAN.md — Evidence schema, raw capture isolation, sanitizer, validator, and source audit.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -244,7 +244,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Contract and Method Hardening | 3/3 | Complete | 2026-06-02 |
-| 2. Nuvei Sandbox Evidence and Checkout Validation | 0/5 | Not started | - |
+| 2. Nuvei Sandbox Evidence and Checkout Validation | 1/5 | In Progress|  |
 | 3. Processor Reconciliation Correctness | 0/TBD | Not started | - |
 | 4. Checkout Data and Metadata Correctness | 0/TBD | Not started | - |
 | 5. Frontend Resilience and Security Hardening | 0/TBD | Not started | - |
@@ -257,7 +257,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 **Goal:** [To be planned]
 **Requirements**: TBD
 **Depends on:** Phase 8
-**Plans:** 0 plans
+**Plans:** 1/5 plans executed
 
 Plans:
 
