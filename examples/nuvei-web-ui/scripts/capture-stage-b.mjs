@@ -235,6 +235,21 @@ function recordBlocker({ scenarioId, frontendMode, rawDir, reason, args }) {
     ],
   });
   if (frontendMode === 'simply-connect') {
+    upsertBlocker(row, {
+      id: `stage-b-${scenarioId}-web-sdk-browser-capture-blocked`,
+      stage: STAGE,
+      frontendMode: 'web-sdk',
+      reason: `Web SDK was not exercised separately because ${reason}`,
+      recordedAt: blocker.recordedAt,
+      evidenceRefs: [
+        `${scenarioId}/metadata.json`,
+        `${scenarioId}/browser-result.json`,
+        `${scenarioId}/getPaymentStatus-response.json`,
+        `${scenarioId}/ct-payment-after-confirm.json`,
+      ],
+    });
+  }
+  if (frontendMode === 'simply-connect') {
     upsertFinding(findings, {
       id: `stage-b-${scenarioId}-web-sdk-not-exercised`,
       scenarioId,
