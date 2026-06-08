@@ -13,7 +13,9 @@
     "evidence:self-check": "node scripts/validate-evidence.mjs --self-check",
     "mock:ct:self-check": "node scripts/mock-ct-self-check.mjs",
     "capture:stage-a": "node scripts/capture-stage-a.mjs",
-    "capture:stage-b": "node scripts/capture-stage-b.mjs"
+    "capture:stage-b": "node scripts/capture-stage-b.mjs",
+    "capture:dmn-proxy": "node scripts/capture-dmn-proxy.mjs",
+    "capture:stage-c": "node scripts/capture-stage-c.mjs"
   },
   "dependencies": {
     "express": "^4.18.3"

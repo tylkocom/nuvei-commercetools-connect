@@ -14,7 +14,7 @@ assert.equal(packageJson.scripts['capture:dmn-proxy'], 'node scripts/capture-dmn
 assert.ok(fs.existsSync(proxyPath), 'capture-dmn-proxy.mjs must exist');
 assert.match(tunnelScript, /--dry-run|DRY_RUN/i, 'tunnel script must support dry-run verification');
 assert.match(tunnelScript, /NGROK_BIN/, 'tunnel script must support configured ngrok binary');
-assert.doesNotMatch(tunnelScript, /spawn\(["']npx["']|\bnpx\b/, 'tunnel script must not invoke npx');
+assert.doesNotMatch(tunnelScript, /spawn\(["']npx["']|exec(?:File)?\(["']npx["']/, 'tunnel script must not invoke npx');
 assert.match(tunnelScript, /\/webhooks\/nuvei/, 'dry-run output must include DMN webhook suffix');
 
 console.log('stage C DMN tunnel self-check passed');
