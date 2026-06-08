@@ -104,6 +104,17 @@ function extractCanonicalPpp(body: Record<string, unknown>): string | undefined 
   return undefined;
 }
 
+function extractNuveiTransactionIdentities(body: Record<string, unknown>): string[] {
+  const ids: string[] = [];
+  for (const key of [...PPP_TRANSACTION_ID_KEYS, ...FALLBACK_TRANSACTION_ID_KEYS]) {
+    const value = getNonEmptyString(body, key);
+    if (value && !ids.includes(value)) {
+      ids.push(value);
+    }
+  }
+  return ids;
+}
+
 function extractNuveiTerminalIdentity(
   body: Record<string, unknown>,
   sessionToken: string,
@@ -1152,6 +1163,26 @@ export class NuveiPaymentService extends AbstractPaymentService {
       .filter((id): id is string => typeof id === "string" && id.length > 0);
   }
 
+  private getPaymentsMatchingDmnTransactionIdentity(
+    payments: Payment[],
+    body: Record<string, unknown>,
+  ): Payment[] {
+    const transactionIdentities = extractNuveiTransactionIdentities(body);
+    if (transactionIdentities.length === 0) return [];
+
+    return payments.filter((payment) =>
+      (payment.transactions ?? []).some(
+        (transaction) =>
+          transaction.interactionId !== undefined &&
+          transactionIdentities.includes(transaction.interactionId),
+      ),
+    );
+  }
+
+  private getPaymentsWithExistingTerminalOutcome(payments: Payment[]): Payment[] {
+    return payments.filter((payment) => this.getExistingTerminalOutcome(payment) !== undefined);
+  }
+
   private async resolveDmnPaymentFromCartId(
     cartId: string,
     body: Record<string, unknown>,
@@ -1181,6 +1212,32 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
     if (candidates.length === 0) {
       return undefined;
+    }
+
+    const identityMatches = this.getPaymentsMatchingDmnTransactionIdentity(candidates, body);
+    if (identityMatches.length === 1) {
+      log.warn("DMN merchant_unique_id resolved as cart ID and matched an existing transaction.", {
+        cartId,
+        paymentId: identityMatches[0].id,
+      });
+      return identityMatches[0];
+    }
+
+    if (identityMatches.length > 1) {
+      throw new Error("Multiple candidate Nuvei Payments matched DMN transaction identity");
+    }
+
+    const terminalMatches = this.getPaymentsWithExistingTerminalOutcome(candidates);
+    if (terminalMatches.length === 1) {
+      log.warn("DMN merchant_unique_id resolved as cart ID and matched an existing terminal Payment.", {
+        cartId,
+        paymentId: terminalMatches[0].id,
+      });
+      return terminalMatches[0];
+    }
+
+    if (terminalMatches.length > 1) {
+      throw new Error("Multiple terminal Nuvei Payments found for DMN cart reference");
     }
 
     if (candidates.length > 1) {

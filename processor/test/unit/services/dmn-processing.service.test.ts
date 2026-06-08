@@ -801,6 +801,141 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
     });
 
+    it("resolves cart-id DMN to the Payment that already has the Nuvei transaction id", async () => {
+      const { service } = createService();
+      const paymentWithoutTransaction = makeDmnMockPayment({
+        id: "older-payment",
+        interfaceId: "older-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+      } as any);
+      const paymentWithTransaction = makeDmnMockPayment({
+        id: "confirmed-payment",
+        interfaceId: "confirmed-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Success",
+            interactionId: "tx-auth-001",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: {
+          payments: [
+            { typeId: "payment", id: "older-payment" },
+            { typeId: "payment", id: "confirmed-payment" },
+          ],
+        },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        if (id === "older-payment") return paymentWithoutTransaction;
+        if (id === "confirmed-payment") return paymentWithTransaction;
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "50001",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "confirmed-payment" }),
+        1000,
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("resolves cart-id DMN to the only candidate with an existing terminal outcome", async () => {
+      const { service } = createService();
+      const pendingPayment = makeDmnMockPayment({
+        id: "pending-payment",
+        interfaceId: "pending-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+      } as any);
+      const terminalPayment = makeDmnMockPayment({
+        id: "terminal-payment",
+        interfaceId: "terminal-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Success",
+            interactionId: "status-fallback-id",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+        TransactionID: "different-dmn-transaction-id",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: {
+          payments: [
+            { typeId: "payment", id: "pending-payment" },
+            { typeId: "payment", id: "terminal-payment" },
+          ],
+        },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        if (id === "pending-payment") return pendingPayment;
+        if (id === "terminal-payment") return terminalPayment;
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "50001",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "terminal-payment" }),
+        1000,
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
     it("rejects when merchant_unique_id payment conflicts with DMN sessionToken", async () => {
       const { service } = createService();
 
