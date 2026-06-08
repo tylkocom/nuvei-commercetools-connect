@@ -27,6 +27,11 @@ function parseArgs(args) {
   return {
     emptyOk: args.includes('--empty-ok'),
     selfCheck: args.includes('--self-check'),
+    allowPendingHumanCapture: args.includes('--allow-pending-human-capture'),
+    requireScenarios: (valueAfter(args, '--require-scenarios') ?? '')
+      .split(',')
+      .map((scenario) => scenario.trim())
+      .filter(Boolean),
     evidenceRoot: valueAfter(args, '--evidence-root') ?? EVIDENCE_ABS_ROOT,
     stage: normalizeStage(valueAfter(args, '--stage')),
   };
@@ -146,7 +151,7 @@ function validateSchemasExist(evidenceRoot, errors) {
   }
 }
 
-function validateIndex(index, evidenceRoot, { emptyOk, stage }) {
+function validateIndex(index, evidenceRoot, { emptyOk, stage, allowPendingHumanCapture, requireScenarios = [] }) {
   const errors = [];
   if (!index || typeof index !== 'object') return ['index is not an object'];
   if (index.rawWorkspace !== RAW_WORKSPACE) errors.push(`index.rawWorkspace must be ${RAW_WORKSPACE}`);
@@ -187,6 +192,20 @@ function validateIndex(index, evidenceRoot, { emptyOk, stage }) {
     const hasStageACapture = stageRow?.evidenceClassification === 'stage-a-server-captured';
     const hasStageABlocker = stageRow?.status === 'blocked' && Array.isArray(stageRow.blockers) && stageRow.blockers.length > 0;
     if (!hasStageACapture && !hasStageABlocker) errors.push('stage-a: NUV-01-success-auth must be captured or blocked with blocker metadata');
+  }
+  if (stage === 'stage-b-local-browser-processor' && !allowPendingHumanCapture) {
+    for (const scenarioId of requireScenarios) {
+      const row = rows.get(scenarioId);
+      if (!row) {
+        errors.push(`stage-b: missing required scenario ${scenarioId}`);
+        continue;
+      }
+      const hasStageBCapture = row.evidenceClassification === 'stage-b-browser-captured';
+      const hasStageBBlocker = row.evidenceClassification === 'stage-b-browser-blocked' && row.status === 'blocked' && Array.isArray(row.blockers) && row.blockers.some((blocker) => blocker.stage === 'stage-b-local-browser-processor');
+      if (!hasStageBCapture && !hasStageBBlocker) errors.push(`stage-b: ${scenarioId} must have browser evidence or exact blocker metadata`);
+      if (row.environment !== 'nuvei-sandbox-local-mock-ct') errors.push(`stage-b: ${scenarioId} must use nuvei-sandbox-local-mock-ct environment`);
+      if (row.frontendMode === 'not-captured') errors.push(`stage-b: ${scenarioId} must label frontendMode`);
+    }
   }
   return errors;
 }
