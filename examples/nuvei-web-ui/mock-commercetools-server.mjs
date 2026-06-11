@@ -265,6 +265,14 @@ function applyCartActions(cart, actions = []) {
     if (action.action === "addPayment" && action.payment?.id) {
       attachPaymentToCart(action.payment.id);
     }
+    if (action.action === "freezeCart") {
+      cart.cartState = "Frozen";
+      cart.version += 1;
+    }
+    if (action.action === "unfreezeCart") {
+      cart.cartState = "Active";
+      cart.version += 1;
+    }
   }
   return cart;
 }
