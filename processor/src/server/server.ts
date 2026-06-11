@@ -6,7 +6,6 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "../config/config.js";
-import debugDumpPlugin from "./debug-dump.plugin.js";
 import { requestContextPlugin } from "../libs/fastify/context/context.js";
 import { errorHandler } from "../libs/fastify/error-handler.js";
 
@@ -104,9 +103,6 @@ export const setupFastify = async () => {
   await server.register(autoLoad, {
     dir: join(__dirname, "plugins"),
   });
-
-  // Register debug dump plugin manually (kept outside autoload dir to avoid double-registration)
-  await server.register(debugDumpPlugin);
 
   return server;
 };
