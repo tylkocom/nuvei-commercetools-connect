@@ -741,7 +741,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
       return {
         outcome: PaymentModificationStatus.REJECTED,
-        pspReference: request.payment.interfaceId as string,
+        pspReference: request.payment.interfaceId ?? request.payment.id,
       };
     }
   }
@@ -795,7 +795,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
       return {
         outcome: PaymentModificationStatus.REJECTED,
-        pspReference: request.payment.interfaceId as string,
+        pspReference: request.payment.interfaceId ?? request.payment.id,
       };
     }
   }
@@ -854,7 +854,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
       return {
         outcome: PaymentModificationStatus.REJECTED,
-        pspReference: request.payment.interfaceId as string,
+        pspReference: request.payment.interfaceId ?? request.payment.id,
       };
     }
   }
