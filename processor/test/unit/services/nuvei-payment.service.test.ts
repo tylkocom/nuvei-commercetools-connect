@@ -408,6 +408,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "settle-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       const result = await service.capturePayment({
@@ -433,6 +434,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "settle-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       await service.capturePayment({
@@ -457,6 +459,44 @@ describe("NuveiPaymentService", () => {
         }),
       );
     });
+
+    it("returns REJECTED when the gateway declines the settle", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.settleTransaction.mockResolvedValue({
+        transactionId: "settle-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+        transactionStatus: "DECLINED",
+        gwErrorCode: -1,
+        gwErrorReason: "Decline",
+      });
+
+      const result = await service.capturePayment({
+        payment: makeMockPayment(),
+        amount: { centAmount: 1000, currencyCode: "USD" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(result.pspReference).toBe("settle-tx-1");
+    });
+
+    it("returns REJECTED when the settle response carries no transactionStatus", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.settleTransaction.mockResolvedValue({
+        transactionId: "settle-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+      });
+
+      const result = await service.capturePayment({
+        payment: makeMockPayment(),
+        amount: { centAmount: 1000, currencyCode: "USD" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -470,6 +510,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "void-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       const result = await service.cancelPayment({
@@ -494,6 +535,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "void-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       await service.cancelPayment({
@@ -512,6 +554,26 @@ describe("NuveiPaymentService", () => {
         }),
       );
     });
+
+    it("returns REJECTED when the gateway declines the void", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.voidTransaction.mockResolvedValue({
+        transactionId: "void-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+        transactionStatus: "ERROR",
+        gwErrorCode: -1100,
+        gwErrorReason: "Transaction must be settled or authorized",
+      });
+
+      const result = await service.cancelPayment({
+        payment: makeMockPayment(),
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(result.pspReference).toBe("void-tx-1");
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -525,6 +587,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "refund-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       const result = await service.refundPayment({
@@ -550,6 +613,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "refund-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       await service.refundPayment({
@@ -563,6 +627,45 @@ describe("NuveiPaymentService", () => {
           relatedTransactionId: "charge-tx-1",
         }),
       );
+    });
+
+    it("returns RECEIVED for asynchronous PENDING refunds", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.refundTransaction.mockResolvedValue({
+        transactionId: "refund-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+        transactionStatus: "PENDING",
+      });
+
+      const result = await service.refundPayment({
+        payment: makeMockPayment(),
+        amount: { centAmount: 1000, currencyCode: "USD" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.RECEIVED);
+    });
+
+    it("returns REJECTED when the gateway declines the refund", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.refundTransaction.mockResolvedValue({
+        transactionId: "refund-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+        transactionStatus: "DECLINED",
+        gwErrorCode: -1,
+        gwErrorReason: "Decline",
+      });
+
+      const result = await service.refundPayment({
+        payment: makeMockPayment(),
+        amount: { centAmount: 1000, currencyCode: "USD" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(result.pspReference).toBe("refund-tx-1");
     });
   });
 
@@ -1196,6 +1299,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "refund-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       const result = await service.reversePayment({
@@ -1220,6 +1324,7 @@ describe("NuveiPaymentService", () => {
         transactionId: "void-tx-1",
         status: "SUCCESS",
         errCode: 0,
+        transactionStatus: "APPROVED",
       });
 
       const result = await service.reversePayment({

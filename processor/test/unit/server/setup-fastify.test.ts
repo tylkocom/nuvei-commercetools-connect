@@ -50,7 +50,7 @@ vi.mock("../../../src/config/config", () => ({
     serviceUrl: "",
     port: 8080,
     returnUrl: "",
-    corsAllowedOrigins: [],
+    corsAllowedOrigins: ["https://allowed.example.com"],
     buildCommit: "test-commit",
     phase02StageALocalMockCt: false,
   },
@@ -95,7 +95,7 @@ describe("setupFastify", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a fastify instance with permissive CORS handling", async () => {
+  it("creates a working fastify instance", async () => {
     const server = await setupFastify();
 
     // Register a simple route for testing
@@ -110,7 +110,7 @@ describe("setupFastify", () => {
     expect(response.json()).toEqual({ ok: true });
   });
 
-  it("allows any origin without CORS restrictions", async () => {
+  it("grants CORS headers to allowlisted origins", async () => {
     const server = await setupFastify();
 
     server.get("/config", async () => ({ environment: "test" }));
@@ -119,35 +119,105 @@ describe("setupFastify", () => {
       method: "GET",
       url: "/config",
       headers: {
-        origin: "https://any-origin.example.com",
+        origin: "https://allowed.example.com",
       },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.headers["access-control-allow-origin"]).toBe("https://any-origin.example.com");
+    expect(response.headers["access-control-allow-origin"]).toBe("https://allowed.example.com");
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
     expect(response.json()).toEqual({ environment: "test" });
   });
 
-  it("does not block OPTIONS requests", async () => {
+  it("does not grant CORS headers to unknown origins", async () => {
     const server = await setupFastify();
 
-    server.post("/payments/session", async () => ({ sessionToken: "test" }));
+    server.get("/config", async () => ({ environment: "test" }));
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/config",
+      headers: {
+        origin: "https://evil.example.com",
+      },
+    });
+
+    // The request itself is served (CORS is a browser-side gate), but no
+    // Access-Control-Allow-Origin is granted, so browsers block the response.
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+
+  it("answers preflight for allowlisted origins with reflected request headers", async () => {
+    const server = await setupFastify();
+
+    server.post("/payments/session", async () => ({ ok: true }));
 
     const response = await server.inject({
       method: "OPTIONS",
       url: "/payments/session",
       headers: {
-        origin: "https://any-origin.example.com",
+        origin: "https://allowed.example.com",
         "access-control-request-method": "POST",
         "access-control-request-headers": "content-type,x-session-id",
       },
     });
 
-    // OPTIONS returns 204 and reflects any origin/header with permissive CORS headers.
     expect(response.statusCode).toBe(204);
-    expect(response.headers["access-control-allow-origin"]).toBe("https://any-origin.example.com");
+    expect(response.headers["access-control-allow-origin"]).toBe("https://allowed.example.com");
     expect(response.headers["access-control-allow-headers"]).toBe("content-type,x-session-id");
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
+  it("does not authorize preflight for unknown origins", async () => {
+    const server = await setupFastify();
+
+    server.post("/payments/session", async () => ({ ok: true }));
+
+    const response = await server.inject({
+      method: "OPTIONS",
+      url: "/payments/session",
+      headers: {
+        origin: "https://evil.example.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-session-id",
+      },
+    });
+
+    expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+
+  it("always allows the configured commercetools Checkout origin", async () => {
+    const server = await setupFastify();
+
+    server.get("/config", async () => ({ environment: "test" }));
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/config",
+      headers: {
+        origin: "https://checkout.europe-west1.gcp.commercetools.com",
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "https://checkout.europe-west1.gcp.commercetools.com",
+    );
+  });
+
+  it("sets defensive security headers on responses", async () => {
+    const server = await setupFastify();
+
+    server.get("/test", async () => ({ ok: true }));
+
+    const response = await server.inject({ method: "GET", url: "/test" });
+
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
+    expect(response.headers["referrer-policy"]).toBe("no-referrer");
+    expect(response.headers["x-frame-options"]).toBe("DENY");
+    expect(response.headers["permissions-policy"]).toContain("camera=()");
   });
 });
