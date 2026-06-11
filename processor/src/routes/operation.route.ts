@@ -1,3 +1,9 @@
+import {
+  AuthorityAuthorizationHook,
+  JWTAuthenticationHook,
+  Oauth2AuthenticationHook,
+  SessionHeaderAuthenticationHook,
+} from "@commercetools/connect-payments-sdk";
 import { Type } from "@sinclair/typebox";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import { ConfigResponseSchema, ConfigResponseSchemaDTO } from "../dtos/operations/config.dto.js";
@@ -19,9 +25,12 @@ import {
 } from "../dtos/operations/transaction.dto.js";
 
 type OperationRouteOptions = {
+  sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
+  oauth2AuthHook: Oauth2AuthenticationHook;
+  jwtAuthHook: JWTAuthenticationHook;
+  authorizationHook: AuthorityAuthorizationHook;
   paymentService: AbstractPaymentService;
 };
-
 
 export const operationsRoute = async (
   fastify: FastifyInstance,
@@ -30,6 +39,7 @@ export const operationsRoute = async (
   fastify.get<{ Reply: ConfigResponseSchemaDTO }>(
     "/config",
     {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         response: {
           200: ConfigResponseSchema,
@@ -45,6 +55,7 @@ export const operationsRoute = async (
   fastify.get<{ Reply: StatusResponseSchemaDTO }>(
     "/status",
     {
+      preHandler: [opts.jwtAuthHook.authenticate()],
       schema: {
         response: {
           200: StatusResponseSchema,
@@ -75,6 +86,7 @@ export const operationsRoute = async (
   fastify.get(
     "/payment-components",
     {
+      preHandler: [opts.jwtAuthHook.authenticate()],
       schema: {
         response: {
           200: SupportedPaymentComponentsSchema,
@@ -94,6 +106,10 @@ export const operationsRoute = async (
   }>(
     "/payment-intents/:id",
     {
+      preHandler: [
+        opts.oauth2AuthHook.authenticate(),
+        opts.authorizationHook.authorize("manage_project", "manage_checkout_payment_intents"),
+      ],
       schema: {
         params: {
           $id: "paramsSchema",
@@ -124,6 +140,10 @@ export const operationsRoute = async (
   fastify.post<{ Body: TransactionDraftDTO; Reply: TransactionResponseDTO }>(
     "/transactions",
     {
+      preHandler: [
+        opts.oauth2AuthHook.authenticate(),
+        opts.authorizationHook.authorize("manage_project", "manage_checkout_transactions"),
+      ],
       schema: {
         body: TransactionDraft,
         response: {

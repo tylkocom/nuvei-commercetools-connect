@@ -1,3 +1,4 @@
+import { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
 import { Type } from "@sinclair/typebox";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
@@ -10,16 +11,19 @@ import {
   PaymentConfirmResponseSchema,
   PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
+import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
 import { DmnChecksumInvalidError, NuveiPaymentService } from "../services/nuvei-payment.service.js";
 import { PaymentSetupError } from "../dtos/operations/payment-errors.dto.js";
 import { log } from "../libs/logger/index.js";
 
 type PaymentRoutesOptions = {
   paymentService: NuveiPaymentService;
+  sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
 };
 
 type WebhookRoutesOptions = {
   paymentService: NuveiPaymentService;
+  nuveiHeaderAuthHook: NuveiHeaderAuthHook;
 };
 
 /**
@@ -39,6 +43,7 @@ export const paymentRoutes = async (
   }>(
     "/session",
     {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         body: PaymentMethodOptionsSchema,
         response: {
@@ -72,6 +77,7 @@ export const paymentRoutes = async (
   }>(
     "/confirm/:id",
     {
+      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         params: {
           $id: "confirmParamsSchema",
@@ -109,6 +115,7 @@ export const nuveiWebhookRoutes = async (
   fastify.post(
     "/nuvei",
     {
+      preHandler: [opts.nuveiHeaderAuthHook.authenticate()],
       config: { rawBody: true },
     },
     async (request, reply) => {
