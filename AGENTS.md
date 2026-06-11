@@ -150,7 +150,10 @@ The current codebase is a working first-pass implementation, but the project is 
 
 ## Conventions
 
-Conventions not yet established. Will populate as patterns emerge during development.
+### Agent Behavioral Rules
+
+- **Never deploy automatically.** The user handles all deployments manually. The assistant must not trigger commercetools Connect deployments, redeployments, or any deployment-related actions.
+
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
