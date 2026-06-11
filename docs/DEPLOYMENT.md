@@ -94,8 +94,8 @@ Optional configuration used by the current source:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `NUVEI_DMN_CHECKSUM_ALGORITHM` | `sha256` | DMN checksum algorithm. Runtime validation accepts only `sha256`. |
-| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated additional browser origins allowed by the processor CORS policy. |
-| `CONNECT_SERVICE_URL` | empty | Base processor service URL used by `processor/src/connectors/post-deploy.ts` to print the Nuvei DMN URL. |
+| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated additional browser origins granted CORS access. The origin of `CTP_CHECKOUT_URL` is always allowed; all other origins are denied. |
+| `CONNECT_SERVICE_URL` | empty | Base processor service URL. Printed as the Nuvei DMN URL by `processor/src/connectors/post-deploy.ts` and passed to Nuvei `openOrder` as `urlDetails.notificationUrl`. |
 | `RETURN_URL` | empty | Optional merchant return URL. Must be HTTPS when set. |
 | `PORT` | `8080` | Fastify listen port. |
 | `HEALTH_CHECK_TIMEOUT` | `5000` | Timeout used by processor status checks. |

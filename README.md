@@ -180,10 +180,10 @@ Optional configuration:
 | Variable | Default | Description |
 | --- | --- | --- |
 | `NUVEI_DMN_CHECKSUM_ALGORITHM` | `sha256` | DMN checksum algorithm. Startup validation only accepts `sha256`. |
-| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated extra browser origins accepted by the processor CORS policy. The Merchant Center origin derived from `CTP_JWT_ISSUER` and `CTP_CHECKOUT_URL` are always allowed. |
+| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated extra browser origins granted CORS access by the processor. The origin of `CTP_CHECKOUT_URL` is always allowed; every other origin is denied. |
 | `HEALTH_CHECK_TIMEOUT` | `5000` | Timeout used by processor status checks. |
 | `LOGGER_LEVEL` | `info` | Fastify logger level. |
-| `CONNECT_SERVICE_URL` | empty | Service URL used by connector deployment scripts and runtime integrations. |
+| `CONNECT_SERVICE_URL` | empty | Public processor base URL. Used by connector deployment scripts and passed to Nuvei `openOrder` as `urlDetails.notificationUrl` (`${CONNECT_SERVICE_URL}/webhooks/nuvei`) so DMNs reach this deployment. |
 | `PORT` | `8080` | Processor listening port. |
 | `RETURN_URL` | empty | Optional merchant return URL. Must use HTTPS when set. |
 

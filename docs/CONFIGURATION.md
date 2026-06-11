@@ -26,9 +26,9 @@ Do not expose `CTP_CLIENT_SECRET`, `NUVEI_SECRET_KEY`, or other credential value
 | `NUVEI_SECRET_KEY` | Required at runtime and in `connect.yaml` secured configuration | None | Nuvei secret key used to sign API requests and validate DMN checksums. Keep this server-side only. |
 | `NUVEI_API_BASE_URL` | Required at runtime and in `connect.yaml` | None | Nuvei API base URL. Must include the `https://` scheme; `NuveiClient` appends `/api/v1` when the path does not already end with `/api/v1`. |
 | `NUVEI_DMN_CHECKSUM_ALGORITHM` | Optional | `sha256` | DMN checksum algorithm. Runtime validation accepts only `sha256`. |
-| `CONNECT_SERVICE_URL` | Optional at runtime; used by post-deploy script | None | Public base URL of the processor service. `processor/src/connectors/post-deploy.ts` prints `${CONNECT_SERVICE_URL}/webhooks/nuvei` as the Nuvei DMN URL to configure manually. `VERIFY: confirm the deployed processor URL in the target commercetools Connect project before configuring Nuvei.` |
+| `CONNECT_SERVICE_URL` | Optional at runtime; set automatically by commercetools Connect | None | Public base URL of the processor service. When set, the processor passes `${CONNECT_SERVICE_URL}/webhooks/nuvei` to Nuvei `openOrder` as `urlDetails.notificationUrl` so DMNs are delivered without manual Nuvei panel configuration. `processor/src/connectors/post-deploy.ts` also prints the same DMN URL. `VERIFY: confirm the deployed processor URL in the target commercetools Connect project before configuring Nuvei.` |
 | `RETURN_URL` | Optional | None | Fallback merchant return URL used when no return URL is available in request context. When set, it must be an HTTPS URL. `VERIFY: use the checkout return URL for the deployment environment.` |
-| `CORS_ALLOWED_ORIGINS` | Optional in `connect.yaml` | Empty list | Comma-separated additional browser origins allowed to call the processor. Each configured origin must be HTTPS. `CTP_CHECKOUT_URL` is always included as an allowed origin. |
+| `CORS_ALLOWED_ORIGINS` | Optional in `connect.yaml` | Empty list | Comma-separated additional browser origins granted CORS access. The origin of `CTP_CHECKOUT_URL` is always allowed; all other origins are denied. |
 | `PORT` | Optional | `8080` | Port used by the Fastify processor service. The service listens on `0.0.0.0`. |
 | `HEALTH_CHECK_TIMEOUT` | Optional | `5000` | Timeout in milliseconds used by the processor status checks. |
 | `LOGGER_LEVEL` | Optional | `info` | Fastify and application logger level. |
@@ -142,7 +142,6 @@ URL validation fails when any configured value in this set is not HTTPS:
 - `CTP_JWT_ISSUER`
 - `NUVEI_API_BASE_URL`
 - `RETURN_URL`, when set
-- every origin in `CORS_ALLOWED_ORIGINS`, when set
 
 `NUVEI_DMN_CHECKSUM_ALGORITHM` fails validation with `NUVEI_DMN_CHECKSUM_ALGORITHM must be sha256` when it is set to any value other than `sha256`.
 
@@ -176,10 +175,10 @@ Runtime defaults from `processor/src/config/config.ts` are:
 | `LOGGER_LEVEL` | `info` | Passed to Fastify logger configuration. |
 | `NUVEI_ENV` | `test` | Returned by the processor config endpoint. |
 | `NUVEI_DMN_CHECKSUM_ALGORITHM` | `sha256` | Hard-coded as `sha256` in the runtime config object. |
-| `CONNECT_SERVICE_URL` | Empty string | Used only by the post-deploy script for printing the DMN URL. |
+| `CONNECT_SERVICE_URL` | Empty string | Printed as the DMN URL by the post-deploy script and passed to Nuvei `openOrder` as `urlDetails.notificationUrl`. |
 | `PORT` | `8080` | Parsed with `parseInt`. |
 | `RETURN_URL` | Empty string | Used only when no merchant return URL is present in request context. |
-| `CORS_ALLOWED_ORIGINS` | Empty list | Split on commas, trimmed, and empty entries removed. The Merchant Center origin derived from `CTP_JWT_ISSUER` and the configured Checkout URL are always allowed. |
+| `CORS_ALLOWED_ORIGINS` | Empty list | Split on commas/semicolons, trimmed, and empty entries removed. The origin of the configured `CTP_CHECKOUT_URL` is always allowed; all other origins are denied. |
 
 The Nuvei client has one additional internal default: request timeout is `10000` milliseconds when no timeout is passed to `NuveiClient`. The production singleton in `processor/src/clients/nuvei.client.ts` does not pass a timeout override.
 
@@ -197,6 +196,6 @@ cd processor
 npm run dev
 ```
 
-3. Use HTTPS URLs for every configured external endpoint, return URL, and CORS origin. Local plain-host values such as `payments.localhost` do not satisfy runtime URL validation.
+3. Use HTTPS URLs for every configured external endpoint and return URL; local plain-host values such as `payments.localhost` do not satisfy runtime URL validation. `CORS_ALLOWED_ORIGINS` entries are not HTTPS-validated, so local development origins such as `http://localhost:3000` can be allowlisted; use HTTPS origins in deployed environments.
 
 For commercetools Connect deployments, configure environment-specific values through `connect.yaml` standard and secured configuration inputs. Secrets belong in secured configuration. `VERIFY: confirm the exact production commercetools region, Nuvei account, processor public URL, return URL, and allowed checkout origins with the deployment owner before promoting configuration between environments.`

@@ -48,9 +48,9 @@ graph TD
 
 1. commercetools Checkout calls `POST /payment-intents/:id` using OAuth2 plus `manage_checkout_payment_intents` authorization.
 2. `operationsRoute` passes the request to the local `AbstractPaymentService.modifyPayment()` flow in `processor/src/services/abstract-payment.service.ts`, with Nuvei-specific methods implemented by `NuveiPaymentService`.
-3. `NuveiPaymentService.capturePayment()` calls Nuvei `settleTransaction` and returns an approved modification response.
-4. `NuveiPaymentService.cancelPayment()` calls Nuvei `voidTransaction` and returns an approved modification response.
-5. `NuveiPaymentService.refundPayment()` calls Nuvei `refundTransaction` and returns a received modification response because refunds can complete asynchronously.
+3. `NuveiPaymentService.capturePayment()` calls Nuvei `settleTransaction` and returns an approved modification response only when Nuvei reports `transactionStatus: APPROVED`; gateway declines (`DECLINED`/`ERROR`) and missing transaction status map to a rejected response.
+4. `NuveiPaymentService.cancelPayment()` calls Nuvei `voidTransaction` with the same `transactionStatus` gate: only `APPROVED` produces an approved response.
+5. `NuveiPaymentService.refundPayment()` calls Nuvei `refundTransaction` and returns a received modification response for `APPROVED` or `PENDING` (refunds can complete asynchronously); declines and errors map to a rejected response.
 6. `NuveiPaymentService.reversePayment()` chooses refund when a successful `Charge` exists, cancel when a successful `Authorization` exists, and otherwise rejects the operation as invalid.
 
 ### Nuvei DMN webhook reconciliation
@@ -180,7 +180,7 @@ The Checkout-facing frontend `Enabler` receives only host-provided Checkout valu
 - Successful payment confirmations validate Nuvei-reported amount, currency, and cart identity before writing CT transactions. CT `Authorization` `interactionId` prefers canonical Nuvei `PPP_TransactionID`, then Nuvei `TransactionID`/`transactionId`, then the already-bound session token as the last stable idempotency key.
 - Successful DMNs validate Nuvei-reported amount, currency, and cart identity before updating commercetools Payment data; cart-referenced DMNs are only accepted when they resolve to one exact linked Nuvei Payment.
 - Fastify sets defensive response headers (`x-content-type-options`, `referrer-policy`, `x-frame-options`, and `permissions-policy`) for all responses.
-- CORS allows requests with no `Origin`, the configured commercetools Checkout URL, the Merchant Center origin derived from `CTP_JWT_ISSUER`, and any explicitly configured `CORS_ALLOWED_ORIGINS`.
+- CORS is deny-by-default: only the origin of the configured `CTP_CHECKOUT_URL` and origins explicitly listed in `CORS_ALLOWED_ORIGINS` receive CORS grants. Requests without an `Origin` header (server-to-server: Nuvei DMNs, Checkout Payment Intents) are unaffected by CORS.
 - The Nuvei SDK script is loaded with a fixed subresource integrity hash from `enabler/src/services/nuvei-sdk.ts`.
 
 > **SECURITY GAP — requires follow-up:** Nuvei does not publish versioned CDN URLs for `safecharge.js`. The script is served from a mutable path (`/v1/websdk/safecharge.js`) that Nuvei can update at any time without notice. This means:

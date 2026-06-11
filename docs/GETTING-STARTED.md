@@ -18,7 +18,7 @@ For functional processor runs against real services, you also need:
 
 - commercetools project credentials with the scopes documented in `connect.yaml`.
 - Nuvei merchant ID, merchant site ID, secret key, and HTTPS Nuvei API base URL.
-- HTTPS values for every configured external URL, return URL, and CORS origin. The processor validates HTTPS at startup.
+- HTTPS values for every configured external URL and return URL. The processor validates HTTPS at startup. Use HTTPS origins in `CORS_ALLOWED_ORIGINS` for deployed environments; plain-HTTP origins are accepted only for local development.
 
 <!-- VERIFY: Confirm the production commercetools region, Nuvei account details, and deployed processor URL with the environment owner before using real credentials. -->
 
@@ -132,7 +132,7 @@ See `docs/CONFIGURATION.md` for the full environment variable table and local do
 
 ### Processor fails because a URL is not HTTPS
 
-Runtime validation rejects non-HTTPS values for configured external endpoints, `RETURN_URL`, and every origin in `CORS_ALLOWED_ORIGINS`. Use HTTPS URLs for commercetools endpoints, Nuvei API base URL, return URLs, and browser origins. Local plain-host values such as `http://localhost:3000` are not accepted by the current validation logic for those configured fields.
+Runtime validation rejects non-HTTPS values for configured external endpoints and `RETURN_URL`. Use HTTPS URLs for commercetools endpoints, the Nuvei API base URL, and return URLs. `CORS_ALLOWED_ORIGINS` entries are not HTTPS-validated so local origins such as `http://localhost:3000` can be allowlisted during development; use HTTPS origins in deployed environments.
 
 ### Local dotenv values are not being loaded
 
