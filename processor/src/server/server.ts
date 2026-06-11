@@ -1,7 +1,8 @@
 import autoLoad from "@fastify/autoload";
+import cors, { type FastifyCorsOptions } from "@fastify/cors";
 import fastifyFormBody from "@fastify/formbody";
 import rawBody from "fastify-raw-body";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyRequest } from "fastify";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,58 +28,39 @@ export const setupFastify = async () => {
     bodyLimit: 100 * 1024,
   });
 
-  const applyCorsHeaders = (
-    request: { headers: Record<string, string | string[] | undefined> },
-    reply: { header: (key: string, value: string | string[]) => unknown },
-  ) => {
-    const origin = request.headers.origin ?? "*";
-    const requestedHeaders = request.headers["access-control-request-headers"] ?? "*";
-
-    reply.header("Access-Control-Allow-Origin", origin);
-    reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    reply.header("Access-Control-Allow-Headers", requestedHeaders);
-    reply.header("Access-Control-Allow-Credentials", "true");
-    reply.header("Vary", "Origin");
-  };
-
-  // Handle OPTIONS requests for all routes with permissive CORS headers
-  server.options("*", async (request, reply) => {
-    applyCorsHeaders(request, reply);
-    return reply.code(204).send();
+  // Browser origins must be explicitly allowlisted: the commercetools Checkout
+  // origin (from CTP_CHECKOUT_URL) is always allowed; CORS_ALLOWED_ORIGINS adds
+  // storefront origins. Every other origin gets no CORS grant. Server-to-server
+  // requests (Nuvei DMNs, Checkout Payment Intents) carry no Origin and are unaffected.
+  await server.register(cors, () => {
+    const allowedOrigins = new Set(config.corsAllowedOrigins);
+    if (config.checkoutUrl) {
+      try {
+        allowedOrigins.add(new URL(config.checkoutUrl).origin);
+      } catch {
+        // Invalid CTP_CHECKOUT_URL is rejected by validateConfig at boot.
+      }
+    }
+    return (request: FastifyRequest, callback: (error: Error | null, options: FastifyCorsOptions) => void) => {
+      const origin = request.headers.origin;
+      const allowed = origin !== undefined && allowedOrigins.has(origin);
+      callback(null, {
+        origin: allowed,
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        credentials: allowed,
+        optionsSuccessStatus: 204,
+      });
+    };
   });
 
-  // Add CORS headers to all responses via onSend hook
-  server.addHook("onSend", async (request, reply, payload) => {
-    applyCorsHeaders(request, reply);
-    return payload;
-  });
-
-  // Log every incoming request with body and headers for evidence capture
-  server.addHook("onRequest", async (request) => {
-    server.log.info(
-      {
-        method: request.method,
-        url: request.url,
-        headers: request.headers,
-        body: request.body,
-        query: request.query,
-        params: request.params,
-        remoteAddress: request.ip,
-      },
-      "Incoming request",
-    );
-  });
-
-  // Log every response for evidence capture
-  server.addHook("onResponse", async (request, reply) => {
-    server.log.info(
-      {
-        method: request.method,
-        url: request.url,
-        statusCode: reply.statusCode,
-        responseTime: reply.elapsedTime,
-      },
-      "Request completed",
+  // Defensive response headers; the processor serves only JSON APIs.
+  server.addHook("onSend", async (_request, reply) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("referrer-policy", "no-referrer");
+    reply.header("x-frame-options", "DENY");
+    reply.header(
+      "permissions-policy",
+      "accelerometer=(), camera=(), geolocation=(), microphone=(), payment=()",
     );
   });
 
