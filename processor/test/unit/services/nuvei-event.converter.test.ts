@@ -39,6 +39,53 @@ describe("NuveiEventConverter", () => {
     });
   });
 
+  it("maps an approved fiscal status to Success", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
+      ...baseDmn,
+      Status: "APPROVED",
+    });
+
+    expect(update.transactions[0].state).toBe("Success");
+  });
+
+  it("maps a declined fiscal status to Failure even when ppp_status is OK", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
+      ...baseDmn,
+      Status: "DECLINED",
+    });
+
+    expect(update.transactions[0].state).toBe("Failure");
+    expect(update.interfaceCode).toBe("failed");
+  });
+
+  it("maps an errored fiscal status to Failure even when ppp_status is OK", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
+      ...baseDmn,
+      Status: "ERROR",
+    });
+
+    expect(update.transactions[0].state).toBe("Failure");
+  });
+
+  it("maps a pending fiscal status to Pending instead of trusting ppp_status", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
+      ...baseDmn,
+      Status: "PENDING",
+    });
+
+    expect(update.transactions[0].state).toBe("Pending");
+  });
+
+  it("maps ppp_status FAIL to Failure regardless of fiscal status", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
+      ...baseDmn,
+      ppp_status: "FAIL",
+      Status: "APPROVED",
+    });
+
+    expect(update.transactions[0].state).toBe("Failure");
+  });
+
   it("parses DMN amount using zero-decimal currency fraction digits", () => {
     const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
       ...baseDmn,

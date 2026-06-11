@@ -23,16 +23,32 @@ export function mapNuveiTransactionType(nuveiType: string): TransactionType {
 }
 
 /**
- * Map Nuvei DMN status to commercetools TransactionState
+ * Map a Nuvei DMN to a commercetools TransactionState.
+ *
+ * `ppp_status` is the request-level status (OK / FAIL / PENDING) while the
+ * optional `Status` field is the fiscal transaction result (APPROVED /
+ * SUCCESS / DECLINED / ERROR / PENDING / UPDATE); both are covered by the
+ * DMN checksum. A DMN maps to Success only when neither field contradicts
+ * it — trusting ppp_status=OK alone would record a Success transaction for
+ * a DECLINED fiscal result.
  */
-export function mapNuveiStatus(nuveiStatus: string): TransactionState {
-  switch (nuveiStatus.toUpperCase()) {
-    case "OK":
-      return "Success";
-    case "FAIL":
+export function mapNuveiDmnTransactionState(
+  pppStatus: string,
+  fiscalStatus?: string,
+): TransactionState {
+  if (pppStatus.toUpperCase() === "FAIL") {
+    return "Failure";
+  }
+
+  switch (fiscalStatus?.toUpperCase()) {
+    case "DECLINED":
+    case "ERROR":
       return "Failure";
-    default:
+    case "PENDING":
+    case "UPDATE":
       return "Pending";
+    default:
+      return pppStatus.toUpperCase() === "OK" ? "Success" : "Pending";
   }
 }
 

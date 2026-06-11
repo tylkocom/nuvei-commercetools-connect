@@ -1,7 +1,7 @@
 import { TransactionData } from "@commercetools/connect-payments-sdk";
 import {
   mapNuveiTransactionType,
-  mapNuveiStatus,
+  mapNuveiDmnTransactionState,
   getStatusInterfaceCode,
 } from "../payment-converter.js";
 
@@ -103,10 +103,11 @@ export class NuveiEventConverter {
     ]);
     const nuveiTransactionType = getRequiredString(body, "transactionType");
     const nuveiStatus = getRequiredString(body, "ppp_status");
+    const fiscalStatus = getOptionalString(body, "Status") ?? getOptionalString(body, "status");
     const currency = getRequiredString(body, "currency");
     const totalCentAmount = parseCentAmount(body.totalAmount, currency);
     const transactionType = mapNuveiTransactionType(nuveiTransactionType);
-    const transactionState = mapNuveiStatus(nuveiStatus);
+    const transactionState = mapNuveiDmnTransactionState(nuveiStatus, fiscalStatus);
 
     const transaction: TransactionData = {
       type: transactionType,
