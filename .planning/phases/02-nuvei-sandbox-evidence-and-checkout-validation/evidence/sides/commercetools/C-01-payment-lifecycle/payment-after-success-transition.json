@@ -1,0 +1,41 @@
+{
+  "body": {
+    "amountPlanned": {
+      "centAmount": 1000,
+      "currencyCode": "EUR",
+      "fractionDigits": 2,
+      "type": "centPrecision"
+    },
+    "createdAt": "[volatile]",
+    "id": "uuid-002",
+    "interfaceId": "sessionToken-001",
+    "interfaceInteractions": [],
+    "lastMessageSequenceNumber": 3,
+    "lastModifiedAt": "[volatile]",
+    "paymentMethodInfo": {
+      "method": "card",
+      "name": "[redacted-pii]",
+      "paymentInterface": "nuvei"
+    },
+    "paymentStatus": {
+      "interfaceCode": "authorized"
+    },
+    "transactions": [
+      {
+        "amount": {
+          "centAmount": 1000,
+          "currencyCode": "EUR",
+          "fractionDigits": 2,
+          "type": "centPrecision"
+        },
+        "id": "uuid-003",
+        "interactionId": "sessionToken-002",
+        "state": "Success",
+        "type": "Authorization"
+      }
+    ],
+    "version": 4,
+    "versionModifiedAt": "[volatile]"
+  },
+  "status": 200
+}

@@ -1,0 +1,80 @@
+{
+  "httpStatus": 200,
+  "request": {
+    "amount": "10.00",
+    "billingAddress": "[redacted-pii]",
+    "checksum": "[redacted-checksum]",
+    "clientRequestId": "request-006",
+    "clientUniqueId": "clientUniqueId-002",
+    "currency": "USD",
+    "deviceDetails": {
+      "ipAddress": "[redacted-pii]"
+    },
+    "merchantId": "[redacted-card-data]",
+    "merchantSiteId": "2192117",
+    "paymentOption": {
+      "card": {
+        "CVV": "217",
+        "cardHolderName": "Evidence Collector",
+        "cardNumber": "[redacted-card-data]",
+        "expirationMonth": "[redacted-card-data]",
+        "expirationYear": "[redacted-card-data]"
+      }
+    },
+    "sessionToken": "sessionToken-002",
+    "timeStamp": "[volatile]",
+    "transactionType": "Auth"
+  },
+  "response": {
+    "authCode": "[volatile]",
+    "clientRequestId": "request-006",
+    "clientUniqueId": "clientUniqueId-002",
+    "customData": "",
+    "errCode": 0,
+    "externalSchemeTransactionId": "",
+    "externalTransactionId": "",
+    "fraudDetails": {
+      "finalDecision": "Accept",
+      "score": "0"
+    },
+    "gwErrorCode": -1,
+    "gwErrorReason": "Declined",
+    "gwExtendedErrorCode": 0,
+    "internalRequestId": "[volatile]",
+    "issuerDeclineCode": "",
+    "issuerDeclineReason": "",
+    "merchantAdviceCode": "",
+    "merchantId": "[redacted-card-data]",
+    "merchantSiteId": "2192117",
+    "orderId": "[volatile]",
+    "paymentOption": {
+      "card": {
+        "acquirerId": "19",
+        "avsCode": "",
+        "bin": "[redacted-card-data]",
+        "cardBrand": "VISA",
+        "cardType": "Debit",
+        "ccCardNumber": "[redacted-card-data]",
+        "ccExpMonth": "12",
+        "ccExpYear": "30",
+        "cvv2Reply": "",
+        "isPrepaid": "false",
+        "issuerBankName": "Sberbank CZ, A.S.",
+        "issuerCountry": "CZ",
+        "last4Digits": "[redacted-card-data]",
+        "processedBrand": "VISA",
+        "threeD": {
+          "challengePreferenceReason": "12"
+        }
+      },
+      "userPaymentOptionId": "[redacted-card-data]"
+    },
+    "reason": "",
+    "sessionToken": "sessionToken-002",
+    "status": "SUCCESS",
+    "transactionId": "transaction-004",
+    "transactionStatus": "DECLINED",
+    "transactionType": "Auth",
+    "version": "1.0"
+  }
+}

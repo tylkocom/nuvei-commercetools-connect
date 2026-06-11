@@ -1,0 +1,17 @@
+{
+  "body": {
+    "outcome": "rejected"
+  },
+  "request": {
+    "actions": [
+      {
+        "action": "refundPayment",
+        "amount": {
+          "centAmount": 1000,
+          "currencyCode": "EUR"
+        }
+      }
+    ]
+  },
+  "status": 200
+}

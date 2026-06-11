@@ -1,0 +1,17 @@
+{
+  "body": {
+    "outcome": "rejected"
+  },
+  "request": {
+    "actions": [
+      {
+        "action": "capturePayment",
+        "amount": {
+          "centAmount": 1000,
+          "currencyCode": "EUR"
+        }
+      }
+    ]
+  },
+  "status": 200
+}

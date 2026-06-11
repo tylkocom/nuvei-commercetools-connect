@@ -1,0 +1,45 @@
+{
+  "body": {
+    "cartState": "Active",
+    "createdAt": "[volatile]",
+    "customLineItems": [],
+    "deleteDaysAfterLastModification": 90,
+    "directDiscounts": [],
+    "discountCodes": [],
+    "discountTypeCombination": {
+      "type": "Stacking"
+    },
+    "id": "uuid-001",
+    "inventoryMode": "None",
+    "itemShippingAddresses": [],
+    "lastMessageSequenceNumber": 1,
+    "lastModifiedAt": "[volatile]",
+    "lineItems": [],
+    "origin": "Customer",
+    "paymentInfo": {
+      "payments": [
+        {
+          "id": "payment-001",
+          "typeId": "payment"
+        }
+      ]
+    },
+    "priceRoundingMode": "HalfEven",
+    "refusedGifts": [],
+    "shipping": [],
+    "shippingMode": "Single",
+    "taxCalculationMode": "LineItemLevel",
+    "taxMode": "Platform",
+    "taxRoundingMode": "HalfEven",
+    "totalPrice": {
+      "centAmount": 0,
+      "currencyCode": "EUR",
+      "fractionDigits": 2,
+      "type": "centPrecision"
+    },
+    "type": "Cart",
+    "version": 3,
+    "versionModifiedAt": "[volatile]"
+  },
+  "status": 200
+}

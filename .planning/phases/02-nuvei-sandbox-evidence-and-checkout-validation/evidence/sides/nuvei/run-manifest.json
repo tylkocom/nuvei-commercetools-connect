@@ -1,0 +1,76 @@
+{
+  "blockers": [
+    {
+      "fixture": "dmn-blocked.json",
+      "reason": "no-dmn-public-url"
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "dmn-blocked.json",
+      "sha256": "0afad5ec4d411b539881a91c71ea7603a177f778546a92f364fc76f8ea5c77f4"
+    },
+    {
+      "name": "field-observations.json",
+      "sha256": "2653566266f8ce4c38b63d1b5907d88ea2835aa19dfdf2417fc458a586f81edc"
+    },
+    {
+      "name": "N-01-auth-settle-refund/getPaymentStatus.json",
+      "sha256": "7b2c0804c2402c7de788a5a2d7f8aa4d645652413891e9e8b3085755ddf49fbe"
+    },
+    {
+      "name": "N-01-auth-settle-refund/openOrder.json",
+      "sha256": "4892667f8d85b167c049367d3203f81694305fa6984b80f2e4bdd435e6a85c8b"
+    },
+    {
+      "name": "N-01-auth-settle-refund/payment-auth.json",
+      "sha256": "67c314fe0f93500da0e1ff883d7be836099855c7a97fb645ffa6f633a7be09f4"
+    },
+    {
+      "name": "N-01-auth-settle-refund/refund.json",
+      "sha256": "93febcb20644af1bb9a8f5b67d28b2387667ba9e147abb2213274b677e733c55"
+    },
+    {
+      "name": "N-01-auth-settle-refund/settle.json",
+      "sha256": "5a9273e4cc1947e24582b700dd30278c2c1c89eb89f82a30891b3d595aea1017"
+    },
+    {
+      "name": "N-02-declined-auth/getPaymentStatus.json",
+      "sha256": "0f254de00f99e7ecce59eefc0851d2404005dbd93ae497211f1dc6cdf9d8e1ec"
+    },
+    {
+      "name": "N-02-declined-auth/openOrder.json",
+      "sha256": "0126bf73aeb6f68b79858f976e1e6220666dfb78c5d2f60129c96782dfb690d3"
+    },
+    {
+      "name": "N-02-declined-auth/payment-declined.json",
+      "sha256": "8742d93e13383b8034e6daf0f8087bb102ec69f26b371cd735091e9245e08fff"
+    },
+    {
+      "name": "N-03-auth-void/openOrder.json",
+      "sha256": "909fc59ba59658e33c9f4f0f3050db00363316f51c2c919604b64f37d48f6717"
+    },
+    {
+      "name": "N-03-auth-void/payment-auth.json",
+      "sha256": "f97eefd2283243c30bd2123e50528799e60dade8c4dab0287498008b5c9e3d2c"
+    },
+    {
+      "name": "N-03-auth-void/void.json",
+      "sha256": "64cfac5b0e69e6a9731b69c5b6ed0d0758fc2a0ff3411331a9138e4a61a8c5fe"
+    },
+    {
+      "name": "N-04-sale/getPaymentStatus.json",
+      "sha256": "9f4a1f354184a949ed105af9ee9e5ffd2d6ea987c45941b11d1c8e14bd54bc56"
+    },
+    {
+      "name": "N-04-sale/openOrder.json",
+      "sha256": "3546416bddd8663f4d5ea78b25ca32ace57b218055b790a1dc6460d7bf2dab24"
+    },
+    {
+      "name": "N-04-sale/payment-sale.json",
+      "sha256": "7265d72a9cca225178816583a3f59f9819d561a4579ee3a6c47c3beee6598fc8"
+    }
+  ],
+  "side": "nuvei",
+  "status": "partially-blocked"
+}

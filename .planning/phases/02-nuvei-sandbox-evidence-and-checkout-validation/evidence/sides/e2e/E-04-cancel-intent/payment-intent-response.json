@@ -1,0 +1,13 @@
+{
+  "body": {
+    "outcome": "rejected"
+  },
+  "request": {
+    "actions": [
+      {
+        "action": "cancelPayment"
+      }
+    ]
+  },
+  "status": 200
+}

@@ -1,0 +1,9 @@
+{
+  "body": {
+    "access_token": "[volatile]",
+    "expires_in": "[volatile]",
+    "scope": "manage_project:tylko-furniture",
+    "token_type": "Bearer"
+  },
+  "status": 200
+}

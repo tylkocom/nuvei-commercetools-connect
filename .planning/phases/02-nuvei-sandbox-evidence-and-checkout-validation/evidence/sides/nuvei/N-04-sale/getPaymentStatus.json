@@ -1,0 +1,32 @@
+{
+  "httpStatus": 200,
+  "request": {
+    "sessionToken": "sessionToken-004"
+  },
+  "response": {
+    "amount": "10.0",
+    "authCode": "[volatile]",
+    "clientRequestId": "request-011",
+    "clientUniqueId": "clientUniqueId-004",
+    "currency": "USD",
+    "errCode": 0,
+    "gwErrorCode": 0,
+    "gwExtendedErrorCode": 0,
+    "internalRequestId": "[volatile]",
+    "issuerDeclineCode": "",
+    "issuerDeclineReason": "",
+    "merchantSiteId": "2192117",
+    "paymentOption": {
+      "card": {
+        "uniqueCC": "[redacted-card-data]"
+      }
+    },
+    "reason": "",
+    "sessionToken": "sessionToken-004",
+    "status": "SUCCESS",
+    "transactionId": "transaction-007",
+    "transactionStatus": "APPROVED",
+    "transactionType": "Sale",
+    "version": "1.0"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "body": {
+    "amountPlanned": {
+      "centAmount": 1000,
+      "currencyCode": "EUR",
+      "fractionDigits": 2
+    },
+    "id": "payment-local-002",
+    "interfaceId": "sessionToken-001",
+    "paymentMethodInfo": {
+      "method": "card",
+      "name": "[redacted-pii]",
+      "paymentInterface": "nuvei"
+    },
+    "paymentStatus": {
+      "interfaceCode": "pending"
+    },
+    "transactions": [
+      {
+        "amount": {
+          "centAmount": 1000,
+          "currencyCode": "EUR",
+          "fractionDigits": 2
+        },
+        "interactionId": "sessionToken-001",
+        "state": "Success",
+        "type": "Authorization"
+      }
+    ],
+    "version": 2
+  },
+  "status": 200
+}

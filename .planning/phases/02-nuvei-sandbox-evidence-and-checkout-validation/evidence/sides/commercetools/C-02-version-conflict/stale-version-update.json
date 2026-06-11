@@ -1,0 +1,14 @@
+{
+  "body": {
+    "errors": [
+      {
+        "code": "ConcurrentModification",
+        "currentVersion": 6,
+        "message": "Object uuid-002 has a different version than expected. Expected: 1 - Actual: 6."
+      }
+    ],
+    "message": "Object uuid-002 has a different version than expected. Expected: 1 - Actual: 6.",
+    "statusCode": 409
+  },
+  "status": 409
+}

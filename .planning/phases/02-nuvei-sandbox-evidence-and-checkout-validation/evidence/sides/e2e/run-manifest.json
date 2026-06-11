@@ -1,0 +1,80 @@
+{
+  "blockers": [
+    {
+      "fixture": "E-05-duplicate-dmn/blocked.json",
+      "reason": "no-dmn-public-url"
+    },
+    {
+      "fixture": "E-06-mismatch-dmn/blocked.json",
+      "reason": "no-dmn-public-url"
+    }
+  ],
+  "fixtures": [
+    {
+      "name": "E-01-auth-confirm/ct-payment-after-confirm.json",
+      "sha256": "8707f878de2f48bdb7c89caef96bbf18ad612cf6939c90ebd79ecc45a048c687"
+    },
+    {
+      "name": "E-01-auth-confirm/nuvei-payment-response.json",
+      "sha256": "972d581302520c50e2980a7a5a4aae0010981899bc343205c01bd401d5e1b467"
+    },
+    {
+      "name": "E-01-auth-confirm/processor-confirm-response.json",
+      "sha256": "ce32ef635695f3a31147dc939620d7239783608570b65bed0d45b82ede0494ee"
+    },
+    {
+      "name": "E-01-auth-confirm/processor-session-response.json",
+      "sha256": "d50018aba5239aee719681212efffcc89118f33cda9bddfcb8781bde1d6b9551"
+    },
+    {
+      "name": "E-02-capture-intent/ct-payment-after-intent.json",
+      "sha256": "8707f878de2f48bdb7c89caef96bbf18ad612cf6939c90ebd79ecc45a048c687"
+    },
+    {
+      "name": "E-02-capture-intent/payment-intent-response.json",
+      "sha256": "7c13dc8df529493527957ba81cc38f50122dc1e4f2b8c846caece48295b016f8"
+    },
+    {
+      "name": "E-03-refund-intent/ct-payment-after-intent.json",
+      "sha256": "8707f878de2f48bdb7c89caef96bbf18ad612cf6939c90ebd79ecc45a048c687"
+    },
+    {
+      "name": "E-03-refund-intent/payment-intent-response.json",
+      "sha256": "967d32e379b00055da389690d1300a0c18c2e8523a09f787c8e9ec87ead54a74"
+    },
+    {
+      "name": "E-04-cancel-intent/ct-payment-after-confirm.json",
+      "sha256": "42de764b44b63fd2dffe81ea88b0cfbce85b40e7ff1d2ed728793643025cd632"
+    },
+    {
+      "name": "E-04-cancel-intent/ct-payment-after-intent.json",
+      "sha256": "42de764b44b63fd2dffe81ea88b0cfbce85b40e7ff1d2ed728793643025cd632"
+    },
+    {
+      "name": "E-04-cancel-intent/nuvei-payment-response.json",
+      "sha256": "faa0fd97e8a2626fd09e38ad5d6f1a69af44484fbbe04fb1ac840fec127b686c"
+    },
+    {
+      "name": "E-04-cancel-intent/payment-intent-response.json",
+      "sha256": "59aa62ce5ab1d8a1a51ddac3957ae225349096aee0439f37e347d2f393605c48"
+    },
+    {
+      "name": "E-04-cancel-intent/processor-confirm-response.json",
+      "sha256": "ce32ef635695f3a31147dc939620d7239783608570b65bed0d45b82ede0494ee"
+    },
+    {
+      "name": "E-04-cancel-intent/processor-session-response.json",
+      "sha256": "844a1939abaf132c39c51e040d355e99c783f0106e61481d3b00d097d8d5caa8"
+    },
+    {
+      "name": "E-05-duplicate-dmn/blocked.json",
+      "sha256": "4d2131484c304040776c74baf048e1cba772dd91cad12f5cc9a3474d1f0b56ce"
+    },
+    {
+      "name": "E-06-mismatch-dmn/blocked.json",
+      "sha256": "4d2131484c304040776c74baf048e1cba772dd91cad12f5cc9a3474d1f0b56ce"
+    }
+  ],
+  "side": "e2e",
+  "status": "partially-blocked"
+}

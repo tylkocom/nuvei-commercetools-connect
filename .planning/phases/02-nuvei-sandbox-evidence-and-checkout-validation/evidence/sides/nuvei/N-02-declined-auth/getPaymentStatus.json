@@ -1,0 +1,32 @@
+{
+  "httpStatus": 200,
+  "request": {
+    "sessionToken": "sessionToken-002"
+  },
+  "response": {
+    "amount": "10.0",
+    "clientRequestId": "request-006",
+    "clientUniqueId": "clientUniqueId-002",
+    "currency": "USD",
+    "errCode": 0,
+    "gwErrorCode": -1,
+    "gwErrorReason": "Declined",
+    "gwExtendedErrorCode": 0,
+    "internalRequestId": "[volatile]",
+    "issuerDeclineCode": "",
+    "issuerDeclineReason": "",
+    "merchantSiteId": "2192117",
+    "paymentOption": {
+      "card": {
+        "uniqueCC": "[redacted-card-data]"
+      }
+    },
+    "reason": "",
+    "sessionToken": "sessionToken-002",
+    "status": "SUCCESS",
+    "transactionId": "transaction-004",
+    "transactionStatus": "DECLINED",
+    "transactionType": "Auth",
+    "version": "1.0"
+  }
+}
