@@ -62,6 +62,9 @@ export const config = {
     .filter(Boolean),
   buildCommit: resolveBuildCommit(),
   phase02StageALocalMockCt: process.env.PHASE_02_STAGE_A_LOCAL_MOCK_CT === "true",
+  // Phase-2 evidence collection: token-gated /evidence/captures route.
+  // Empty (default) keeps the route absent and buffering off.
+  evidenceCaptureToken: process.env.EVIDENCE_CAPTURE_TOKEN || "",
 };
 
 export const getConfig = () => {

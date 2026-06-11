@@ -66,3 +66,6 @@ deployAs:
         - key: NUVEI_SECRET_KEY
           description: Nuvei Secret Key
           required: true
+        - key: EVIDENCE_CAPTURE_TOKEN
+          description: Optional token (min 16 chars) enabling the whitelisted /evidence/captures route for phase-2 evidence runs; leave unset in production
+          required: false

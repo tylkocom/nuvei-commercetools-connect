@@ -32,6 +32,7 @@ Do not expose `CTP_CLIENT_SECRET`, `NUVEI_SECRET_KEY`, or other credential value
 | `PORT` | Optional | `8080` | Port used by the Fastify processor service. The service listens on `0.0.0.0`. |
 | `HEALTH_CHECK_TIMEOUT` | Optional | `5000` | Timeout in milliseconds used by the processor status checks. |
 | `LOGGER_LEVEL` | Optional | `info` | Fastify and application logger level. |
+| `EVIDENCE_CAPTURE_TOKEN` | Optional (secured in `connect.yaml`) | None | Enables the token-gated `GET /evidence/captures` route for phase-2 evidence collection when set to a value of at least 16 characters. The route returns a bounded ring buffer of whitelisted request/response summaries (never session tokens, checksums, card data, or raw bodies). Leave unset outside evidence sessions. |
 | `CTP_CHECKOUT_APPLICATION_KEY` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. Keep only if your deployment tooling or external setup requires it. |
 | `CTP_SCOPE` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. The required commercetools API scopes are documented in `connect.yaml` under `CTP_CLIENT_ID`. |
 
@@ -87,7 +88,7 @@ deployAs:
       securedConfiguration: []
 ```
 
-The processor `standardConfiguration` entries are non-secret settings such as commercetools endpoints, Nuvei environment, merchant IDs, API base URL, checksum algorithm, and CORS origins. The processor `securedConfiguration` entries are `CTP_CLIENT_ID`, `CTP_CLIENT_SECRET`, and `NUVEI_SECRET_KEY`.
+The processor `standardConfiguration` entries are non-secret settings such as commercetools endpoints, Nuvei environment, merchant IDs, API base URL, checksum algorithm, and CORS origins. The processor `securedConfiguration` entries are `CTP_CLIENT_ID`, `CTP_CLIENT_SECRET`, `NUVEI_SECRET_KEY`, and the optional `EVIDENCE_CAPTURE_TOKEN`.
 
 `connect.yaml` also defines these processor lifecycle scripts:
 
