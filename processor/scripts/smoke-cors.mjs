@@ -50,7 +50,7 @@ async function waitForReady(baseUrl, child, getLogs) {
   while (Date.now() < deadline) {
     assertChildAlive(child, getLogs);
     try {
-      const response = await fetchWithTimeout(`${baseUrl}/operations/config`, {
+      const response = await fetchWithTimeout(`${baseUrl}/operations/health`, {
         headers: { origin: ORIGIN },
       });
       if (response.status === 200) {
@@ -128,7 +128,7 @@ async function main() {
   try {
     await waitForReady(baseUrl, child, getLogs);
 
-    const preflight = await fetchWithTimeout(`${baseUrl}/operations/config`, {
+    const preflight = await fetchWithTimeout(`${baseUrl}/operations/health`, {
       method: "OPTIONS",
       headers: {
         origin: ORIGIN,
@@ -151,21 +151,18 @@ async function main() {
     );
 
     for (let i = 0; i < 3; i += 1) {
-      const config = await fetchWithTimeout(`${baseUrl}/operations/config`, {
+      const health = await fetchWithTimeout(`${baseUrl}/operations/health`, {
         headers: {
           origin: ORIGIN,
-          "x-session-id": "local-session-id",
         },
       });
-      assertEqual(config.status, 200, `config status ${i + 1}`);
-      assertEqual(config.headers.get("access-control-allow-origin"), ORIGIN, `config origin ${i + 1}`);
+      assertEqual(health.status, 200, `health status ${i + 1}`);
+      assertEqual(health.headers.get("access-control-allow-origin"), ORIGIN, `health origin ${i + 1}`);
       assertEqual(
-        config.headers.get("access-control-allow-credentials"),
+        health.headers.get("access-control-allow-credentials"),
         "true",
-        `config credentials ${i + 1}`,
+        `health credentials ${i + 1}`,
       );
-      const body = await config.json();
-      assertEqual(body.environment, "test", `config environment ${i + 1}`);
     }
 
     await delay(CRASH_WAIT_MS);

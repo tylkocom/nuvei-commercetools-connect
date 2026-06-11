@@ -57,7 +57,7 @@ export const config = {
   // Payment Providers config
   returnUrl: process.env.RETURN_URL || "",
   corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || "")
-    .split(",")
+    .split(/[;,]/)
     .map((origin) => origin.trim())
     .filter(Boolean),
   buildCommit: resolveBuildCommit(),

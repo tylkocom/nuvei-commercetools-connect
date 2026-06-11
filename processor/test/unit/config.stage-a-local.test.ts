@@ -16,7 +16,7 @@ const BASE_ENV = {
 async function loadConfig(env: Record<string, string | undefined>) {
   vi.resetModules();
   for (const key of Object.keys(process.env)) {
-    if (key.startsWith("CTP_") || key.startsWith("NUVEI_") || key === "PHASE_02_STAGE_A_LOCAL_MOCK_CT" || key === "RETURN_URL") {
+    if (key.startsWith("CTP_") || key.startsWith("NUVEI_") || key === "PHASE_02_STAGE_A_LOCAL_MOCK_CT" || key === "RETURN_URL" || key === "CORS_ALLOWED_ORIGINS") {
       delete process.env[key];
     }
   }
@@ -62,5 +62,18 @@ describe("validateConfig Stage A local mock CT exception", () => {
     });
 
     expect(() => validateConfig()).toThrow("CTP_API_URL must use HTTPS");
+  });
+
+  it("parses semicolon-separated CORS origins", async () => {
+    const { config } = await loadConfig({
+      ...BASE_ENV,
+      CORS_ALLOWED_ORIGINS:
+        "http://localhost:3000; https://shelfmarket-dev.public.cloud.oklyt.pl",
+    });
+
+    expect(config.corsAllowedOrigins).toEqual([
+      "http://localhost:3000",
+      "https://shelfmarket-dev.public.cloud.oklyt.pl",
+    ]);
   });
 });
