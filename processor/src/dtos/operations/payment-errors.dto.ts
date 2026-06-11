@@ -5,6 +5,7 @@ export const PublicPaymentErrorCode = {
   METHOD_UNSUPPORTED: "METHOD_UNSUPPORTED",
   REQUEST_MALFORMED: "REQUEST_MALFORMED",
   AUTH_SESSION_INVALID: "AUTH_SESSION_INVALID",
+  CART_NOT_LOCKABLE: "CART_NOT_LOCKABLE",
 } as const;
 
 export type PublicPaymentErrorCode =
@@ -22,6 +23,7 @@ const PUBLIC_MESSAGES: Record<PublicPaymentErrorCode, string> = {
   [PublicPaymentErrorCode.METHOD_UNSUPPORTED]: "Payment method is not supported.",
   [PublicPaymentErrorCode.REQUEST_MALFORMED]: "Payment setup request is malformed.",
   [PublicPaymentErrorCode.AUTH_SESSION_INVALID]: "Payment session is invalid.",
+  [PublicPaymentErrorCode.CART_NOT_LOCKABLE]: "Cart cannot be locked for payment.",
 };
 
 export class PaymentSetupError extends Error {

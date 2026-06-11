@@ -40,17 +40,34 @@ import {
   NuveiEventConverter,
   type NuveiDmnUpdateData,
 } from "./converters/nuvei-event.converter.js";
-import type { Cart, Payment } from "@commercetools/platform-sdk";
+import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
   PublicPaymentErrorCode,
 } from "../dtos/operations/payment-errors.dto.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
 
+/**
+ * Minimal structural slice of the platform SDK ByProjectKeyRequestBuilder used
+ * for cart freeze/unfreeze. Structurally satisfied by paymentSDK.ctAPI.client
+ * and trivially mockable in tests.
+ */
+export type CommercetoolsCartClient = {
+  carts: () => {
+    withId: (arg: { ID: string }) => {
+      get: () => { execute: () => Promise<{ body: Cart }> };
+      post: (arg: { body: { version: number; actions: CartUpdateAction[] } }) => {
+        execute: () => Promise<{ body: Cart }>;
+      };
+    };
+  };
+};
+
 export type NuveiPaymentServiceOptions = {
   ctCartService: CommercetoolsCartService;
   ctPaymentService: CommercetoolsPaymentService;
   ctOrderService: CommercetoolsOrderService;
+  ctCartClient: CommercetoolsCartClient;
 };
 
 export class DmnChecksumInvalidError extends Error {
@@ -158,6 +175,7 @@ function classifyNuveiStatus(
 export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private nuveiEventConverter: NuveiEventConverter;
+  private ctCartClient: CommercetoolsCartClient;
 
   constructor(opts: NuveiPaymentServiceOptions) {
     super(opts.ctCartService, opts.ctPaymentService, opts.ctOrderService);
@@ -166,6 +184,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ctPaymentService: opts.ctPaymentService,
     });
     this.nuveiEventConverter = new NuveiEventConverter();
+    this.ctCartClient = opts.ctCartClient;
   }
 
   private formatAmount(amount: {
@@ -895,6 +914,88 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * Lock the cart before any payment processing by freezing it (HardFreeze:
+   * prices, discounts, and shipping are pinned; the cart total cannot change
+   * between openOrder and reconciliation). Frozen carts still accept
+   * addPayment and can be ordered.
+   *
+   * Idempotent: an already-frozen cart (retry, second payment attempt, or a
+   * freeze applied by Checkout) is accepted as-is. Non-active carts
+   * (Ordered/Merged) are rejected.
+   */
+  private async lockCartForPayment(cart: Cart): Promise<{ cart: Cart; frozenByUs: boolean }> {
+    if (cart.cartState === "Frozen") {
+      log.info("Cart already frozen; continuing with existing lock.", { cartId: cart.id });
+      return { cart, frozenByUs: false };
+    }
+    if (cart.cartState !== "Active") {
+      throw new PaymentSetupError(
+        PublicPaymentErrorCode.CART_NOT_LOCKABLE,
+        { cartId: cart.id, cartState: cart.cartState },
+        409,
+      );
+    }
+
+    const freeze = (version: number) =>
+      this.ctCartClient
+        .carts()
+        .withId({ ID: cart.id })
+        .post({ body: { version, actions: [{ action: "freezeCart", strategy: "HardFreeze" }] } })
+        .execute();
+
+    try {
+      const response = await freeze(cart.version);
+      log.info("Cart frozen for payment.", { cartId: cart.id });
+      return { cart: response.body, frozenByUs: true };
+    } catch (initialError) {
+      // One retry on version conflict: refetch; if a concurrent actor froze the
+      // cart we accept it, otherwise retry the freeze with the fresh version.
+      const latest = await this.ctCartService.getCart({ id: cart.id });
+      if (latest.cartState === "Frozen") {
+        log.info("Cart frozen concurrently; continuing with existing lock.", { cartId: cart.id });
+        return { cart: latest, frozenByUs: false };
+      }
+      if (latest.cartState !== "Active") {
+        throw new PaymentSetupError(
+          PublicPaymentErrorCode.CART_NOT_LOCKABLE,
+          { cartId: cart.id, cartState: latest.cartState },
+          409,
+        );
+      }
+      log.warn("Cart freeze failed; retrying once with fresh version.", {
+        cartId: cart.id,
+        error: initialError instanceof Error ? initialError.message : String(initialError),
+      });
+      const response = await freeze(latest.version);
+      log.info("Cart frozen for payment.", { cartId: cart.id });
+      return { cart: response.body, frozenByUs: true };
+    }
+  }
+
+  /**
+   * Best-effort unfreeze for failure paths where THIS request froze the cart
+   * but payment session setup did not complete — without this the shopper
+   * would be stuck with an immutable cart and no payment in flight.
+   */
+  private async unfreezeCartBestEffort(cartId: string): Promise<void> {
+    try {
+      const latest = await this.ctCartClient.carts().withId({ ID: cartId }).get().execute();
+      if (latest.body.cartState !== "Frozen") return;
+      await this.ctCartClient
+        .carts()
+        .withId({ ID: cartId })
+        .post({ body: { version: latest.body.version, actions: [{ action: "unfreezeCart" }] } })
+        .execute();
+      log.info("Cart unfrozen after payment session failure.", { cartId });
+    } catch (error) {
+      log.warn("Failed to unfreeze cart after payment session failure; manual unfreeze may be required.", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * Handle the payment transaction request
    *
    * @remarks
@@ -906,8 +1007,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async handleTransaction(
     transactionDraft: TransactionDraftDTO,
   ): Promise<TransactionResponseDTO> {
+    let frozenByUs = false;
     try {
-      const cart = await this.ctCartService.getCart({ id: transactionDraft.cartId });
+      const fetchedCart = await this.ctCartService.getCart({ id: transactionDraft.cartId });
+
+      // Lock the cart before any payment processing.
+      const lock = await this.lockCartForPayment(fetchedCart);
+      const cart = lock.cart;
+      frozenByUs = lock.frozenByUs;
 
       const amountPlanned =
         transactionDraft.amount ?? (await this.ctCartService.getPaymentAmount({ cart }));
@@ -948,6 +1055,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
         },
       };
     } catch (error) {
+      if (frozenByUs) {
+        await this.unfreezeCartBestEffort(transactionDraft.cartId);
+      }
       log.error("Error handling transaction", {
         error: error instanceof Error ? error.message : String(error),
         cartId: transactionDraft.cartId,
@@ -984,10 +1094,20 @@ export class NuveiPaymentService extends AbstractPaymentService {
     amount: string;
     currency: string;
   }> {
+    let frozenByUs = false;
+    let lockedCartId: string | undefined;
     try {
       const paymentMethod = this.validatePaymentMethodOptions(options);
       const cartId = getCartIdFromContext();
-      const cart = await this.ctCartService.getCart({ id: cartId });
+      const fetchedCart = await this.ctCartService.getCart({ id: cartId });
+
+      // Lock the cart before any payment processing: the amount sent to Nuvei
+      // is computed from the frozen cart and can no longer drift.
+      const lock = await this.lockCartForPayment(fetchedCart);
+      const cart = lock.cart;
+      frozenByUs = lock.frozenByUs;
+      lockedCartId = cart.id;
+
       const amountPlanned = await this.ctCartService.getPaymentAmount({ cart });
       const formattedAmount = this.formatAmount(amountPlanned);
 
@@ -1033,6 +1153,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
         currency: amountPlanned.currencyCode,
       };
     } catch (error) {
+      if (frozenByUs && lockedCartId) {
+        await this.unfreezeCartBestEffort(lockedCartId);
+      }
       if (error instanceof PaymentSetupError) {
         log.warn("Payment setup validation failed.", {
           route: "POST /payments/session",
