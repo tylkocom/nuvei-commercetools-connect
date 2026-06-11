@@ -165,6 +165,24 @@ async function main() {
       );
     }
 
+    // Disallowed origins must receive no CORS grant at all.
+    const disallowed = await fetchWithTimeout(`${baseUrl}/operations/health`, {
+      headers: {
+        origin: "https://not-allowlisted.example.com",
+      },
+    });
+    assertEqual(disallowed.status, 200, "disallowed origin status");
+    assertEqual(
+      disallowed.headers.get("access-control-allow-origin"),
+      null,
+      "disallowed origin must not be granted",
+    );
+    assertEqual(
+      disallowed.headers.get("access-control-allow-credentials"),
+      null,
+      "disallowed origin must not get credentials",
+    );
+
     await delay(CRASH_WAIT_MS);
     assertChildAlive(child, getLogs);
     assertNoBadLogs(logs);

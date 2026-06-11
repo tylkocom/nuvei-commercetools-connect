@@ -93,7 +93,11 @@ async function testCorsPreflight() {
   }
   const allowOrigin = res.headers.get("access-control-allow-origin");
   if (!allowOrigin) {
-    fail("TEST-2", "Missing Access-Control-Allow-Origin header");
+    fail(
+      "TEST-2",
+      `Missing Access-Control-Allow-Origin header. The processor only grants CORS to ` +
+        `allowlisted origins - start it with CORS_ALLOWED_ORIGINS=${TEST_ORIGIN}`,
+    );
     return false;
   }
   ok("TEST-2", `CORS allowed origin: ${allowOrigin}`);
@@ -214,18 +218,17 @@ async function testProcessorDmnWebhook(paymentReference) {
   return false;
 }
 
-async function testDebugDump() {
-  log("TEST-8", "GET /debug/dump");
-  const { status, body } = await request(`${PROCESSOR_URL}/debug/dump`);
-  if (status === 404) {
-    warn("TEST-8", "Debug dump not available (plugin not loaded in this environment)");
-    return true;
-  }
-  if (status !== 200) {
-    fail("TEST-8", `Expected 200, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+async function testDebugDumpRemoved() {
+  log("TEST-8", "GET /debug/dump (must not exist)");
+  const { status } = await request(`${PROCESSOR_URL}/debug/dump`);
+  if (status === 200) {
+    fail(
+      "TEST-8",
+      "Debug dump endpoint is exposed. It leaks session tokens and headers and was removed - this is a security regression.",
+    );
     return false;
   }
-  ok("TEST-8", "Debug dump available");
+  ok("TEST-8", `Debug dump endpoint not exposed (${status})`);
   return true;
 }
 
@@ -272,8 +275,8 @@ async function main() {
     failed += 2;
   }
 
-  // Debug utilities
-  await run(testDebugDump);
+  // Security regressions
+  await run(testDebugDumpRemoved);
 
   console.log("\n" + "=".repeat(60));
   console.log(`Results: ${passed} passed, ${failed} failed`);
