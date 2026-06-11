@@ -277,7 +277,6 @@ describe("confirmPaymentResult", () => {
     const onPending = vi.fn();
 
     await confirmPaymentResult(
-      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
@@ -302,7 +301,6 @@ describe("confirmPaymentResult", () => {
     const onPending = vi.fn();
 
     await confirmPaymentResult(
-      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
@@ -334,7 +332,6 @@ describe("confirmPaymentResult", () => {
     const onPending = vi.fn();
 
     await confirmPaymentResult(
-      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
@@ -372,7 +369,6 @@ describe("confirmPaymentResult", () => {
     const onPending = vi.fn();
 
     await confirmPaymentResult(
-      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
@@ -406,7 +402,6 @@ describe("confirmPaymentResult", () => {
     };
 
     await confirmPaymentResult(
-      makeResult("APPROVED"),
       "ref-123",
       "known-session-token",
       mockApi,
