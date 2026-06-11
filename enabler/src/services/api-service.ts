@@ -57,7 +57,6 @@ export type ConfirmPaymentRequest = {
   paymentReference: string;
 };
 
-const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const;
 
 export type ConfirmPaymentPollingOptions = {
   retryDelaysMs?: readonly number[];
@@ -69,14 +68,21 @@ function waitForNextConfirmAttempt(delayMs: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
 }
 
+const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const;
+
 /**
  * Confirms a payment via the processor and routes to the appropriate merchant
  * callback based on the authoritative processor outcome.
  *
- * The processor response is the single source of truth. Pending outcomes are
- * observed via `onPending` and polled to a bounded terminal result. Business
- * rejections are reported through `onComplete({ isSuccess: false })` for
- * Checkout-template compatibility; `onError` is reserved for technical failures.
+ * Terminal outcomes (approved, rejected) always go through `onComplete`.
+ * `onError` is reserved for technical failures (network, malformed response).
+ *
+ * Pending resolution:
+ *   - If `onPending` is provided, fires it once and stops — the merchant owns
+ *     the follow-up UX.
+ *   - If `onPending` is not provided, retries up to the configured delays
+ *     (default: 2 attempts over ~3s), then resolves through `onComplete`
+ *     so the merchant always gets a definitive callback through one channel.
  */
 export async function confirmPaymentResult(
   paymentReference: string,
@@ -114,17 +120,27 @@ export async function confirmPaymentResult(
         });
         return;
 
-      case "pending":
-        onPending?.({ paymentReference });
+      case "pending": {
+        // Merchant provided onPending → hand off responsibility immediately.
+        if (onPending) {
+          onPending({ paymentReference });
+          return;
+        }
+        // No onPending → bounded retry, then resolve through onComplete.
         const retryDelayMs = retryDelaysMs[attempt];
         if (retryDelayMs !== undefined) {
           await wait(retryDelayMs);
           continue;
         }
-        onError?.(new Error("Payment confirmation is still pending. Please wait for final payment status."), {
+        // Retries exhausted — report as unsuccessful so the merchant always
+        // receives a terminal callback through onComplete, never through
+        // onError for a business outcome.
+        onComplete?.({
+          isSuccess: false,
           paymentReference,
         });
         return;
+      }
     }
   }
 }

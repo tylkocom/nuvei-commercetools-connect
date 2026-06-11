@@ -318,15 +318,8 @@ describe("confirmPaymentResult", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("polls pending confirmation until approved and notifies onPending for pending observations", async () => {
-    const mockApi = {
-      getConfig: vi.fn(),
-      createPayment: vi.fn(),
-      confirmPayment: vi
-        .fn()
-        .mockResolvedValueOnce({ outcome: "pending" })
-        .mockResolvedValueOnce({ outcome: "approved" }),
-    };
+  it("hands off to onPending immediately and does not retry when onPending is provided", async () => {
+    const mockApi = makeApi("pending");
     const onComplete = vi.fn();
     const onError = vi.fn();
     const onPending = vi.fn();
@@ -341,19 +334,64 @@ describe("confirmPaymentResult", () => {
       { retryDelaysMs: [0] },
     );
 
-    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(2);
-    expect(mockApi.confirmPayment).toHaveBeenNthCalledWith(1, {
-      sessionToken: "known-session-token",
-      paymentReference: "ref-123",
-    });
-    expect(mockApi.confirmPayment).toHaveBeenNthCalledWith(2, {
-      sessionToken: "known-session-token",
-      paymentReference: "ref-123",
-    });
+    // onPending present → immediate hand-off, no retry.
+    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(1);
     expect(onPending).toHaveBeenCalledOnce();
-    expect(onPending).toHaveBeenCalledWith({
+    expect(onPending).toHaveBeenCalledWith({ paymentReference: "ref-123" });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("retries pending without onPending and resolves through onComplete on exhaustion", async () => {
+    const mockApi = makeApi("pending");
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    // No onPending — triggers bounded retry with default delays.
+
+    await confirmPaymentResult(
+      "ref-123",
+      "known-session-token",
+      mockApi,
+      onComplete,
+      onError,
+      undefined,
+      { retryDelaysMs: [0, 0, 0, 0, 0] },
+    );
+
+    // 1 initial + 5 retries = 6 calls total.
+    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(6);
+    // Exhausted pending resolves through onComplete, NOT onError.
+    expect(onComplete).toHaveBeenCalledOnce();
+    expect(onComplete).toHaveBeenCalledWith({
+      isSuccess: false,
       paymentReference: "ref-123",
     });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("retries pending without onPending and resolves when processor eventually approves", async () => {
+    const mockApi = {
+      getConfig: vi.fn(),
+      createPayment: vi.fn(),
+      confirmPayment: vi
+        .fn()
+        .mockResolvedValueOnce({ outcome: "pending" })
+        .mockResolvedValueOnce({ outcome: "approved" }),
+    };
+    const onComplete = vi.fn();
+    const onError = vi.fn();
+    // No onPending — triggers retry.
+
+    await confirmPaymentResult(
+      "ref-123",
+      "known-session-token",
+      mockApi,
+      onComplete,
+      onError,
+      undefined,
+      { retryDelaysMs: [0] },
+    );
+
+    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(2);
     expect(onComplete).toHaveBeenCalledOnce();
     expect(onComplete).toHaveBeenCalledWith({
       isSuccess: true,
@@ -362,34 +400,6 @@ describe("confirmPaymentResult", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("exhausts persistent pending confirmation and reports a safe technical error", async () => {
-    const mockApi = makeApi("pending");
-    const onComplete = vi.fn();
-    const onError = vi.fn();
-    const onPending = vi.fn();
-
-    await confirmPaymentResult(
-      "ref-123",
-      "known-session-token",
-      mockApi,
-      onComplete,
-      onError,
-      onPending,
-      { retryDelaysMs: [0, 0] },
-    );
-
-    expect(mockApi.confirmPayment).toHaveBeenCalledTimes(3);
-    expect(onPending).toHaveBeenCalledTimes(3);
-    expect(onPending).toHaveBeenCalledWith({
-      paymentReference: "ref-123",
-    });
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledOnce();
-    const error = onError.mock.calls[0][0] as Error;
-    expect(error.message).toContain("still pending");
-    expect(error.message).not.toContain("known-session-token");
-    expect(onError.mock.calls[0][1]).toEqual({ paymentReference: "ref-123" });
-  });
 
   it("does not leak session token when processor call throws (D-21 safe error path)", async () => {
     const onComplete = vi.fn();
