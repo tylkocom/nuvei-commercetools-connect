@@ -28,6 +28,25 @@ export const setupFastify = async () => {
     bodyLimit: 100 * 1024,
   });
 
+  // Handle OPTIONS requests for all routes with permissive CORS headers
+  server.options("*", async (request, reply) => {
+    reply
+      .code(204)
+      .header("Access-Control-Allow-Origin", "*")
+      .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+      .header("Access-Control-Allow-Headers", "*")
+      .header("Access-Control-Allow-Credentials", "true")
+      .send();
+  });
+
+  // Add CORS headers to all responses via onSend hook
+  server.addHook("onSend", async (request, reply, payload) => {
+    reply.header("Access-Control-Allow-Origin", "*");
+    reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", "*");
+    return payload;
+  });
+
   // Log every incoming request with body and headers for evidence capture
   server.addHook("onRequest", async (request) => {
     server.log.info(

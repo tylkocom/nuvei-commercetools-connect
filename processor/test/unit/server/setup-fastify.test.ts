@@ -141,7 +141,8 @@ describe("setupFastify", () => {
       },
     });
 
-    // OPTIONS returns 404 because no route handles OPTIONS, but it's not blocked by CORS
-    expect(response.statusCode).toBe(404);
+    // OPTIONS returns 204 with permissive CORS headers
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("*");
   });
 });
