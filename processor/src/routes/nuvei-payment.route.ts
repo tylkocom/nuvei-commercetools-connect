@@ -1,4 +1,3 @@
-import { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
 import { Type } from "@sinclair/typebox";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
@@ -12,22 +11,15 @@ import {
   PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
 import { DmnChecksumInvalidError, NuveiPaymentService } from "../services/nuvei-payment.service.js";
-import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
-import {
-  PaymentSetupError,
-  PublicPaymentErrorSchema,
-  type PublicPaymentErrorSchemaDTO,
-} from "../dtos/operations/payment-errors.dto.js";
+import { PaymentSetupError } from "../dtos/operations/payment-errors.dto.js";
 import { log } from "../libs/logger/index.js";
 
 type PaymentRoutesOptions = {
   paymentService: NuveiPaymentService;
-  sessionHeaderAuthHook: SessionHeaderAuthenticationHook;
 };
 
 type WebhookRoutesOptions = {
   paymentService: NuveiPaymentService;
-  nuveiHeaderAuthHook: NuveiHeaderAuthHook;
 };
 
 /**
@@ -43,17 +35,14 @@ export const paymentRoutes = async (
   // POST /session - Create a payment session with payment method options support
   fastify.post<{
     Body: PaymentMethodOptionsSchemaDTO;
-    Reply: PaymentResponseSchemaDTO | PublicPaymentErrorSchemaDTO;
+    Reply: PaymentResponseSchemaDTO | { code: string; message: string };
   }>(
     "/session",
     {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         body: PaymentMethodOptionsSchema,
         response: {
           200: PaymentResponseSchema,
-          400: PublicPaymentErrorSchema,
-          422: PublicPaymentErrorSchema,
         },
       },
     },
@@ -83,7 +72,6 @@ export const paymentRoutes = async (
   }>(
     "/confirm/:id",
     {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         params: {
           $id: "confirmParamsSchema",
@@ -121,7 +109,6 @@ export const nuveiWebhookRoutes = async (
   fastify.post(
     "/nuvei",
     {
-      preHandler: [opts.nuveiHeaderAuthHook.authenticate()],
       config: { rawBody: true },
     },
     async (request, reply) => {

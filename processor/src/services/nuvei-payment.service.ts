@@ -1323,8 +1323,17 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async processNuveiDmn(body: Record<string, unknown>): Promise<void> {
     const config = getConfig();
 
+    log.info("Processing Nuvei DMN.", {
+      body,
+      merchantId: String(body.merchant_id ?? body.merchantId ?? ""),
+      transactionType: String(body.transactionType ?? ""),
+      pppStatus: String(body.ppp_status ?? ""),
+      pppTransactionId: String(body.PPP_TransactionID ?? body.PPP_TransactionId ?? body.ppp_TransactionID ?? ""),
+    });
+
     const isValid = nuveiClient().validateDmnChecksum(body, config.nuveiDmnChecksumAlgorithm);
     if (!isValid) {
+      log.warn("DMN checksum validation failed.", { body });
       throw new DmnChecksumInvalidError();
     }
 
@@ -1334,7 +1343,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const paymentId = ctPayment.id;
     const bodyForConversion = { ...body, merchant_unique_id: paymentId };
 
-    log.info("Processing Nuvei DMN.", {
+    log.info("Resolved DMN to CT Payment.", {
       paymentId,
       transactionType: String(body.transactionType),
       pppStatus: String(body.ppp_status),

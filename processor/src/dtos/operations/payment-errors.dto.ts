@@ -11,7 +11,7 @@ export type PublicPaymentErrorCode =
   (typeof PublicPaymentErrorCode)[keyof typeof PublicPaymentErrorCode];
 
 export const PublicPaymentErrorSchema = Type.Object({
-  code: Type.Enum(PublicPaymentErrorCode),
+  code: Type.String(),
   message: Type.String(),
 });
 

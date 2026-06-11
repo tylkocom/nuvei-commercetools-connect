@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { log } from "../libs/logger/index.js";
 
 export interface NuveiClientConfig {
   baseUrl: string;
@@ -296,6 +297,8 @@ export class NuveiClient {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
+    log.info("Nuvei API request", { endpoint, payload: this.redactPayload(payload) });
+
     try {
       const response = await fetch(`${this.baseUrl}/${endpoint}.do`, {
         method: "POST",
@@ -305,6 +308,8 @@ export class NuveiClient {
       });
 
       const responseBody = (await response.json()) as { errCode?: number | string };
+
+      log.info("Nuvei API response", { endpoint, status: response.status, body: responseBody });
 
       if (
         !response.ok ||
@@ -375,6 +380,17 @@ export class NuveiClient {
 
   private calculateChecksum(checkString: string): string {
     return crypto.createHash("sha256").update(checkString).digest("hex");
+  }
+
+  private redactPayload(payload: NuveiRequestPayload): NuveiRequestPayload {
+    const redacted = { ...payload };
+    if (redacted.checksum) {
+      redacted.checksum = "[REDACTED]";
+    }
+    if (redacted.secretKey) {
+      redacted.secretKey = "[REDACTED]";
+    }
+    return redacted;
   }
 
   private timingSafeHexEqual(expected: string, received: string): boolean {
