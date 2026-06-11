@@ -128,14 +128,13 @@ Expected result:
 
 ## Scenario 2: Processor Configuration Endpoint
 
-Purpose: Confirm Checkout/session-authenticated clients can fetch frontend Nuvei configuration.
+Purpose: Confirm any Checkout-facing client can fetch frontend Nuvei configuration before a session exists.
 
 Steps:
 
-1. Create or obtain a valid commercetools Checkout session.
-2. Send `GET {PROCESSOR_URL}/config` with the required session authentication headers.
-3. Inspect the response body.
-4. Confirm no secret fields are returned.
+1. Send `GET {PROCESSOR_URL}/config` with no authentication headers (the endpoint is public by design; Checkout calls it before creating a session).
+2. Inspect the response body.
+3. Confirm no secret fields are returned.
 
 Expected result:
 

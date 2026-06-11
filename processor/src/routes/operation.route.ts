@@ -36,10 +36,13 @@ export const operationsRoute = async (
   fastify: FastifyInstance,
   opts: FastifyPluginOptions & OperationRouteOptions,
 ) => {
+  // Public by design: Checkout fetches connector config BEFORE a session
+  // exists, so this route must not require session auth. The response schema
+  // is limited to shopper-safe values (environment, merchantId, merchantSiteId)
+  // that the browser widget embeds anyway — never add secrets here.
   fastify.get<{ Reply: ConfigResponseSchemaDTO }>(
     "/config",
     {
-      preHandler: [opts.sessionHeaderAuthHook.authenticate()],
       schema: {
         response: {
           200: ConfigResponseSchema,

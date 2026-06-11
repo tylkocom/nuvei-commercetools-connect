@@ -200,6 +200,8 @@ describe("operation routes", () => {
     const configRoute = app.routes.find((r) => r.url === "/config");
     expect(configRoute).toBeDefined();
     expect(configRoute!.method).toBe("GET");
+    // Public by design: Checkout calls /operations/config before a session exists.
+    expect(configRoute!.opts).not.toHaveProperty("preHandler");
 
     const reply = makeReply();
     await configRoute!.handler({}, reply);
