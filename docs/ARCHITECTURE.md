@@ -29,7 +29,7 @@ graph TD
 
 1. A storefront or commercetools Checkout page instantiates the Checkout-facing `Enabler` adapter from `enabler/src/index.ts` with the processor URL, commercetools session ID, locale/country when available, and completion/error callbacks. Nuvei merchant identifiers and environment are fetched from the processor, not supplied by the shopper page.
 2. The caller asks the enabler for a card component builder (`card`). The adapter returns the Web SDK card builder path by default because it is host-submit compatible (`componentHasSubmit = true`).
-3. `apiService.getConfig()` sends `GET /operations/config` with `X-Session-ID`; the processor returns Nuvei frontend configuration from secured Connect configuration.
+3. `apiService.getConfig()` sends `GET /operations/config` (the `X-Session-ID` header is sent but not required — Checkout fetches connector config before a session exists); the processor returns only shopper-safe Nuvei frontend configuration (environment, merchant ID, merchant site ID).
 4. `WebSdkCardComponent` loads the Nuvei SafeCharge Web SDK from `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js` and calls the processor through `apiService` in `enabler/src/services/api-service.ts`.
 5. `apiService.createPayment()` sends `POST /payments/session` with `X-Session-ID`. The processor registers this route in `processor/src/server/plugins/nuvei-payment.plugin.ts` and authenticates it with the commercetools session header hook. The request body can include `paymentMethodOptions` and defaults to `card` when omitted.
 6. `NuveiPaymentService.createPaymentSession()` reads the cart ID from request context, fetches the cart through the commercetools Connect Payments SDK, calculates the planned payment amount, calls `NuveiClient.openOrder()`, and creates a commercetools Payment through `CtPaymentCreationService.handleCtPaymentCreation()`.
@@ -88,7 +88,7 @@ graph TD
 
 | Method | Path | Implemented in | Auth model | Purpose |
 | --- | --- | --- | --- | --- |
-| `GET` | `/config` | `processor/src/routes/operation.route.ts` | commercetools session header | Return frontend Nuvei environment, merchant ID, and merchant site ID. |
+| `GET` | `/config` | `processor/src/routes/operation.route.ts` | None (public by design; Checkout calls it before a session exists) | Return frontend Nuvei environment, merchant ID, and merchant site ID — shopper-safe values only. |
 | `GET` | `/status` | `processor/src/routes/operation.route.ts` | JWT | Run commercetools permission and Nuvei reachability checks. |
 | `GET` | `/health` | `processor/src/routes/operation.route.ts` | None | No auth. Returns `{ status: ok|degraded, commit: string, checks: [{name, status}] }` based on config-var presence plus the running commit hash. |
 | `GET` | `/payment-components`, `/operations/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return supported components and express methods. |

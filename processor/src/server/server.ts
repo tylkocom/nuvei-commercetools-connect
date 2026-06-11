@@ -1,8 +1,8 @@
 import autoLoad from "@fastify/autoload";
-import cors, { type FastifyCorsOptions } from "@fastify/cors";
+import cors from "@fastify/cors";
 import fastifyFormBody from "@fastify/formbody";
 import rawBody from "fastify-raw-body";
-import Fastify, { type FastifyRequest } from "fastify";
+import Fastify from "fastify";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,27 +30,24 @@ export const setupFastify = async () => {
 
   // Browser origins must be explicitly allowlisted: the commercetools Checkout
   // origin (from CTP_CHECKOUT_URL) is always allowed; CORS_ALLOWED_ORIGINS adds
-  // storefront origins. Every other origin gets no CORS grant. Server-to-server
-  // requests (Nuvei DMNs, Checkout Payment Intents) carry no Origin and are unaffected.
-  await server.register(cors, () => {
-    const allowedOrigins = new Set(config.corsAllowedOrigins);
-    if (config.checkoutUrl) {
-      try {
-        allowedOrigins.add(new URL(config.checkoutUrl).origin);
-      } catch {
-        // Invalid CTP_CHECKOUT_URL is rejected by validateConfig at boot.
-      }
+  // storefront origins. Non-allowlisted origins still get a preflight answer
+  // (204) but no Access-Control-Allow-Origin grant, so browsers block them —
+  // returning `origin: false` per-request would instead 404 the OPTIONS
+  // preflight, which breaks Checkout error reporting. Server-to-server requests
+  // (Nuvei DMNs, Checkout Payment Intents) carry no Origin and are unaffected.
+  const allowedOrigins = new Set(config.corsAllowedOrigins);
+  if (config.checkoutUrl) {
+    try {
+      allowedOrigins.add(new URL(config.checkoutUrl).origin);
+    } catch {
+      // Invalid CTP_CHECKOUT_URL is rejected by validateConfig at boot.
     }
-    return (request: FastifyRequest, callback: (error: Error | null, options: FastifyCorsOptions) => void) => {
-      const origin = request.headers.origin;
-      const allowed = origin !== undefined && allowedOrigins.has(origin);
-      callback(null, {
-        origin: allowed,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        credentials: allowed,
-        optionsSuccessStatus: 204,
-      });
-    };
+  }
+  await server.register(cors, {
+    origin: [...allowedOrigins],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    optionsSuccessStatus: 204,
   });
 
   // Defensive response headers; the processor serves only JSON APIs.

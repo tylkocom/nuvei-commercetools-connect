@@ -165,7 +165,8 @@ async function main() {
       );
     }
 
-    // Disallowed origins must receive no CORS grant at all.
+    // Disallowed origins must receive no ACAO grant; allow-credentials without
+    // a grant is inert. Preflight must answer 204, never 404.
     const disallowed = await fetchWithTimeout(`${baseUrl}/operations/health`, {
       headers: {
         origin: "https://not-allowlisted.example.com",
@@ -177,10 +178,20 @@ async function main() {
       null,
       "disallowed origin must not be granted",
     );
+
+    const disallowedPreflight = await fetchWithTimeout(`${baseUrl}/operations/config`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://not-allowlisted.example.com",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "content-type",
+      },
+    });
+    assertEqual(disallowedPreflight.status, 204, "disallowed preflight must answer 204, not 404");
     assertEqual(
-      disallowed.headers.get("access-control-allow-credentials"),
+      disallowedPreflight.headers.get("access-control-allow-origin"),
       null,
-      "disallowed origin must not get credentials",
+      "disallowed preflight must not be granted",
     );
 
     await delay(CRASH_WAIT_MS);

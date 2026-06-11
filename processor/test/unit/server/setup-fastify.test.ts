@@ -146,7 +146,7 @@ describe("setupFastify", () => {
     // Access-Control-Allow-Origin is granted, so browsers block the response.
     expect(response.statusCode).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
-    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
+    // allow-credentials may still be emitted; without an ACAO grant it is inert.
   });
 
   it("answers preflight for allowlisted origins with reflected request headers", async () => {
@@ -170,7 +170,7 @@ describe("setupFastify", () => {
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 
-  it("does not authorize preflight for unknown origins", async () => {
+  it("answers preflight for unknown origins without a grant instead of 404", async () => {
     const server = await setupFastify();
 
     server.post("/payments/session", async () => ({ ok: true }));
@@ -185,8 +185,9 @@ describe("setupFastify", () => {
       },
     });
 
+    // A 404 here breaks browser error reporting; the boundary is the missing ACAO grant.
+    expect(response.statusCode).toBe(204);
     expect(response.headers["access-control-allow-origin"]).toBeUndefined();
-    expect(response.headers["access-control-allow-credentials"]).toBeUndefined();
   });
 
   it("always allows the configured commercetools Checkout origin", async () => {
