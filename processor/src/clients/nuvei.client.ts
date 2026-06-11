@@ -14,6 +14,7 @@ export interface OpenOrderParams {
   currency: string;
   userTokenId?: string;
   clientUniqueId: string;
+  urlDetails?: { notificationUrl: string };
 }
 
 export interface OpenOrderResult {
@@ -309,7 +310,11 @@ export class NuveiClient {
 
       const responseBody = (await response.json()) as { errCode?: number | string };
 
-      log.info("Nuvei API response", { endpoint, status: response.status, body: responseBody });
+      log.info("Nuvei API response", {
+        endpoint,
+        status: response.status,
+        body: this.summarizeResponseForLog(responseBody as Record<string, unknown>),
+      });
 
       if (
         !response.ok ||
@@ -384,13 +389,48 @@ export class NuveiClient {
 
   private redactPayload(payload: NuveiRequestPayload): NuveiRequestPayload {
     const redacted = { ...payload };
-    if (redacted.checksum) {
-      redacted.checksum = "[REDACTED]";
-    }
-    if (redacted.secretKey) {
-      redacted.secretKey = "[REDACTED]";
+    for (const field of ["checksum", "secretKey", "sessionToken", "userTokenId"]) {
+      if (redacted[field]) {
+        redacted[field] = "[REDACTED]";
+      }
     }
     return redacted;
+  }
+
+  /**
+   * Whitelist of non-sensitive Nuvei response fields for structured logs.
+   * Responses carry session tokens and shopper data that must never be logged.
+   */
+  private summarizeResponseForLog(body: Record<string, unknown>): Record<string, unknown> {
+    const allowedFields = [
+      "status",
+      "transactionStatus",
+      "errCode",
+      "reason",
+      "transactionId",
+      "internalRequestId",
+      "clientRequestId",
+      "clientUniqueId",
+      "orderId",
+      "gwErrorCode",
+      "gwErrorReason",
+      "gwExtendedErrorCode",
+      "paymentMethodErrorCode",
+      "paymentMethodErrorReason",
+      "authCode",
+      "merchantId",
+      "merchantSiteId",
+      "transactionType",
+      "version",
+    ] as const;
+
+    const summary: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) {
+        summary[field] = body[field];
+      }
+    }
+    return summary;
   }
 
   private timingSafeHexEqual(expected: string, received: string): boolean {

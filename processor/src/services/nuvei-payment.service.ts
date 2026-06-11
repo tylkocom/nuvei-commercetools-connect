@@ -34,7 +34,7 @@ import {
   getCartIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context.js";
-import { nuveiClient } from "../clients/nuvei.client.js";
+import { nuveiClient, type NuveiTransactionResponse } from "../clients/nuvei.client.js";
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
 import {
   NuveiEventConverter,
@@ -638,6 +638,40 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   /**
+   * Nuvei settle/void/refund responses report gateway declines with HTTP 200,
+   * errCode=0 and status=SUCCESS; the business result lives in transactionStatus
+   * (APPROVED / DECLINED / ERROR). Only an explicit APPROVED (or PENDING for
+   * asynchronous refunds) may be treated as a successful modification.
+   */
+  private getNuveiTransactionStatus(response: NuveiTransactionResponse): string {
+    const status = response.transactionStatus;
+    return typeof status === "string" ? status.toUpperCase() : "";
+  }
+
+  private logNuveiModificationResult(
+    operation: string,
+    paymentId: string,
+    response: NuveiTransactionResponse,
+    outcome: PaymentModificationStatus,
+  ): void {
+    const fields = {
+      operation,
+      paymentId,
+      outcome,
+      transactionId: response.transactionId,
+      transactionStatus: this.getNuveiTransactionStatus(response),
+      gwErrorCode: String(response.gwErrorCode ?? ""),
+      gwErrorReason: String(response.gwErrorReason ?? ""),
+    };
+
+    if (outcome === PaymentModificationStatus.REJECTED) {
+      log.warn("Nuvei transaction modification was not approved.", fields);
+    } else {
+      log.info("Nuvei transaction modification completed.", fields);
+    }
+  }
+
+  /**
    * Capture payment in Nuvei (settleTransaction)
    *
    * @remarks
@@ -670,16 +704,16 @@ export class NuveiPaymentService extends AbstractPaymentService {
         relatedTransactionId: interfaceId,
       });
 
-      log.info("Nuvei settleTransaction completed.", {
-        paymentId: request.payment.id,
-        interfaceId,
-        outcome: PaymentModificationStatus.APPROVED,
-      });
+      const outcome =
+        this.getNuveiTransactionStatus(response) === "APPROVED"
+          ? PaymentModificationStatus.APPROVED
+          : PaymentModificationStatus.REJECTED;
+
+      this.logNuveiModificationResult("settleTransaction", request.payment.id, response, outcome);
 
       return {
-        outcome: PaymentModificationStatus.APPROVED,
-        pspReference:
-          ((response as Record<string, unknown>).transactionId as string) || interfaceId,
+        outcome,
+        pspReference: response.transactionId || interfaceId,
       };
     } catch (error) {
       log.error("Error capturing payment in Nuvei", {
@@ -724,16 +758,16 @@ export class NuveiPaymentService extends AbstractPaymentService {
         relatedTransactionId: interfaceId,
       });
 
-      log.info("Nuvei voidTransaction completed.", {
-        paymentId: request.payment.id,
-        interfaceId,
-        outcome: PaymentModificationStatus.APPROVED,
-      });
+      const outcome =
+        this.getNuveiTransactionStatus(response) === "APPROVED"
+          ? PaymentModificationStatus.APPROVED
+          : PaymentModificationStatus.REJECTED;
+
+      this.logNuveiModificationResult("voidTransaction", request.payment.id, response, outcome);
 
       return {
-        outcome: PaymentModificationStatus.APPROVED,
-        pspReference:
-          ((response as Record<string, unknown>).transactionId as string) || interfaceId,
+        outcome,
+        pspReference: response.transactionId || interfaceId,
       };
     } catch (error) {
       log.error("Error canceling payment in Nuvei", {
@@ -782,16 +816,17 @@ export class NuveiPaymentService extends AbstractPaymentService {
         relatedTransactionId: interfaceId,
       });
 
-      log.info("Nuvei refundTransaction completed.", {
-        paymentId: request.payment.id,
-        interfaceId,
-        outcome: PaymentModificationStatus.RECEIVED,
-      });
+      const transactionStatus = this.getNuveiTransactionStatus(response);
+      const outcome =
+        transactionStatus === "APPROVED" || transactionStatus === "PENDING"
+          ? PaymentModificationStatus.RECEIVED
+          : PaymentModificationStatus.REJECTED;
+
+      this.logNuveiModificationResult("refundTransaction", request.payment.id, response, outcome);
 
       return {
-        outcome: PaymentModificationStatus.RECEIVED,
-        pspReference:
-          ((response as Record<string, unknown>).transactionId as string) || interfaceId,
+        outcome,
+        pspReference: response.transactionId || interfaceId,
       };
     } catch (error) {
       log.error("Error refunding payment in Nuvei", {
@@ -885,10 +920,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
         currency: amountPlanned.currencyCode,
       });
 
+      const notificationUrl = this.getDmnNotificationUrl();
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
+        ...(notificationUrl && { urlDetails: { notificationUrl } }),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -961,10 +998,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
         paymentMethod,
       });
 
+      const notificationUrl = this.getDmnNotificationUrl();
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
+        ...(notificationUrl && { urlDetails: { notificationUrl } }),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -1111,6 +1150,38 @@ export class NuveiPaymentService extends AbstractPaymentService {
       }
     }
     return undefined;
+  }
+
+  /**
+   * DMN delivery target for this deployment. Passing urlDetails.notificationUrl
+   * on openOrder removes the dependency on manual per-site DMN configuration in
+   * the Nuvei control panel.
+   */
+  private getDmnNotificationUrl(): string | undefined {
+    const serviceUrl = getConfig().serviceUrl;
+    if (!serviceUrl) return undefined;
+    return `${serviceUrl.replace(/\/+$/, "")}/webhooks/nuvei`;
+  }
+
+  /**
+   * Whitelisted, non-sensitive DMN correlation fields safe for structured logs.
+   * Never log the raw DMN body: it carries checksums, shopper PII, and card metadata.
+   */
+  private getDmnLogFields(body: Record<string, unknown>): Record<string, string> {
+    return {
+      merchantId: String(body.merchant_id ?? body.merchantId ?? ""),
+      transactionType: String(body.transactionType ?? ""),
+      pppStatus: String(body.ppp_status ?? ""),
+      status: String(body.Status ?? body.status ?? ""),
+      pppTransactionId: String(
+        body.PPP_TransactionID ?? body.PPP_TransactionId ?? body.ppp_TransactionID ?? "",
+      ),
+      transactionId: String(body.TransactionID ?? body.transactionId ?? ""),
+      merchantUniqueId: String(body.merchant_unique_id ?? ""),
+      clientUniqueId: String(body.clientUniqueId ?? ""),
+      totalAmount: String(body.totalAmount ?? ""),
+      currency: String(body.currency ?? ""),
+    };
   }
 
   private isResourceNotFoundError(error: unknown): boolean {
@@ -1323,17 +1394,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async processNuveiDmn(body: Record<string, unknown>): Promise<void> {
     const config = getConfig();
 
-    log.info("Processing Nuvei DMN.", {
-      body,
-      merchantId: String(body.merchant_id ?? body.merchantId ?? ""),
-      transactionType: String(body.transactionType ?? ""),
-      pppStatus: String(body.ppp_status ?? ""),
-      pppTransactionId: String(body.PPP_TransactionID ?? body.PPP_TransactionId ?? body.ppp_TransactionID ?? ""),
-    });
+    log.info("Processing Nuvei DMN.", this.getDmnLogFields(body));
 
     const isValid = nuveiClient().validateDmnChecksum(body, config.nuveiDmnChecksumAlgorithm);
     if (!isValid) {
-      log.warn("DMN checksum validation failed.", { body });
+      log.warn("DMN checksum validation failed.", this.getDmnLogFields(body));
       throw new DmnChecksumInvalidError();
     }
 
