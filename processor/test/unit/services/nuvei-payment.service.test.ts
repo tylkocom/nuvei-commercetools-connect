@@ -176,7 +176,37 @@ function makeMockPayment(overrides: Record<string, unknown> = {}): Payment {
   } as unknown as Payment;
 }
 
-function createService() {
+function makeCtCartClientMock(cartAfterFreeze: Record<string, unknown> = {}) {
+  let currentId = "cart-123";
+  const post = vi.fn().mockImplementation(({ body }: { body: { actions: { action: string }[] } }) => ({
+    execute: vi.fn().mockResolvedValue({
+      body: {
+        id: currentId,
+        version: 2,
+        cartState: body.actions[0]?.action === "unfreezeCart" ? "Active" : "Frozen",
+        totalPrice: { centAmount: 1000, currencyCode: "USD" },
+        paymentInfo: { payments: [{ typeId: "payment", id: "payment-1" }] },
+        ...cartAfterFreeze,
+      },
+    }),
+  }));
+  const get = vi.fn().mockImplementation(() => ({
+    execute: vi.fn().mockResolvedValue({
+      body: { id: currentId, version: 2, cartState: "Frozen" },
+    }),
+  }));
+  const client = {
+    carts: () => ({
+      withId: ({ ID }: { ID: string }) => {
+        currentId = ID;
+        return { post, get };
+      },
+    }),
+  };
+  return { client, post, get };
+}
+
+function createService(ctCartClient?: ReturnType<typeof makeCtCartClientMock>) {
   const ctCartService = { getCart: mockGetCart, getPaymentAmount: mockGetPaymentAmount };
   const ctPaymentService = {
     getPayment: mockGetPayment,
@@ -187,6 +217,8 @@ function createService() {
 
   mockGetCart.mockResolvedValue({
     id: "cart-123",
+    version: 1,
+    cartState: "Active",
     totalPrice: { centAmount: 1000, currencyCode: "USD" },
     paymentInfo: { payments: [{ typeId: "payment", id: "payment-1" }] },
   });
@@ -194,13 +226,16 @@ function createService() {
   mockGetPayment.mockResolvedValue(makeMockPayment());
   mockUpdatePayment.mockResolvedValue(undefined);
 
+  const cartClient = ctCartClient ?? makeCtCartClientMock();
+
   const service = new NuveiPaymentService({
     ctCartService: ctCartService as unknown as CommercetoolsCartService,
     ctPaymentService: ctPaymentService as unknown as CommercetoolsPaymentService,
     ctOrderService: ctOrderService as unknown as CommercetoolsOrderService,
+    ctCartClient: cartClient.client as never,
   });
 
-  return { service };
+  return { service, cartClient };
 }
 
 // ---------------------------------------------------------------------------
@@ -676,7 +711,7 @@ describe("NuveiPaymentService", () => {
     it("formats zero-decimal currencies without forcing cents", async () => {
       const { service } = createService();
 
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1, cartState: "Active" });
       mockGetPaymentAmount.mockResolvedValue({
         centAmount: 1000,
         currencyCode: "JPY",
@@ -697,7 +732,7 @@ describe("NuveiPaymentService", () => {
     it("passes paymentMethod 'card' when paymentMethodOptions contains card", async () => {
       const { service } = createService();
 
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1, cartState: "Active" });
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-card" });
 
@@ -723,7 +758,7 @@ describe("NuveiPaymentService", () => {
     it("passes paymentMethod 'card' when no options are provided", async () => {
       const { service } = createService();
 
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1, cartState: "Active" });
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-default" });
 
@@ -802,7 +837,7 @@ describe("NuveiPaymentService", () => {
     it("returns cartId, sessionToken, paymentReference, and merchantReturnUrl", async () => {
       const { service } = createService();
 
-      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1 });
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1, cartState: "Active" });
       mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
       mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "session-token-xyz" });
 
@@ -816,6 +851,112 @@ describe("NuveiPaymentService", () => {
         amount: "10.00",
         currency: "USD",
       });
+    });
+
+    it("freezes the cart with HardFreeze before opening the Nuvei order", async () => {
+      const { service, cartClient } = createService();
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-lock" });
+      mockHandleCtPaymentCreation.mockResolvedValue("payment-1");
+
+      let frozenBeforeOpenOrder = false;
+      mockNuveiClientInstance.openOrder.mockImplementation(async () => {
+        frozenBeforeOpenOrder = cartClient.post.mock.calls.some(
+          ([arg]) => arg.body.actions[0]?.action === "freezeCart",
+        );
+        return { sessionToken: "st-lock" };
+      });
+
+      await service.createPaymentSession({ paymentMethodOptions: { card: {} } });
+
+      expect(frozenBeforeOpenOrder).toBe(true);
+      expect(cartClient.post).toHaveBeenCalledWith({
+        body: { version: 1, actions: [{ action: "freezeCart", strategy: "HardFreeze" }] },
+      });
+    });
+
+    it("accepts an already-frozen cart without issuing another freeze", async () => {
+      const { service, cartClient } = createService();
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 3,
+        cartState: "Frozen",
+        totalPrice: { centAmount: 1000, currencyCode: "USD" },
+      });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-frozen" });
+      mockHandleCtPaymentCreation.mockResolvedValue("payment-1");
+
+      const result = await service.createPaymentSession({ paymentMethodOptions: { card: {} } });
+
+      expect(result.sessionToken).toBe("st-frozen");
+      expect(cartClient.post).not.toHaveBeenCalled();
+    });
+
+    it("rejects ordered carts with CART_NOT_LOCKABLE before any Nuvei call", async () => {
+      const { service } = createService();
+      mockGetCart.mockResolvedValue({ id: "cart-123", version: 5, cartState: "Ordered" });
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { card: {} } }),
+      ).rejects.toMatchObject({ code: PublicPaymentErrorCode.CART_NOT_LOCKABLE, statusCode: 409 });
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+    });
+
+    it("unfreezes the cart when session setup fails after this request froze it", async () => {
+      const { service, cartClient } = createService();
+      mockNuveiClientInstance.openOrder.mockRejectedValue(new Error("nuvei down"));
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { card: {} } }),
+      ).rejects.toThrow("nuvei down");
+
+      const actions = cartClient.post.mock.calls.map(([arg]) => arg.body.actions[0]?.action);
+      expect(actions).toContain("freezeCart");
+      expect(actions).toContain("unfreezeCart");
+    });
+
+    it("does not unfreeze a cart it did not freeze when setup fails", async () => {
+      const { service, cartClient } = createService();
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 3,
+        cartState: "Frozen",
+        totalPrice: { centAmount: 1000, currencyCode: "USD" },
+      });
+      mockNuveiClientInstance.openOrder.mockRejectedValue(new Error("nuvei down"));
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { card: {} } }),
+      ).rejects.toThrow("nuvei down");
+
+      expect(cartClient.post).not.toHaveBeenCalled();
+    });
+
+    it("accepts a concurrently frozen cart after a freeze conflict", async () => {
+      const { service, cartClient } = createService();
+      cartClient.post.mockImplementationOnce(() => ({
+        execute: vi.fn().mockRejectedValue(new Error("ConcurrentModification")),
+      }));
+      // Refetch sees the cart already frozen by the concurrent actor.
+      mockGetCart
+        .mockResolvedValueOnce({
+          id: "cart-123",
+          version: 1,
+          cartState: "Active",
+          totalPrice: { centAmount: 1000, currencyCode: "USD" },
+        })
+        .mockResolvedValueOnce({
+          id: "cart-123",
+          version: 2,
+          cartState: "Frozen",
+          totalPrice: { centAmount: 1000, currencyCode: "USD" },
+        });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-conflict" });
+      mockHandleCtPaymentCreation.mockResolvedValue("payment-1");
+
+      const result = await service.createPaymentSession({ paymentMethodOptions: { card: {} } });
+
+      expect(result.sessionToken).toBe("st-conflict");
+      expect(cartClient.post).toHaveBeenCalledTimes(1);
     });
   });
 

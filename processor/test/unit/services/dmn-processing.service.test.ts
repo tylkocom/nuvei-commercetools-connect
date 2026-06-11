@@ -155,10 +155,24 @@ function createService() {
   mockFindPaymentsByInterfaceId.mockResolvedValue([makeDmnMockPayment()]);
   mockUpdatePayment.mockResolvedValue(undefined);
 
+  const ctCartClient = {
+    carts: () => ({
+      withId: () => ({
+        get: () => ({ execute: vi.fn().mockResolvedValue({ body: { id: "cart-123", version: 2, cartState: "Frozen" } }) }),
+        post: () => ({
+          execute: vi.fn().mockResolvedValue({
+            body: { id: "cart-123", version: 2, cartState: "Frozen" },
+          }),
+        }),
+      }),
+    }),
+  };
+
   const service = new NuveiPaymentService({
     ctCartService: ctCartService as any,
     ctPaymentService: ctPaymentService as any,
     ctOrderService: ctOrderService as any,
+    ctCartClient: ctCartClient as any,
   });
 
   return { service };

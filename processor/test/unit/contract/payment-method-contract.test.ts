@@ -46,6 +46,7 @@ function makePaymentService(): NuveiPaymentService {
     ctCartService: {} as CommercetoolsCartService,
     ctPaymentService: {} as CommercetoolsPaymentService,
     ctOrderService: {} as CommercetoolsOrderService,
+    ctCartClient: { carts: () => ({ withId: () => ({}) }) } as never,
   });
 }
 
