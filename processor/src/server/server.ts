@@ -28,22 +28,29 @@ export const setupFastify = async () => {
     bodyLimit: 100 * 1024,
   });
 
+  const applyCorsHeaders = (
+    request: { headers: Record<string, string | string[] | undefined> },
+    reply: { header: (key: string, value: string | string[]) => unknown },
+  ) => {
+    const origin = request.headers.origin ?? "*";
+    const requestedHeaders = request.headers["access-control-request-headers"] ?? "*";
+
+    reply.header("Access-Control-Allow-Origin", origin);
+    reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    reply.header("Access-Control-Allow-Headers", requestedHeaders);
+    reply.header("Access-Control-Allow-Credentials", "true");
+    reply.header("Vary", "Origin");
+  };
+
   // Handle OPTIONS requests for all routes with permissive CORS headers
   server.options("*", async (request, reply) => {
-    reply
-      .code(204)
-      .header("Access-Control-Allow-Origin", "*")
-      .header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-      .header("Access-Control-Allow-Headers", "*")
-      .header("Access-Control-Allow-Credentials", "true")
-      .send();
+    applyCorsHeaders(request, reply);
+    return reply.code(204).send();
   });
 
   // Add CORS headers to all responses via onSend hook
   server.addHook("onSend", async (request, reply, payload) => {
-    reply.header("Access-Control-Allow-Origin", "*");
-    reply.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    reply.header("Access-Control-Allow-Headers", "*");
+    applyCorsHeaders(request, reply);
     return payload;
   });
 

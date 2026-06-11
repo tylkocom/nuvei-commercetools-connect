@@ -95,7 +95,7 @@ describe("setupFastify", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a fastify instance without CORS preflight handler", async () => {
+  it("creates a fastify instance with permissive CORS handling", async () => {
     const server = await setupFastify();
 
     // Register a simple route for testing
@@ -124,6 +124,8 @@ describe("setupFastify", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://any-origin.example.com");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
     expect(response.json()).toEqual({ environment: "test" });
   });
 
@@ -138,11 +140,14 @@ describe("setupFastify", () => {
       headers: {
         origin: "https://any-origin.example.com",
         "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-session-id",
       },
     });
 
-    // OPTIONS returns 204 with permissive CORS headers
+    // OPTIONS returns 204 and reflects any origin/header with permissive CORS headers.
     expect(response.statusCode).toBe(204);
-    expect(response.headers["access-control-allow-origin"]).toBe("*");
+    expect(response.headers["access-control-allow-origin"]).toBe("https://any-origin.example.com");
+    expect(response.headers["access-control-allow-headers"]).toBe("content-type,x-session-id");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 });

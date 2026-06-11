@@ -38,7 +38,7 @@ export const operationsRoute = async (
     },
     async (_, reply) => {
       const config = await opts.paymentService.config();
-      reply.code(200).send(config);
+      return reply.code(200).send(config);
     },
   );
 
@@ -53,7 +53,7 @@ export const operationsRoute = async (
     },
     async (_, reply) => {
       const status = await opts.paymentService.status();
-      reply.code(200).send(status);
+      return reply.code(200).send(status);
     },
   );
 
@@ -83,7 +83,7 @@ export const operationsRoute = async (
     },
     async (_, reply) => {
       const result = await opts.paymentService.getSupportedPaymentComponents();
-      reply.code(200).send(result);
+      return reply.code(200).send(result);
     },
   );
 
