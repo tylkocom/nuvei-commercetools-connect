@@ -5,6 +5,7 @@ import {
 } from "@commercetools/connect-payments-sdk";
 import { PaymentTransactions } from "../dtos/operations/payment-intents.dto.js";
 import { getConfig } from "../config/config.js";
+import { getPaymentInterfaceFromContext } from "../libs/fastify/context/context.js";
 import { log } from "../libs/logger/index.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
 import {
@@ -42,11 +43,18 @@ export class CtPaymentCreationService {
     paymentMethod?: string;
   }): Promise<string> {
     const paymentMethod = opts.paymentMethod ?? "nuvei";
+    // commercetools Checkout binds a Payment to its checkout transaction by
+    // matching paymentMethodInfo.paymentInterface against the per-attempt
+    // payment interface it passes through the session metadata. Falling back
+    // to the static connector identifier keeps non-Checkout flows working,
+    // but Checkout sessions MUST use the session-provided value or Checkout
+    // never recognizes the payment and cannot create the Order.
+    const paymentInterface = getPaymentInterfaceFromContext() ?? NUVEI_PAYMENT_INTERFACE;
     const response = await this.ctPaymentService.createPayment({
       amountPlanned: opts.amountPlanned,
       interfaceId: opts.interactionId,
       paymentMethodInfo: {
-        paymentInterface: NUVEI_PAYMENT_INTERFACE,
+        paymentInterface,
         method: paymentMethod,
         name: {
           en: isSupportedPaymentMethod(paymentMethod) ? METHOD_NAMES[paymentMethod] : "Nuvei",

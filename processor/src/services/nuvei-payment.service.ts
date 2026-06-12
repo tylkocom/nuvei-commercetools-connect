@@ -1391,7 +1391,17 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   private isNuveiPayment(payment: Payment): boolean {
-    return payment.paymentMethodInfo?.paymentInterface === NUVEI_PAYMENT_INTERFACE;
+    const info = payment.paymentMethodInfo;
+    if (info?.paymentInterface === NUVEI_PAYMENT_INTERFACE) return true;
+    // Checkout-session payments carry the per-attempt payment interface that
+    // commercetools Checkout dictates (see CtPaymentCreationService), so the
+    // static identifier no longer matches. Recognize them by the method the
+    // connector registered plus the stored Nuvei session token.
+    return (
+      typeof payment.interfaceId === "string" &&
+      payment.interfaceId.length > 0 &&
+      isSupportedPaymentMethod(info?.method ?? "")
+    );
   }
 
   private paymentMatchesDmnAmount(
