@@ -729,6 +729,49 @@ describe("NuveiPaymentService", () => {
       );
     });
 
+    it("pre-fills shopper billing details on openOrder from the locked cart", async () => {
+      const cartClient = makeCtCartClientMock({
+        customerEmail: "shopper@example.com",
+        billingAddress: {
+          country: "DE",
+          email: "billing@example.com",
+          firstName: "Jane",
+          lastName: "Doe",
+        },
+      });
+      const { service } = createService(cartClient);
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-billing" });
+
+      await service.createPaymentSession();
+
+      const expectedDetails = {
+        email: "billing@example.com",
+        country: "DE",
+        firstName: "Jane",
+        lastName: "Doe",
+      };
+      expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          billingAddress: expectedDetails,
+          userDetails: expectedDetails,
+        }),
+      );
+    });
+
+    it("falls back to customerEmail when the cart has no billing email", async () => {
+      const cartClient = makeCtCartClientMock({ customerEmail: "shopper@example.com" });
+      const { service } = createService(cartClient);
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-email" });
+
+      await service.createPaymentSession();
+
+      expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          billingAddress: { email: "shopper@example.com" },
+        }),
+      );
+    });
+
     it("passes paymentMethod 'card' when paymentMethodOptions contains card", async () => {
       const { service } = createService();
 

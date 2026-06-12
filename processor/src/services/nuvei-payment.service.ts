@@ -34,7 +34,11 @@ import {
   getCartIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context.js";
-import { nuveiClient, type NuveiTransactionResponse } from "../clients/nuvei.client.js";
+import {
+  nuveiClient,
+  type NuveiTransactionResponse,
+  type OpenOrderBillingAddress,
+} from "../clients/nuvei.client.js";
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
 import {
   NuveiEventConverter,
@@ -1028,11 +1032,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
 
       const notificationUrl = this.getDmnNotificationUrl();
+      const shopperDetails = this.cartShopperDetails(cart);
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
         ...(notificationUrl && { urlDetails: { notificationUrl } }),
+        ...(shopperDetails && { billingAddress: shopperDetails, userDetails: shopperDetails }),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -1119,11 +1125,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
       });
 
       const notificationUrl = this.getDmnNotificationUrl();
+      const shopperDetails = this.cartShopperDetails(cart);
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
         ...(notificationUrl && { urlDetails: { notificationUrl } }),
+        ...(shopperDetails && { billingAddress: shopperDetails, userDetails: shopperDetails }),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -1284,6 +1292,27 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const serviceUrl = getConfig().serviceUrl;
     if (!serviceUrl) return undefined;
     return `${serviceUrl.replace(/\/+$/, "")}/webhooks/nuvei`;
+  }
+
+  /**
+   * Shopper contact details for openOrder, taken from the cart. Pre-filling
+   * them on the Nuvei order satisfies the gateway's mandatory-field rules
+   * (gateway error 1136 "Mandatory fields are missing") for Web SDK payments,
+   * whose browser payload only carries what the enabler knows — commercetools
+   * Checkout does not pass the shopper email to enablers.
+   */
+  private cartShopperDetails(cart: Cart): OpenOrderBillingAddress | undefined {
+    const address = cart.billingAddress ?? cart.shippingAddress;
+    const email = address?.email ?? cart.customerEmail ?? undefined;
+    const country = address?.country;
+    if (!email && !country) return undefined;
+
+    return {
+      ...(email && { email }),
+      ...(country && { country }),
+      ...(address?.firstName && { firstName: address.firstName }),
+      ...(address?.lastName && { lastName: address.lastName }),
+    };
   }
 
   /**

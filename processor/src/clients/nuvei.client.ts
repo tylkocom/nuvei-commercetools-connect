@@ -9,12 +9,26 @@ export interface NuveiClientConfig {
   timeoutMs?: number;
 }
 
+export interface OpenOrderBillingAddress {
+  email?: string;
+  country?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface OpenOrderParams {
   amount: string;
   currency: string;
   userTokenId?: string;
   clientUniqueId: string;
   urlDetails?: { notificationUrl: string };
+  /**
+   * Pre-fills shopper data on the Nuvei order so Web SDK payments satisfy
+   * the gateway's mandatory-field rules (gateway error 1136) even when the
+   * browser payload carries no email.
+   */
+  billingAddress?: OpenOrderBillingAddress;
+  userDetails?: OpenOrderBillingAddress;
 }
 
 export interface OpenOrderResult {
