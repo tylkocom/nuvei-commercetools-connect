@@ -111,20 +111,20 @@ describe("WebSdkCardComponent", () => {
     });
     expect(create).toHaveBeenCalledWith("card", {});
     expect(attach).toHaveBeenCalledWith(expect.any(Object));
-    expect(sfc.createPayment).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionToken: "session-token-1",
-        clientUniqueId: "cart-1",
-        merchant_unique_id: "payment-ref-1",
-        merchantUniqueId: "payment-ref-1",
-        merchantUniqueID: "payment-ref-1",
-        paymentOption: cardField,
-        billingAddress: {
-          country: "US",
-        },
-      }),
-      expect.any(Function),
-    );
+    const createPaymentParams = sfc.createPayment.mock.calls[0][0];
+    expect(createPaymentParams).toMatchObject({
+      sessionToken: "session-token-1",
+      clientUniqueId: "cart-1",
+      merchant_unique_id: "payment-ref-1",
+      merchantUniqueId: "payment-ref-1",
+      merchantUniqueID: "payment-ref-1",
+      paymentOption: cardField,
+    });
+    // Without a shopper email the payload must NOT carry a billingAddress: an
+    // explicit one replaces the processor's openOrder pre-fill at the gateway
+    // and trips the mandatory-field rules (gateway error 1136).
+    expect(createPaymentParams).not.toHaveProperty("billingAddress");
+    expect(sfc.createPayment).toHaveBeenCalledWith(expect.any(Object), expect.any(Function));
     expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
       "payment-ref-1",
       "session-token-1",
@@ -135,6 +135,40 @@ describe("WebSdkCardComponent", () => {
     );
   });
 
+  it("attaches billingAddress when a shopper email is provided", async () => {
+    stubDocument();
+    const attach = vi.fn();
+    const create = vi.fn().mockReturnValue({ attach });
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create }),
+      createPayment: vi.fn((_params: unknown, callback: (res: unknown) => void) => {
+        callback({ result: "DECLINED", errCode: 42, transactionId: "tx-1" });
+      }),
+    };
+
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "USD",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const builder = new WebSdkCardBuilder(
+      makeEnablerOptions({ shopperEmail: "shopper@example.com", countryCode: "DE" }),
+    );
+    const component = builder.build({ showPayButton: true });
+    await component.mount("#container");
+    await component.submit();
+
+    expect(sfc.createPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        billingAddress: { email: "shopper@example.com", country: "DE" },
+      }),
+      expect.any(Function),
+    );
+  });
 
   it("calls onError for Web SDK ERROR without confirmation polling", async () => {
     stubDocument();

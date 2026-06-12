@@ -75,10 +75,17 @@ class WebSdkCardComponent implements PaymentComponent {
         merchantUniqueId: this.paymentReference,
         merchantUniqueID: this.paymentReference,
         paymentOption: this.scard,
-        billingAddress: {
-          ...(this.baseOptions.shopperEmail && { email: this.baseOptions.shopperEmail }),
-          country: this.baseOptions.countryCode ?? "US",
-        },
+        // Only attach billingAddress when we actually hold shopper data: an
+        // explicit billingAddress REPLACES the openOrder pre-fill wholesale
+        // at the gateway, and one without an email trips the mandatory-field
+        // rules (gateway error 1136). The processor pre-fills shopper details
+        // on the order from the cart, so omitting it here is the safe default.
+        ...(this.baseOptions.shopperEmail && {
+          billingAddress: {
+            email: this.baseOptions.shopperEmail,
+            country: this.baseOptions.countryCode ?? "US",
+          },
+        }),
         ...(storePaymentDetails !== undefined && { savePM: storePaymentDetails }),
       },
       (res: SafeChargeResult) => {
