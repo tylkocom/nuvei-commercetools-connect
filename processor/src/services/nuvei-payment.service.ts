@@ -1336,6 +1336,31 @@ export class NuveiPaymentService extends AbstractPaymentService {
     };
   }
 
+  /**
+   * A DMN without any transaction identity, type, amount, or payment
+   * reference carries nothing to reconcile against a Payment (typically a
+   * request-level ping with only ppp_status set). Its checksum fields are
+   * absent, so validation can never succeed either. A DMN that references a
+   * payment (merchant_unique_id / clientUniqueId / sessionToken) is NOT a
+   * ping — malformed ones must keep failing loudly.
+   */
+  private isNonTransactionDmn(body: Record<string, unknown>): boolean {
+    const present = (value: unknown): boolean =>
+      typeof value === "string" ? value.length > 0 : value != null;
+
+    return (
+      !present(body.PPP_TransactionID) &&
+      !present(body.PPP_TransactionId) &&
+      !present(body.TransactionID) &&
+      !present(body.transactionId) &&
+      !present(body.transactionType) &&
+      !present(body.totalAmount) &&
+      !present(body.merchant_unique_id) &&
+      !present(body.clientUniqueId) &&
+      !present(body.sessionToken)
+    );
+  }
+
   private isResourceNotFoundError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
 
@@ -1547,6 +1572,15 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const config = getConfig();
 
     log.info("Processing Nuvei DMN.", this.getDmnLogFields(body));
+
+    // Nuvei also delivers non-transaction notifications (request-level pings
+    // carrying only ppp_status) whose checksum fields are absent, so they can
+    // never validate. They carry nothing to reconcile: acknowledge them so
+    // Nuvei stops retrying instead of hammering the endpoint with 400s.
+    if (this.isNonTransactionDmn(body)) {
+      log.info("Ignoring non-transaction DMN notification.", this.getDmnLogFields(body));
+      return;
+    }
 
     const isValid = nuveiClient().validateDmnChecksum(body, config.nuveiDmnChecksumAlgorithm);
     if (!isValid) {

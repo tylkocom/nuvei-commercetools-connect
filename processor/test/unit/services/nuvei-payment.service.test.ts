@@ -1637,7 +1637,28 @@ describe("NuveiPaymentService", () => {
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(false);
 
-      await expect(service.processNuveiDmn({})).rejects.toThrow("Invalid DMN checksum");
+      await expect(
+        service.processNuveiDmn({
+          PPP_TransactionID: "ppp-1",
+          transactionType: "Sale",
+          totalAmount: "10.00",
+          currency: "USD",
+          ppp_status: "OK",
+        }),
+      ).rejects.toThrow("Invalid DMN checksum");
+    });
+
+    it("acknowledges non-transaction notifications without validating or updating", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(false);
+
+      await expect(
+        service.processNuveiDmn({ ppp_status: "OK", merchantId: "merchant-1" }),
+      ).resolves.toBeUndefined();
+
+      expect(mockNuveiClientInstance.validateDmnChecksum).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
   });
 });
