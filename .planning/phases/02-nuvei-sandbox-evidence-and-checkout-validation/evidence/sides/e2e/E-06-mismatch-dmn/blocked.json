@@ -1,8 +1,0 @@
-{
-  "attempted": "Set DMN_PUBLIC_URL to a public HTTPS URL forwarding to localhost:8091.",
-  "kind": "blocker",
-  "missing": [
-    "DMN_PUBLIC_URL"
-  ],
-  "reason": "no-dmn-public-url"
-}

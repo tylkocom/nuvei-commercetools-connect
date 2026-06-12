@@ -1,7 +1,0 @@
-{
-  "sessionToken": "sessionToken-001",
-  "clientUniqueId": "cart-001",
-  "amount": "10.00",
-  "currency": "EUR",
-  "source": "processor-session-response-visible-openOrder-fields"
-}
