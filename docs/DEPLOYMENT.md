@@ -89,6 +89,8 @@ Required secured configuration:
 | `CTP_CLIENT_SECRET` | commercetools API client secret. |
 | `NUVEI_SECRET_KEY` | Nuvei secret key used to sign API requests and validate DMN checksums. |
 
+Required commercetools scopes for `CTP_CLIENT_ID`: `manage_checkout_payment_intents`, `manage_checkout_transactions`, `manage_payments`, `manage_orders`, `view_sessions`, `view_api_clients`, and `introspect_oauth_tokens`.
+
 Optional configuration used by the current source:
 
 | Variable | Default | Purpose |
@@ -141,6 +143,38 @@ Optional configuration used by the current source:
 
    <!-- VERIFY: Confirm the exact deployed `CONNECT_SERVICE_URL` from the Connect deployment before configuring Nuvei. Confirm the Nuvei dashboard location and permissions for the target merchant account. -->
 
+## Merchant Center Drop-in configuration
+
+For the Nuvei Simply Connect drop-in demo, configure a dedicated Drop-in Payment Integration:
+
+1. Install or deploy the Organization Connector through the deployment process owned by the merchant/operator.
+2. Create or open a Complete Checkout or Payment Only Application.
+3. In Payment integrations, add Standard Payments.
+4. Select the Nuvei connector deployment.
+5. Select `Drop-in` as the payment integration type.
+6. Enter `Nuvei Simply Connect` or another operator-visible name.
+7. Optionally set key `nuvei-simply-connect-dropin`.
+8. Save and activate the Payment Integration.
+9. Set the Application status active.
+10. For API-created Applications, set `paymentsConfiguration.activePaymentComponentType` to `DropIn`.
+
+Payment Integrations API draft shape:
+
+```json
+{
+  "key": "nuvei-simply-connect-dropin",
+  "application": { "typeId": "application", "id": "<application-id>" },
+  "connectorDeployment": { "typeId": "connector-deployment", "id": "<deployment-id>" },
+  "componentType": "DropIn",
+  "type": "embedded",
+  "name": "Nuvei Simply Connect",
+  "status": "Active",
+  "sortingInfo": { "priority": 0 }
+}
+```
+
+Do not select `hpp`: this connector renders Nuvei Simply Connect in-place and currently validates only card payments through `pmWhitelist: ["cc_card"]`.
+
 ## Post-deployment verification
 
 Use implemented processor endpoints only. The source currently registers `/config`, `/status`, `/health`, `/payment-components`, `/payment-intents/:id`, `/transactions`, `/payments/session`, `/payments/confirm/:id`, and `/webhooks/nuvei`. Operation routes are also available under `/operations/*`, including `/operations/payment-components` for the commercetools Checkout Add payment integration flow.
@@ -172,7 +206,7 @@ Recommended checks:
      https://<processor-service-url>/operations/payment-components
    ```
 
-   The current implementation advertises the `card` component only.
+   Expected response: `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }], "express": [] }`. This exposes Web Components `card` and Drop-in `embedded` while keeping non-card APMs disabled until method-specific reconciliation evidence exists.
 
 5. Run a test checkout flow that creates a payment session through `POST /payments/session` with `X-Session-ID`, confirms an approved Nuvei widget result through `POST /payments/confirm/:id`, and verifies that the commercetools Payment receives the expected transaction update.
 

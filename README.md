@@ -52,7 +52,7 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 | Path | Purpose |
 | --- | --- |
 | `connect.yaml` | commercetools Connect deployment descriptor. Defines the `enabler` assets application, the `processor` service application, deployment scripts, and required configuration keys. |
-| `enabler/` | Browser-side Nuvei wrapper built with TypeScript and Vite. It exports the explicit dual-mode card enablers and card component support. |
+| `enabler/` | Browser-side Nuvei wrapper built with TypeScript and Vite. It exports the Checkout-facing `Enabler` adapter for `card` components and `embedded` drop-ins. |
 | `processor/` | Fastify service that creates Nuvei payment sessions, confirms widget results, handles commercetools payment operations, and processes Nuvei DMN webhooks. |
 | `examples/nuvei-web-ui/` | Local Express mock server and browser evidence harness for exercising connector flows with mocked commercetools state. |
 | `docs/` | Operational, deployment, architecture, testing, and Nuvei setup documentation. |
@@ -61,7 +61,7 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 
 ### Mount the card component
 
-`enabler/src/index.ts` exports the Checkout-facing `Enabler` adapter, plus Nuvei-specific `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, `PaymentMethod`, `PaymentComponentBuilder`, `SimplyConnectCardBuilder`, and `WebSdkCardBuilder`.
+`enabler/src/index.ts` exports the Checkout-facing `Enabler` adapter, plus `PaymentMethod`, `PaymentComponentBuilder`, `PaymentDropinBuilder`, `SimplyConnectDropinBuilder`, and `WebSdkCardBuilder`. Migration note: legacy `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, and `SimplyConnectCardBuilder` exports were removed; use `new Enabler(...).createComponentBuilder("card")` for Web SDK card and `new Enabler(...).createDropinBuilder("embedded")` for Simply Connect.
 ```ts
 import { Enabler } from "@nuvei-commercetools/enabler";
 
@@ -84,37 +84,72 @@ await component.mount("#payment-container");
 await component.submit({ storePaymentDetails: false });
 ```
 
-Expected result: the Checkout-facing enabler fetches Nuvei frontend configuration from `GET /operations/config`, loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint to create a payment session, renders the card field into `#payment-container`, and calls `onComplete` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A `rejected` outcome calls `onError` with a safe error. A `pending` outcome calls the optional `onPending` callback when provided, otherwise it calls `onError` with a safe pending-state error. `onComplete` is only called for approved outcomes and does not expose the Nuvei session token.
+Expected result: the Checkout-facing enabler fetches Nuvei frontend configuration from `GET /operations/config`, loads the Nuvei SafeCharge SDK, calls the processor's `POST /payments/session` endpoint with `{ "paymentMethodOptions": { "card": {} } }`, renders the card field into `#payment-container`, and calls `onComplete({ isSuccess: true, paymentReference })` after the processor returns `{ outcome: "approved" }` from `POST /payments/confirm/:id`. A rejected outcome calls `onComplete({ isSuccess: false, paymentReference })`. A pending outcome calls the optional `onPending({ paymentReference })` callback when provided; without `onPending`, the enabler uses bounded retries before calling `onComplete({ isSuccess: false, paymentReference })`. Browser callbacks never expose the Nuvei session token.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
+
+### Mount the Simply Connect drop-in
+
+Use this path for Merchant Center `Drop-in` payment integrations. Nuvei owns the internal pay button, so `dropinHasSubmit` is `false`; Checkout can still provide `onPayButtonClick` for final terms/order validation through Nuvei `prePayment`.
+
+```ts
+import { Enabler } from "@nuvei-commercetools/enabler";
+
+const enabler = new Enabler({
+  processorUrl: "https://service-<id>.<region>.gcp.commercetools.app",
+  sessionId: "<checkout-session-id>",
+  locale: "en",
+  countryCode: "DE",
+  onComplete: ({ isSuccess, paymentReference }) => {
+    console.log({ isSuccess, paymentReference });
+  },
+  onPending: ({ paymentReference }) => {
+    console.log({ pendingPaymentReference: paymentReference });
+  },
+  onError: console.error,
+});
+
+const builder = await enabler.createDropinBuilder("embedded");
+console.log(builder.dropinHasSubmit); // false
+
+const dropin = builder.build({
+  onPayButtonClick: async () => {
+    // Check terms acceptance or final order readiness here.
+  },
+});
+await dropin.mount("#payment-container");
+```
+
+Expected result: `POST /payments/session` is called with `{ "paymentMethodOptions": { "embedded": {} } }`, Nuvei Simply Connect renders in-place, and the checkout config includes `pmWhitelist: ["cc_card"]` so the first drop-in demo remains card-only.
 
 ### Create a payment session through the processor
 
 The processor registers payment routes under `/payments` in `processor/src/server/plugins/nuvei-payment.plugin.ts`.
 
 ```bash
-curl -X POST "https://service-<id>.<region>.gcp.commercetools.app/payments" \
+curl -X POST "https://service-<id>.<region>.gcp.commercetools.app/payments/session" \
   -H "Content-Type: application/json" \
   -H "X-Session-ID: <checkout-session-id>" \
   -d '{
     "paymentMethodOptions": {
-      "card": {}
+      "embedded": {}
     }
   }'
 ```
 
 Expected response shape:
-
 ```json
 {
   "cartId": "<cart-id>",
   "sessionToken": "<nuvei-session-token>",
   "paymentReference": "<commercetools-payment-id>",
-  "merchantReturnUrl": "<return-url>"
+  "merchantReturnUrl": "<return-url>",
+  "amount": "10.00",
+  "currency": "EUR"
 }
 ```
 
-Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The local example harness exercises the same card body against the mock server.
+Use `{ "paymentMethodOptions": { "card": {} } }` for the Web Components card path and `{ "paymentMethodOptions": { "embedded": {} } }` for the Simply Connect drop-in path. The local example harness defaults to the Checkout-facing drop-in path and can switch to the same `Enabler` card component route for Web SDK comparison.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
@@ -123,16 +158,52 @@ Use `{ "paymentMethodOptions": { "card": {} } }` for the card component. The loc
 `enabler/src/payment-enabler/method-registry.ts` and the processor payment-components DTO advertise:
 
 ```ts
-import { getComponentPaymentMethods, PaymentMethod } from "@nuvei-commercetools/enabler";
+import {
+  getComponentPaymentMethods,
+  getDropinPaymentMethods,
+  PaymentMethod,
+} from "@nuvei-commercetools/enabler";
 
 console.log(getComponentPaymentMethods().map((method) => method.key));
 // ["card"]
 
-console.log(PaymentMethod.card);
-// "card"
+console.log(getDropinPaymentMethods().map((method) => method.key));
+// ["embedded"]
+
+console.log(PaymentMethod.card, PaymentMethod.embedded);
+// "card" "embedded"
 ```
 
-Expected result: custom storefront or Checkout integration code can distinguish the card component from the explicit mode enablers without hard-coding display metadata.
+`GET /operations/payment-components` returns `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }], "express": [] }`. Non-card Nuvei APMs are intentionally not exposed until each method has reconciliation and runbook evidence.
+
+### Merchant Center Drop-in setup
+
+1. Install or deploy the Organization Connector.
+2. Create or open a Complete Checkout or Payment Only Application.
+3. In Payment integrations, add Standard Payments.
+4. Select the Nuvei connector deployment.
+5. Select `Drop-in` as the payment integration type.
+6. Enter a name such as `Nuvei Simply Connect`.
+7. Optionally set key `nuvei-simply-connect-dropin`.
+8. Save and activate the Payment Integration.
+9. Set the Application status active.
+10. For programmatic setup, ensure `paymentsConfiguration.activePaymentComponentType` is `DropIn`.
+
+Payment Integrations API draft shape:
+
+```json
+{
+  "key": "nuvei-simply-connect-dropin",
+  "application": { "typeId": "application", "id": "<application-id>" },
+  "connectorDeployment": { "typeId": "connector-deployment", "id": "<deployment-id>" },
+  "componentType": "DropIn",
+  "type": "embedded",
+  "name": "Nuvei Simply Connect",
+  "status": "Active",
+  "sortingInfo": { "priority": 0 }
+}
+```
+
 
 ## Runtime behavior
 
@@ -171,7 +242,7 @@ Required secured configuration:
 
 | Variable | Description |
 | --- | --- |
-| `CTP_CLIENT_ID` | commercetools API client ID. `connect.yaml` documents the required scopes. |
+| `CTP_CLIENT_ID` | commercetools API client ID. Required scopes: `manage_checkout_payment_intents`, `manage_checkout_transactions`, `manage_payments`, `manage_orders`, `view_sessions`, `view_api_clients`, and `introspect_oauth_tokens`. |
 | `CTP_CLIENT_SECRET` | commercetools API client secret. |
 | `NUVEI_SECRET_KEY` | Nuvei secret key used for signing API requests and validating DMN checksums. |
 

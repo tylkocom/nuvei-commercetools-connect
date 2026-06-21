@@ -18,50 +18,44 @@ The main template-compatibility gaps identified below have been addressed in the
 
 ## Executive verdict
 
-The processor has several Checkout-compatible route shapes, but the browser enabler is not currently template-compatible enough for the commercetools whitelabel Checkout page.
+The browser enabler now exposes the template-compatible Checkout entry point. `Enabler` is the single Checkout-facing adapter: Checkout selects a configured Web Components integration and calls `createComponentBuilder("card")`, or selects a Drop-in integration and calls `createDropinBuilder("embedded")`.
 
-The highest-risk discrepancy is the default enabler surface. The template publishes a named `Enabler` export and builds a UMD global named `Connector`; our bundle exports `NuveiEnabler` under a UMD global named `NuveiEnabler`, requires a second constructor argument, and requires Nuvei merchant configuration in the constructor. A Checkout integration written against the template-style contract can fail before rendering any payment UI.
-
-Use the current implementation as a Nuvei-specific harness, not as the Checkout-facing contract. Add a template-compatible adapter as the clean cutover path.
+The previous Nuvei-specific facade classes have been removed from the public entry point. Remaining production follow-up is sandbox evidence for real Nuvei Web SDK and Simply Connect callback/DMN fields.
 
 ## Compatibility map
 
 | Area | Template behavior | Current Nuvei behavior | Parity |
 | --- | --- | --- | --- |
-| Public enabler export | `export { MockPaymentEnabler as Enabler }` from `enabler/src/main.ts`. | Exports `NuveiEnabler`, `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`; no `Enabler` export. | Broken. |
-| UMD global | Vite `lib.name = "Connector"`. | Vite `lib.name = "NuveiEnabler"`; built UMD assigns `globalThis.NuveiEnabler`. | Broken for template-style UMD loading. |
-| Constructor | `new Enabler({ processorUrl, sessionId, locale?, countryCode?, onComplete?, onError? })`. | `new NuveiEnabler(opts, "simply-connect" | "web-sdk")`; `opts` requires `merchantId`, `merchantSiteId`, `env`. | Broken for template-style instantiation. |
-| Runtime config | Enabler fetches `GET /operations/config` with `X-Session-Id` during setup. | Processor exposes `/operations/config`, but enabler does not call it. | Broken/incomplete. |
-| Component builder | `createComponentBuilder(type)` plus drop-in, express, and stored-payment builders. | `createComponentBuilder(type)` only. | Card-only is acceptable if only card is advertised; interface is incomplete. |
-| Component lifecycle | `mount(selector): Promise<void>`, `submit({ storePaymentDetails? }): Promise<void>`. | `mount(selector): void` with async work fire-and-forget; `submit(): void`. | Risky. |
-| `componentHasSubmit` handling | Checkout/harness uses it to decide whether the host or component owns the Pay button. | Web SDK uses `true`; Simply Connect uses `false` but ignores `showPayButton` and `onPayButtonClick`. | Web SDK closer; Simply Connect mismatched. |
-| Payment callback shape | `onComplete({ isSuccess, paymentReference })`; `onError(error, { paymentReference? })`. | Success includes `sessionToken`; rejection goes to `onError`; pending goes to non-template `onPending`. | Mismatched. |
-| Enabler processor calls | Template enabler calls `/payments`, `/stored-payment-methods`, `/operations/config`. | Nuvei enabler calls `/payments/session`, `/payments/confirm/:id`; no stored route calls. | Different by PSP design; OK if hidden behind compatible enabler. |
-| Payment components route | `/operations/payment-components` returns `{ dropins, components, express }`. | Same shape; advertises card only. | Compatible for card-only. |
+| Public enabler export | `export { MockPaymentEnabler as Enabler }` from `enabler/src/main.ts`. | Exports `Enabler` from `enabler/src/index.ts`; no Nuvei-specific enabler facade is required. | Compatible. |
+| UMD global | Vite `lib.name = "Connector"`. | Vite `lib.name = "Connector"`; built UMD assigns `globalThis.Connector`. | Compatible. |
+| Constructor | `new Enabler({ processorUrl, sessionId, locale?, countryCode?, onComplete?, onError? })`. | `new Enabler({ processorUrl, sessionId, locale?, countryCode?, onComplete?, onError?, onPending? })`; Nuvei merchant config is fetched from the processor. | Compatible. |
+| Runtime config | Enabler fetches `GET /operations/config` with `X-Session-Id` during setup. | Checkout-facing `Enabler` fetches `/operations/config` before building card or drop-in UI. | Compatible. |
+| Component builder | `createComponentBuilder(type)` plus drop-in, express, and stored-payment builders. | `createComponentBuilder("card")` and `createDropinBuilder("embedded")` are implemented; express/stored methods reject safely. | Compatible for supported surfaces. |
+| Component lifecycle | `mount(selector): Promise<void>`, `submit({ storePaymentDetails? }): Promise<void>`. | Card and drop-in components return promises; drop-in `submit()` rejects defensively because Nuvei owns the internal pay button. | Compatible. |
+| `componentHasSubmit` / `dropinHasSubmit` handling | Checkout/harness uses submit flags to decide whether host or PSP owns the Pay button. | Web SDK card uses `componentHasSubmit = true`; Simply Connect drop-in uses `dropinHasSubmit = false` and gates through `prePayment`. | Compatible. |
+| Payment callback shape | `onComplete({ isSuccess, paymentReference })`; `onError(error, { paymentReference? })`. | Browser callbacks expose safe template-compatible result/context payloads and do not forward Nuvei session tokens. | Compatible. |
+| Enabler processor calls | Template enabler calls `/payments`, `/stored-payment-methods`, `/operations/config`. | Nuvei enabler calls `/operations/config`, `/payments/session`, and `/payments/confirm/:id`; no stored route calls. | Different by PSP design; OK behind compatible enabler. |
+| Payment components route | `/operations/payment-components` returns `{ dropins, components, express }`. | Same shape; advertises Drop-in `embedded` and Web Components `card`. | Compatible. |
 
 ## Findings
 
-### F-01 — Critical: default enabler export/global is not template-compatible
+### F-01 — Resolved: default enabler export/global is template-compatible
 
 Evidence:
 
 - Template entry exports `Enabler`: `payment-template/enabler/src/main.ts:1-3`.
 - Template Vite library name is `Connector`: `payment-template/enabler/vite.config.ts:33-42`.
-- Local entry exports Nuvei-specific class names only: `enabler/src/index.ts:22-71`.
-- Local Vite library name is `NuveiEnabler`: `enabler/vite.config.ts:8-12`.
-- Local built UMD assigns `globalThis.NuveiEnabler`, not `globalThis.Connector`: `enabler/public/connector-enabler.umd.js:1`.
+- Local entry exports `Enabler`: `enabler/src/index.ts`.
+- Local Vite library name is `Connector`: `enabler/vite.config.ts:8-12`.
+- Local built UMD assigns `globalThis.Connector`.
 
 Impact:
 
-A whitelabel Checkout page or loader that expects the payment-template surface cannot reliably instantiate this connector. The likely failures are `Connector` missing, `Connector.Enabler` missing, or named ESM export `Enabler` missing.
+The ESM and UMD entry points now match the template-facing names.
 
 Recommendation:
 
-Publish a template-compatible entry point:
-
-- Export a class named `Enabler`.
-- Build the UMD bundle with `lib.name = "Connector"`.
-- Keep existing `Nuvei*` exports as aliases for custom storefronts, but make `Enabler` the Checkout-facing default.
+Keep `Enabler` as the only Checkout-facing enabler class.
 
 ### F-02 — Critical: constructor options require PSP details that should come from the processor
 
@@ -81,20 +75,20 @@ Recommendation:
 
 Make `new Enabler(options)` accept the template-style options. Fetch `GET /operations/config` during enabler setup and use that response to configure Nuvei SDK loading. If a custom storefront still wants to pass explicit Nuvei config, keep it as an override on Nuvei-specific aliases, not as the Checkout-facing required path.
 
-### F-03 — Critical: `NuveiEnabler` requires a mode argument the template does not provide
+### F-03 — Resolved: no mode argument is required
 
 Evidence:
 
 - Template instantiates with one argument: `new Enabler({ processorUrl, sessionId, ... })` in `payment-template/enabler/index.html:258-269`.
-- Local facade requires a second `mode` argument and throws when it is missing: `enabler/src/index.ts:54-66`; tests assert undefined mode throws at `enabler/test/unit/payment-enabler.test.ts:143-161`.
+- Local `Enabler` takes one template-style options object; Checkout selects card versus drop-in through `createComponentBuilder("card")` or `createDropinBuilder("embedded")`.
 
 Impact:
 
-A Checkout integration following the template can fail immediately with `METHOD_UNSUPPORTED` before config fetch, SDK load, or payment rendering.
+Checkout can instantiate the enabler without Nuvei-specific mode knowledge.
 
 Recommendation:
 
-The Checkout-facing `Enabler` should be one-argument. Choose the Nuvei mode from processor config or a stable connector setting. For whitelabel Checkout, prefer the Web SDK component path unless Simply Connect is made to respect the template's internal-button lifecycle and validation callback contract.
+Keep routing in `Enabler`; do not reintroduce provider-specific enabler facades for Checkout.
 
 ### F-04 — High: enabler interface omits template methods for drop-ins, express, and stored payment methods
 
@@ -112,62 +106,42 @@ Recommendation:
 
 Implement the full template `PaymentEnabler` surface on the Checkout-facing adapter. Unsupported methods can throw clear unsupported errors, but the methods should exist. Keep `/operations/payment-components` authoritative for what Checkout should render.
 
-### F-05 — High: `mount` and `submit` are fire-and-forget instead of awaited lifecycle operations
+### F-05 — Mitigated: lifecycle methods are promise-based
 
 Evidence:
 
-- Template component contract returns promises for `mount` and `submit`: `payment-template/enabler/src/payment-enabler/payment-enabler.ts:108-146`.
-- Template local checkout harness awaits `component.mount(...)` and `component.submit(...)`: `payment-template/enabler/index.html:219-235`.
-- Local component contract uses `mount(selector): void` and `submit(): void`: `enabler/src/payment-enabler/payment-enabler.ts:143-155`.
-- Local `mount` starts async initialization but returns immediately: `enabler/src/components/simply-connect-card.ts:40-42`, `enabler/src/components/web-sdk-card.ts:43-45`.
-- Local Web SDK `submit` can throw if async mount has not completed: `enabler/src/components/web-sdk-card.ts:47-66`.
+- Checkout-facing wrapper awaits delegated `mount` and `submit` calls: `enabler/src/payment-enabler/checkout-enabler.ts`.
+- Web SDK card and Simply Connect drop-in both expose async lifecycle methods through the shared Checkout delegate.
+- The Simply Connect drop-in memoizes initialization and resets the promise after initialization failure, so transient config/SDK errors can be retried.
 
-Impact:
+Residual risk:
 
-Checkout can believe the component is mounted while SDK loading and payment-session creation are still in progress. In Web SDK mode, a fast user click or host-driven submit can race initialization and throw `not mounted yet`.
+Whitelabel Checkout behavior still needs browser evidence, but the local component contract no longer returns before async SDK/session initialization completes.
 
-Recommendation:
-
-Return `Promise<void>` from `mount` and `submit`. Store a single initialization promise per component, await it from `mount`, and have `submit` await it before using SDK fields. Accept the template submit argument even if card tokenization is not implemented yet: `submit({ storePaymentDetails } = {})`.
-
-### F-06 — High: Simply Connect does not honor `showPayButton` / `onPayButtonClick`
+### F-06 — Mitigated: Simply Connect drop-in gates Nuvei payment start through `prePayment`
 
 Evidence:
 
-- Template builders expose `componentHasSubmit`; host code passes `showPayButton` and `onPayButtonClick` when the component owns submission: `payment-template/enabler/index.html:271-298`.
-- Template card component uses `showPayButton` to render a pay button and wire click handling: `payment-template/enabler/src/components/payment-methods/card/card.ts:34-62`.
-- Local Simply Connect builder reports `componentHasSubmit = false`: `enabler/src/components/simply-connect-card.ts:14-21`.
-- Local Simply Connect component never reads `componentOptions.showPayButton` or `componentOptions.onPayButtonClick`: `enabler/src/components/simply-connect-card.ts:30-98`.
+- Simply Connect is exposed as a drop-in with `dropinHasSubmit = false`, matching the PSP-owned-button model.
+- The drop-in passes a Nuvei `prePayment` callback and awaits Checkout's `onPayButtonClick` before resolving Nuvei's payment start.
+- Failed host gating rejects Nuvei payment start with a generic shopper-safe message and reports the original host error only through `onError`.
 
-Impact:
+Residual risk:
 
-If Checkout treats `componentHasSubmit = false` as “the connector renders and controls its own pay button”, it can pass validation or terms gating through `onPayButtonClick`. The Simply Connect path currently bypasses that host callback entirely because Nuvei's widget owns the button.
+This is compatible with a drop-in path, not a card-component path. The Web SDK card remains the external-submit component path with `componentHasSubmit = true`.
 
-Recommendation:
-
-For whitelabel Checkout, either:
-
-1. expose card through Web SDK mode with `componentHasSubmit = true`, so Checkout owns the Pay button; or
-2. adapt Simply Connect so its internal payment initiation is gated by the provided callback before Nuvei payment submission proceeds.
-
-Do not make Simply Connect the default Checkout-facing mode until this is resolved.
-
-### F-07 — High: callback result shape does not match the template and leaks session token
+### F-07 — Mitigated: completion callbacks no longer expose session tokens
 
 Evidence:
 
 - Template `PaymentResult` contains only `isSuccess` and `paymentReference`: `payment-template/enabler/src/payment-enabler/payment-enabler.ts:246-268`.
-- Local success result includes `sessionToken`: `enabler/src/payment-enabler/payment-enabler.ts:196-198`.
-- Local `confirmPaymentResult` passes `sessionToken` to `onComplete` and `onPending`: `enabler/src/services/api-service.ts:88-109`.
-- Local README example logs `result.sessionToken`: `README.md:75-78`.
+- Local `PaymentResult` now matches that shape for completion callbacks.
+- `confirmPaymentResult` uses the processor-side session token internally but passes only `{ isSuccess, paymentReference }` to `onComplete`, and `{ paymentReference }` to `onPending`.
+- README examples no longer instruct callers to log the Nuvei session token.
 
-Impact:
+Residual risk:
 
-The callback payload diverges from the template and exposes a Nuvei session token to host callback code. The token is already present in the browser to run Nuvei, but passing it into public completion callbacks and documenting logging makes accidental exposure more likely.
-
-Recommendation:
-
-Match the template callback shape for `onComplete`. Do not include `sessionToken` in `PaymentResult` or documentation examples. If pending state must be exposed, use `{ paymentReference }` only and document the behavior as a Nuvei extension.
+Nuvei's browser result object can still contain tokens or card metadata; keep it internal to the drop-in and never forward it to host callbacks.
 
 ### F-08 — High: pending outcomes can produce no Checkout callback
 
@@ -201,91 +175,74 @@ Follow-up:
 
 Sandbox evidence is still required to record real Nuvei field behavior for Web SDK and Simply Connect: `merchant_unique_id`, `sessionToken`, `clientUniqueId`, `PPP_TransactionID`, fiscal `TransactionID`, `Status`, `ppp_status`, amount, and currency. If Nuvei can reliably echo a dedicated CT Payment reference field, prefer that over relying on session-token fallback as the primary path.
 
-### F-10 — Medium: shopper country and billing data are hard-coded in the enabler
+### F-10 — Mitigated for Simply Connect: shopper country/email are no longer hard-coded test values
 
 Evidence:
 
-- Template options include `locale` and `countryCode`: `payment-template/enabler/src/payment-enabler/payment-enabler.ts:180-187`.
-- Local Simply Connect hard-codes `country: "US"` and `billingAddress.email = "test@example.com"`: `enabler/src/components/simply-connect-card.ts:78-95`.
-- Local Web SDK hard-codes `sandbox@example.com` and `US`: `enabler/src/components/web-sdk-card.ts:52-61`.
+- Simply Connect drop-in uses `baseOptions.countryCode` with a conservative `US` fallback and passes `baseOptions.shopperEmail` only when provided.
+- Web SDK card still uses browser-provided Checkout options/fallbacks and should be verified in sandbox for 3DS/fraud field sufficiency.
 
-Impact:
+Residual risk:
 
-Whitelabel Checkout collects real billing/shipping data. Hard-coded shopper data can break 3DS, fraud checks, localization, country-specific cards, and future APM eligibility.
+Whitelabel Checkout must still prove which billing/shipping fields it provides to the enabler versus what must be sourced server-side from the authenticated cart.
 
-Recommendation:
-
-Source shopper country/billing data from the authenticated session/cart in the processor or from explicit Checkout-provided component options. Do not keep browser hard-coded values in the Checkout-facing path.
-
-### F-11 — Medium: validation/state methods are weaker than the template contract
+### F-11 — Partially mitigated: validation/state methods exist but are SDK-limited
 
 Evidence:
 
-- Template component interface includes optional `showValidation`, `isValid`, `getState`, and `isAvailable`: `payment-template/enabler/src/payment-enabler/payment-enabler.ts:124-145`.
-- Template card implements validation and state extraction: `payment-template/enabler/src/components/payment-methods/card/card.ts:175-195`.
-- Local interface omits `showValidation`; local Simply Connect `isValid` only checks mounted state: `enabler/src/payment-enabler/payment-enabler.ts:143-155`, `enabler/src/components/simply-connect-card.ts:48-59`.
-- Local Web SDK `isValid` only checks that the card field exists: `enabler/src/components/web-sdk-card.ts:68-74`.
+- Checkout-facing delegate exposes `showValidation`, `isValid`, `getState`, and `isAvailable` for both card and drop-in builders.
+- Simply Connect hosted validation remains Nuvei-controlled; local `isValid` can only confirm the widget is mounted.
+- Web SDK card validation remains limited by what the Nuvei iframe exposes safely.
 
-Impact:
+Residual risk:
 
-Checkout may use these methods to control button enablement, display validation, or summarize card state. Returning “valid” for mounted/existing SDK fields is not the same as validating card input.
+Checkout may use these methods for button enablement or validation display. Sandbox evidence is still needed to confirm whether mounted-state validation is sufficient for the whitelabel host.
 
-Recommendation:
-
-Implement the template optional methods where the Nuvei SDK supports them. Where Nuvei iframe state cannot be inspected safely, return conservative values and rely on SDK validation at submit time.
-
-### F-12 — Medium: raw Nuvei widget result is logged in the browser
+### F-12 — Mitigated: raw Nuvei widget results are not logged or forwarded
 
 Evidence:
 
-- `handleCheckoutResult` logs the full Simply Connect result: `enabler/src/components/simply-connect-card.ts:100-108`.
-- The result type can include `sessionToken`, `userPaymentOptionId`, `ccCardNumber`, BIN, and last-four fields: `enabler/src/services/simply-connect-sdk.ts:6-19`.
+- The deleted Simply Connect card path no longer logs raw checkout results.
+- The Simply Connect drop-in confirms payment through the processor using the session token returned by `POST /payments/session`; it does not forward browser result tokens to `onComplete`.
+- Widget errors are reported to public callbacks with a generic message plus an allowlisted diagnostic `name`/`code` cause only.
 
-Impact:
+Residual risk:
 
-This is unsafe for a shopper-facing Checkout page and contradicts the project constraint that session tokens and sensitive payment data must not be exposed or logged unsafely.
+Do not enable browser diagnostics that print raw Nuvei callback payloads. Those payloads can contain session tokens, UPO identifiers, BIN, last-four, or card fragments depending on Nuvei behavior.
 
-Recommendation:
-
-Remove the raw console log. If browser diagnostics are needed during sandbox work, log only redacted, non-sensitive fields behind an explicit development flag that cannot be enabled in production Checkout.
-
-### F-13 — Low: Simply Connect SDK loader cannot retry after a failed first load
+### F-13 — Mitigated: Simply Connect SDK loader retries and times out safely
 
 Evidence:
 
-- `loadSimplyConnectSdk` caches `scLoadPromise`: `enabler/src/services/simply-connect-sdk.ts:46-87`.
-- Unlike `loadWebSdk`, it does not clear the cached promise in `finally`: `enabler/src/services/web-sdk.ts:48-106`.
+- Failed script loads remove the script element and clear the cached loader promise, allowing retry.
+- A bounded SDK-load timeout now removes both newly-created and pre-existing script tags if `checkout.js` never resolves `window.checkout`.
 
-Impact:
+Residual risk:
 
-A transient CDN or network failure can poison the page for the rest of the session. Subsequent attempts reuse the rejected promise instead of reinjecting/retrying the script.
-
-Recommendation:
-
-Mirror the Web SDK loader pattern and clear `scLoadPromise` after rejection/completion as appropriate.
+Sandbox browser evidence is still needed for CDN failure and recovery behavior under real network conditions.
 
 ## What is already close to template-compatible
 
 - Processor exposes `/operations/config`, `/operations/status`, `/operations/payment-components`, `/operations/payment-intents/:id`, and `/operations/transactions` with the same broad auth split as the template: `processor/src/routes/operation.route.ts:39-158`.
 - Processor advertises the standard `{ dropins, components, express }` payment-components response shape: `processor/src/dtos/operations/payment-components.dto.ts:77-83`.
-- Card-only advertisement is consistent with the project's card-first scope, as long as the enabler only exposes card to Checkout: `processor/src/services/nuvei-payment.service.ts:492-501`.
-- Web SDK mode is closer to the template's external-submit model because it sets `componentHasSubmit = true`: `enabler/src/components/web-sdk-card.ts:16-23`.
+- The current advertisement is card-first but no longer card-only: `dropins: [{ type: "embedded" }]`, `components: [{ type: "card" }]`, and `express: []`. Non-card APMs remain disabled by the Simply Connect `pmWhitelist`.
+- Web SDK mode remains the external-submit model (`componentHasSubmit = true`); the Simply Connect drop-in is the Merchant Center-compatible PSP-submit model (`dropinHasSubmit = false`).
 
 ## Recommended clean cutover
 
-1. Add a Checkout-facing `Enabler` adapter and export it from the enabler entry.
-2. Change Vite UMD `lib.name` to `Connector`; keep the output filenames unchanged.
-3. Make the adapter constructor one-argument and template-compatible. Fetch Nuvei config through `GET /operations/config`.
-4. Default whitelabel Checkout to a card builder with `componentHasSubmit = true` unless Simply Connect is adapted to honor `showPayButton` and `onPayButtonClick`.
-5. Align component lifecycle signatures to promises and accept the template submit parameter object.
-6. Match template callback payloads; remove session tokens from public callback results and docs.
-7. Resolve Nuvei DMN correlation with real sandbox evidence before relying on whitelabel Checkout for payment completion.
-8. Add parity tests:
+1. Keep the Checkout-facing `Enabler` adapter as the only Merchant Center entry point.
+2. Keep Vite UMD `lib.name` aligned with the commercetools loader contract once confirmed in whitelabel evidence.
+3. Keep the adapter constructor one-argument and template-compatible. Fetch Nuvei config through `GET /operations/config`.
+4. Use Web SDK `card` for external-submit card components and Simply Connect `embedded` for the Merchant Center-compatible drop-in path.
+5. Preserve promise-based lifecycle methods and template submit parameter compatibility.
+6. Keep public callback payloads template-shaped; never pass session tokens to `onComplete`.
+7. Resolve any remaining Nuvei DMN field ambiguity with real sandbox evidence before production claims.
+8. Maintain parity tests:
    - ESM bundle exports named `Enabler`.
-   - UMD bundle exposes `Connector.Enabler`.
+   - UMD bundle exposes the confirmed commercetools loader global.
    - `new Enabler({ processorUrl, sessionId })` does not require merchant config or a mode argument.
    - `mount()` awaits config/session/SDK initialization.
-   - `submit({ storePaymentDetails })` is accepted and awaited.
+   - `submit({ storePaymentDetails })` is accepted and awaited where the component owns submit.
    - Pending/rejected/approved outcomes produce documented Checkout-compatible callbacks.
    - Browser code does not log raw Nuvei results or pass session tokens to `onComplete`.
 

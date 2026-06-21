@@ -3,14 +3,14 @@
 
 ## System overview
 
-The Nuvei commercetools Connector is a commercetools Connect payment integration with two deployed applications: an `assets` application (`enabler`) that runs in the browser and renders either Nuvei Simply Connect or Nuvei Web SDK card mode, and a `service` application (`processor`) that exposes Fastify HTTP routes for commercetools Checkout, creates and updates commercetools Payments, and calls Nuvei server APIs. The primary inputs are commercetools session- or OAuth-authenticated payment requests, Nuvei widget callbacks, and Nuvei Direct Merchant Notification (DMN) webhooks. The primary outputs are Nuvei payment sessions or transaction operations and updated commercetools Payment transactions. The architecture is layered around a thin routing layer, a payment orchestration service, external API clients, and browser-side widget adapters.
+The Nuvei commercetools Connector is a commercetools Connect payment integration with two deployed applications: an `assets` application (`enabler`) that runs in the browser and renders either the Checkout-compatible Nuvei Simply Connect `embedded` drop-in or the Web SDK card component, and a `service` application (`processor`) that exposes Fastify HTTP routes for commercetools Checkout, creates and updates commercetools Payments, and calls Nuvei server APIs. The primary inputs are commercetools session- or OAuth-authenticated payment requests, Nuvei widget callbacks, and Nuvei Direct Merchant Notification (DMN) webhooks. The primary outputs are Nuvei payment sessions or transaction operations and updated commercetools Payment transactions. The architecture is layered around a thin routing layer, a payment orchestration service, dedicated commercetools/Nuvei clients, and browser enabler components that keep secrets server-side.
 
 ## Component diagram
 
 ```mermaid
 graph TD
   Browser[Browser / commercetools Checkout] --> Enabler[enabler assets package]
-  Enabler --> NuveiSDK[Nuvei SafeCharge Web SDK]
+  Enabler --> NuveiSDK[Nuvei Simply Connect / SafeCharge SDK]
   Enabler --> ProcessorRoutes[processor Fastify routes]
   ProcessorRoutes --> PaymentSDK[commercetools Connect Payments SDK]
   ProcessorRoutes --> NuveiPaymentService[NuveiPaymentService]
@@ -28,14 +28,14 @@ graph TD
 ### Checkout payment creation and confirmation
 
 1. A storefront or commercetools Checkout page instantiates the Checkout-facing `Enabler` adapter from `enabler/src/index.ts` with the processor URL, commercetools session ID, locale/country when available, and completion/error callbacks. Nuvei merchant identifiers and environment are fetched from the processor, not supplied by the shopper page.
-2. The caller asks the enabler for a card component builder (`card`). The adapter returns the Web SDK card builder path by default because it is host-submit compatible (`componentHasSubmit = true`).
+2. The caller asks the enabler for either a Web Components card builder (`createComponentBuilder("card")`) or the Simply Connect drop-in builder (`createDropinBuilder("embedded")`). The card builder is host-submit compatible (`componentHasSubmit = true`); the drop-in builder has `dropinHasSubmit = false` because Nuvei owns the internal pay button.
 3. `apiService.getConfig()` sends `GET /operations/config` (the `X-Session-ID` header is sent but not required — Checkout fetches connector config before a session exists); the processor returns only shopper-safe Nuvei frontend configuration (environment, merchant ID, merchant site ID).
-4. `WebSdkCardComponent` loads the Nuvei SafeCharge Web SDK from `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js` and calls the processor through `apiService` in `enabler/src/services/api-service.ts`.
-5. `apiService.createPayment()` sends `POST /payments/session` with `X-Session-ID`. The processor registers this route in `processor/src/server/plugins/nuvei-payment.plugin.ts` and authenticates it with the commercetools session header hook. The request body can include `paymentMethodOptions` and defaults to `card` when omitted.
+4. `WebSdkCardComponent` loads the Nuvei SafeCharge Web SDK from `https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js`; `SimplyConnectDropinComponent` loads Simply Connect v1 from `https://cdn.safecharge.com/safecharge_resources/v1/checkout/checkout.js`, passes `pmWhitelist: ["cc_card"]`, and gates Nuvei's pay button through `prePayment`/`onPayButtonClick`.
+5. `apiService.createPayment()` sends `POST /payments/session` with `X-Session-ID`. The processor registers this route in `processor/src/server/plugins/nuvei-payment.plugin.ts` and authenticates it with the commercetools session header hook. The request body is `{ paymentMethodOptions: { card: {} } }` for the Web Components path, `{ paymentMethodOptions: { embedded: {} } }` for the drop-in path, and defaults to `card` when omitted.
 6. `NuveiPaymentService.createPaymentSession()` reads the cart ID from request context, fetches the cart through the commercetools Connect Payments SDK, and **locks the cart** with the `freezeCart` update action (`HardFreeze` strategy) before any other processing — the cart total, discounts, and shipping can no longer drift between the Nuvei session and reconciliation. An already-frozen cart is accepted as-is (idempotent retries, second payment attempts); `Ordered`/`Merged` carts are rejected with `CART_NOT_LOCKABLE` (409). The planned payment amount is then calculated from the frozen cart, `NuveiClient.openOrder()` is called, and a commercetools Payment is created through `CtPaymentCreationService.handleCtPaymentCreation()`. If session setup fails after this request froze the cart, the processor unfreezes it best-effort so the shopper is not left with an immutable cart. The same locking applies to the `/operations/transactions` flow.
 7. The processor returns the cart ID, Nuvei `sessionToken`, commercetools payment reference, and merchant return URL to the enabler.
-8. The enabler renders the Nuvei card field using `SafeCharge(...).fields().create("card", ...)`. On submit it calls `SafeCharge(...).createPayment(...)` with the Nuvei session token, sends `clientUniqueId` as the commercetools cart ID, and sends the commercetools Payment ID through Nuvei merchant-reference aliases (`merchant_unique_id`, `merchantUniqueId`, and `merchantUniqueID`). The exact CT Payment is correlated by `merchant_unique_id` when it is a CT Payment ID, by DMN `sessionToken` matching `Payment.interfaceId`, or, for legacy/cart-referenced DMNs, by matching Nuvei transaction identifiers against existing cart Payment transactions.
-9. After the widget reports a result, `confirmPaymentResult()` calls `POST /payments/confirm/:paymentReference` with the Nuvei session token.
+8. The enabler renders the chosen Nuvei UI. Both paths send the commercetools Payment ID through Nuvei merchant-reference aliases (`merchant_unique_id`, `merchantUniqueId`, and `merchantUniqueID`); the Web SDK path also sends `clientUniqueId` as the commercetools cart ID. The exact CT Payment is correlated by `merchant_unique_id` when it is a CT Payment ID, by DMN `sessionToken` matching `Payment.interfaceId`, or, for cart-referenced DMNs, by matching Nuvei transaction identifiers against existing cart Payment transactions.
+9. After the widget reports a result, `confirmPaymentResult()` calls `POST /payments/confirm/:paymentReference` with the server-issued Nuvei session token, never a token echoed from the browser result.
 10. `NuveiPaymentService.confirmPayment()` retrieves the commercetools Payment, verifies that the authenticated session cart owns that Payment, calls `NuveiClient.getPaymentStatus()`, classifies the Nuvei status, and returns a tri-state outcome: `approved`, `rejected`, or `pending`. Terminal approved and rejected confirmations write one CT `Authorization` transaction. The interaction ID prefers Nuvei `PPP_TransactionID`, then Nuvei `TransactionID`/`transactionId`, then the already-bound Nuvei session token as a final idempotency key. Pending (inconclusive or unknown Nuvei status) does not write a CT transaction.
 
 ### Server-driven transaction creation
@@ -68,14 +68,11 @@ graph TD
 
 | Abstraction | Location | Role |
 | --- | --- | --- |
-| `Enabler` | `enabler/src/index.ts` | Checkout-facing payment-template-compatible adapter; accepts `processorUrl` and `sessionId`, fetches Nuvei config from the processor, and returns the Web SDK card builder. |
-| `NuveiSimplyConnectEnabler` | `enabler/src/index.ts` | Nuvei-specific browser entry point for Simply Connect mode; returns the Simply Connect card builder. |
-| `NuveiWebSdkEnabler` | `enabler/src/index.ts` | Nuvei-specific browser entry point for Web SDK mode; returns the Web SDK card builder. |
-| `NuveiEnabler` | `enabler/src/index.ts` | Nuvei-specific facade that requires an explicit mode parameter (`simply-connect` or `web-sdk`) and delegates to the matching card enabler. |
-| `PaymentEnabler`, `PaymentComponentBuilder` | `enabler/src/payment-enabler/payment-enabler.ts` | Frontend contracts consumed by commercetools Checkout or custom storefront code. |
-| `PAYMENT_METHOD_REGISTRY` | `enabler/src/payment-enabler/method-registry.ts`, `processor/src/dtos/operations/payment-components.dto.ts` | Registry of supported payment methods: `card` only. |
-| `SimplyConnectCardBuilder` / `SimplyConnectCardComponent` | `enabler/src/components/simply-connect-card.ts` | Browser card integration for Simply Connect mode; creates a payment session, loads Nuvei SDK, renders the widget, and routes tri-state confirmation outcomes. Not the default whitelabel Checkout path because Nuvei owns the internal pay button. |
-| `WebSdkCardBuilder` / `WebSdkCardComponent` | `enabler/src/components/web-sdk-card.ts` | Browser card integration for Web SDK mode; creates a payment session, loads Nuvei SDK, renders the card field, awaits mount/submit lifecycle calls, and routes tri-state confirmation outcomes. |
+| `Enabler` | `enabler/src/index.ts` | Checkout-facing payment-template-compatible adapter; accepts `processorUrl` and `sessionId`, fetches Nuvei config from the processor, returns the Web SDK card builder for `card`, and returns the Simply Connect drop-in builder for `embedded`. |
+| `PaymentEnabler`, `PaymentComponentBuilder`, `PaymentDropinBuilder` | `enabler/src/payment-enabler/payment-enabler.ts` | Frontend contracts consumed by commercetools Checkout or custom storefront code. Drop-in builders expose `dropinHasSubmit`, not `componentHasSubmit`. |
+| `PAYMENT_METHOD_REGISTRY` | `enabler/src/payment-enabler/method-registry.ts`, `processor/src/dtos/operations/payment-components.dto.ts` | Registry of supported UI methods: component `card` and drop-in `embedded`. |
+| `SimplyConnectDropinBuilder` / `SimplyConnectDropinComponent` | `enabler/src/components/simply-connect-dropin.ts` | Checkout-compatible in-page Simply Connect drop-in; creates an embedded session, loads `checkout.js`, whitelists `cc_card`, gates through `prePayment`, and routes tri-state confirmation outcomes without exposing raw Nuvei browser results. |
+| `WebSdkCardBuilder` / `WebSdkCardComponent` | `enabler/src/components/web-sdk-card.ts` | Browser card integration for Web SDK mode; creates a card session, loads Nuvei SDK, renders the card field, awaits mount/submit lifecycle calls, and routes tri-state confirmation outcomes. |
 | `apiService` | `enabler/src/services/api-service.ts` | Thin fetch client for `GET /operations/config`, `POST /payments/session`, and `POST /payments/confirm/:id`. |
 | `NuveiClient` | `processor/src/clients/nuvei.client.ts` | Server-side Nuvei REST client for `openOrder`, `getPaymentStatus`, `settleTransaction`, `voidTransaction`, `refundTransaction`, and DMN checksum validation. |
 | `NuveiPaymentService` | `processor/src/services/nuvei-payment.service.ts` | Core orchestration service for configuration, status, payment creation, transaction handling, payment modifications, confirmation, and DMN processing. |
@@ -91,10 +88,10 @@ graph TD
 | `GET` | `/config` | `processor/src/routes/operation.route.ts` | None (public by design; Checkout calls it before a session exists) | Return frontend Nuvei environment, merchant ID, and merchant site ID — shopper-safe values only. |
 | `GET` | `/status` | `processor/src/routes/operation.route.ts` | JWT | Run commercetools permission and Nuvei reachability checks. |
 | `GET` | `/health` | `processor/src/routes/operation.route.ts` | None | No auth. Returns `{ status: ok|degraded, commit: string, checks: [{name, status}] }` based on config-var presence plus the running commit hash. |
-| `GET` | `/payment-components`, `/operations/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return supported components and express methods. |
+| `GET` | `/payment-components`, `/operations/payment-components` | `processor/src/routes/operation.route.ts` | JWT | Return `{ dropins: [{ type: "embedded" }], components: [{ type: "card" }], express: [] }`. |
 | `POST` | `/payment-intents/:id`, `/operations/payment-intents/:id` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_payment_intents` | Capture, cancel, refund, or reverse a payment intent. |
 | `POST` | `/transactions`, `/operations/transactions` | `processor/src/routes/operation.route.ts` | OAuth2 + `manage_checkout_transactions` | Create a server-driven Nuvei order and commercetools Payment for a cart. |
-| `POST` | `/payments/session` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for the `card` payment method, defaulting to `card` if omitted. |
+| `POST` | `/payments/session` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Create a payment session for `card` or `embedded`, defaulting to `card` if omitted. |
 | `POST` | `/payments/confirm/:id` | `processor/src/routes/nuvei-payment.route.ts` | commercetools session header | Confirm a payment with Nuvei and return `{ outcome: "approved" \| "rejected" \| "pending" }`. HTTP `200` for approved and pending, `402` for rejected. CT `Authorization` `interactionId` prefers Nuvei `PPP_TransactionID`, then Nuvei transaction ID, then the bound session token. |
 | `POST` | `/webhooks/nuvei` | `processor/src/routes/nuvei-payment.route.ts` | Nuvei checksum/header hook | Process Nuvei DMN webhooks and reconcile Payment transactions. |
 
@@ -153,8 +150,8 @@ graph TD
 ```
 
 - `connect.yaml` is the commercetools Connect deployment descriptor. It declares the `enabler` assets application and `processor` service application, plus required standard and secured configuration keys.
-- `enabler/` is a Vite-built browser package. Its source is split by public payment contracts (`payment-enabler/`), explicit mode card components (`components/`), and external service wrappers (`services/`).
-- `enabler/src/components/` contains the explicit mode card integrations. The current implemented components are `simply-connect-card.ts` and `web-sdk-card.ts`.
+- `enabler/` is a Vite-built browser package. Its source is split by public payment contracts (`payment-enabler/`), Checkout/custom components (`components/`), and external service wrappers (`services/`).
+- `enabler/src/components/` contains `simply-connect-dropin.ts` and `web-sdk-card.ts`.
 - `enabler/src/services/` isolates browser-side external effects: loading the Simply Connect and Web SDK loaders (`simply-connect-sdk.ts`, `web-sdk.ts`) and calling the processor API.
 - `processor/` is a TypeScript Fastify service. Its source is split by HTTP concerns (`server/`, `routes/`, `dtos/`), business orchestration (`services/`), external clients (`clients/`), configuration (`config/`), Connect lifecycle scripts (`connectors/`), and shared infrastructure (`libs/`).
 - `processor/src/server/` owns Fastify construction, plugin autoloading, request context, security headers, CORS, raw body handling, and global error handling.

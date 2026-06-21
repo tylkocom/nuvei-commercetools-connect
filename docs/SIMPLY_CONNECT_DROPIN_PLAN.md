@@ -38,6 +38,14 @@ The first working demo must stay card-first. Nuvei Simply Connect can render man
 - `GET /operations/payment-components` currently returns `dropins: []` and `components: [{ type: "card" }]`.
 - The processor registry currently only treats `card` as supported. Earlier roadmap/docs explicitly removed embedded/drop-in support, so tests and docs must be updated as an intentional reversal.
 
+The earlier removal was correct at the time: it removed non-functional template scaffolding that advertised an embedded drop-in without a real Nuvei SDK implementation behind it. This plan reverses that decision only because the repository now has a working Simply Connect SDK integration that can be exposed through the proper commercetools DropIn contract.
+
+## Implementation Decisions
+
+- Use `embedded` as the advertised DropIn type and implement first, then verify the exact Checkout invocation against real Complete Checkout and Payment Only sandbox evidence.
+- Consolidate Simply Connect into a drop-in-only path. Remove the old Simply Connect card builder/enabler path instead of keeping two browser code paths that both call `checkout(...)`.
+- Make DMN payment recognition resilient to Nuvei/DMN method-name changes. A payment with a non-empty Nuvei `interfaceId` should continue to be recognized as a Nuvei payment even if `paymentMethodInfo.method` changes from `embedded` to a Nuvei-reported value such as `cc_card`.
+
 ## Target Architecture
 
 ### Merchant Center Surface
@@ -118,6 +126,7 @@ Files:
 - `enabler/src/payment-enabler/method-registry.ts`
 - `processor/src/dtos/operations/payment-components.dto.ts`
 - `processor/src/services/nuvei-payment.service.ts`
+- `processor/src/services/converters/nuvei-event.converter.ts` if method-update behavior needs adjustment after sandbox evidence
 - `processor/test/unit/contract/payment-method-contract.test.ts`
 
 Changes:
@@ -137,6 +146,7 @@ Changes:
 
 - Keep the existing `card` entry as a `component`.
 - Expand registry types from only `"card"` to `"card" | "embedded"` where the registry is used as the accepted UI method list.
+- Expand the TypeBox `DropinType` enum in `processor/src/dtos/operations/payment-components.dto.ts` from only `HPP: "hpp"` to include `EMBEDDED: "embedded"`. Without this, Fastify response validation can reject the intended `dropins: [{ type: "embedded" }]` response.
 - Change `NuveiPaymentService.getSupportedPaymentComponents()` to return:
 
 ```json
@@ -149,6 +159,7 @@ Changes:
 
 - Update `validatePaymentMethodOptions()` so `POST /payments/session` accepts exactly one of `card` or `embedded`, with an empty object payload for each. Continue rejecting unsupported keys, multiple keys, arrays, or non-empty arbitrary payloads.
 - For `embedded` sessions, pass `paymentMethod: "embedded"` into CT Payment creation. This records that the payment attempt started from the drop-in. DMN processing can still update `paymentMethodInfo.method` or name later with Nuvei-provided card metadata.
+- Update `isNuveiPayment()` so Checkout-session Payments remain recognizable after DMN method updates. The fallback should accept a non-empty `Payment.interfaceId` as sufficient Nuvei evidence instead of requiring `paymentMethodInfo.method` to still be present in the connector registry. This prevents duplicate or late DMNs from failing to resolve after a first DMN changes `method` from `embedded` to Nuvei card metadata such as `cc_card`.
 - Update tests that currently assert `dropins: []` and `card` only.
 
 Rationale:
@@ -162,7 +173,7 @@ Files:
 
 - `enabler/src/payment-enabler/payment-enabler.ts`
 - `enabler/src/payment-enabler/checkout-enabler.ts`
-- `enabler/src/components/simply-connect-dropin.ts` or `enabler/src/dropin/simply-connect-dropin.ts`
+- `enabler/src/dropin/simply-connect-dropin.ts`
 - `enabler/src/components/simply-connect-card.ts`
 - `enabler/src/index.ts`
 - `enabler/test/unit/checkout-enabler.test.ts`
@@ -173,8 +184,9 @@ Changes:
   - `createDropinBuilder(type: string): Promise<PaymentDropinBuilder>` stays on `PaymentEnabler`.
   - `PaymentDropinBuilder` must expose `dropinHasSubmit`, not `componentHasSubmit`.
   - Add `DropinOptions` and `DropinComponent` types if needed. They can initially mirror `ComponentOptions` and `PaymentComponent`.
+- Break the current `PaymentDropinBuilder extends PaymentComponentBuilder` inheritance. A drop-in builder must have its own `dropinHasSubmit` flag and must not inherit `componentHasSubmit`.
 - Implement `SimplyConnectDropinBuilder` with `dropinHasSubmit = false`.
-- Move the Simply Connect rendering logic out of `SimplyConnectCardComponent` into shared code or into the new drop-in component. Keep `SimplyConnectCardBuilder` only if the custom local harness still needs it, but the Checkout-facing path should use the drop-in builder.
+- Delete the Simply Connect card-component path. Remove `SimplyConnectCardBuilder`, `SimplyConnectCardComponent`, and `NuveiSimplyConnectEnabler` instead of maintaining two separate browser paths that call `checkout(...)`.
 - Implement `Enabler.createDropinBuilder("embedded")` in `checkout-enabler.ts`. It should:
   - Validate only `embedded` is supported.
   - Fetch processor config through the existing cached `getConfig()` path.
@@ -182,6 +194,7 @@ Changes:
 - Keep `Enabler.createComponentBuilder("card")` returning the Web SDK card builder so existing Web Components integrations still work.
 - Keep unsupported drop-in types such as `hpp`, `card`, `simply-connect`, and `dropin` rejected with a safe `METHOD_UNSUPPORTED` error.
 - Export `SimplyConnectDropinBuilder` from `enabler/src/index.ts` for tests and custom storefronts.
+- Remove Nuvei-specific enabler facades. Checkout configuration should choose the integration surface and call the matching builder on the single `Enabler` adapter.
 
 Rationale:
 
@@ -199,15 +212,17 @@ Files:
 Changes:
 
 - Extend `CheckoutFunction` typing to include `prePayment` and `onPaymentEvent`.
-- In the drop-in `checkout(...)` call, pass `prePayment`:
+- In the drop-in `checkout(...)` call, pass `prePayment`. Implement it defensively because Nuvei docs describe `resolve()`/`reject()` but the exact callback argument shape must be verified in sandbox. Prefer object-style `{ resolve, reject }`, and support positional arguments if sandbox evidence shows Nuvei passes them differently.
 
 ```ts
-prePayment: async ({ resolve, reject }) => {
+prePayment: async (callbackOrResolve, maybeReject) => {
+  const resolve = typeof callbackOrResolve === "function" ? callbackOrResolve : callbackOrResolve?.resolve;
+  const reject = typeof maybeReject === "function" ? maybeReject : callbackOrResolve?.reject;
   try {
     await this.componentOptions.onPayButtonClick?.();
-    resolve();
+    resolve?.();
   } catch (error) {
-    reject("Payment could not be started.");
+    reject?.("Payment could not be started.");
   }
 }
 ```
@@ -290,6 +305,7 @@ Changes:
 
 - Do not `console.log` raw Simply Connect result objects.
 - Do not pass `sessionToken`, card number fragments, BIN, UPO IDs, or raw Nuvei errors to `onComplete`.
+- Delete the old `simply-connect-card.ts` component rather than updating it in place, unless implementation discovers a direct custom-storefront requirement that justifies a second Simply Connect surface.
 - Keep public callback payloads template-compatible:
 
 ```ts
@@ -374,7 +390,7 @@ const dropin = builder.build({ onPayButtonClick });
 await dropin.mount("#payment-container");
 ```
 
-- Keep existing explicit `NuveiSimplyConnectEnabler` and `NuveiWebSdkEnabler` modes for comparison, but mark the new `Enabler drop-in` mode as the Merchant Center/Checkout-compatible path.
+- Remove explicit Nuvei-specific enabler modes from the harness after the drop-in path works locally. Use the Checkout-facing `Enabler` for both comparison paths: `createComponentBuilder("card")` for Web SDK card and `createDropinBuilder("embedded")` for Simply Connect drop-in.
 - Update mock `/payment-components` to return object arrays and include `dropins: [{ type: "embedded" }]` plus `express: []`.
 - Update mock `/payments/session` to recognize `paymentMethodOptions.embedded` and set `paymentMethodInfo.method = "embedded"`.
 - Capture safe evidence for:
@@ -401,6 +417,7 @@ Enabler tests:
 - `prePayment` rejects with a generic safe message when `onPayButtonClick` throws.
 - `onResult` calls `confirmPaymentResult` and never passes `sessionToken` to `onComplete`.
 - `loadSimplyConnectSdk()` can retry after a failed script load.
+- Public exports no longer include `NuveiSimplyConnectEnabler` or `SimplyConnectCardBuilder` after consolidation.
 
 Processor tests:
 
@@ -408,7 +425,7 @@ Processor tests:
 - `GET /operations/payment-components` returns `{ dropins: [{ type: "embedded" }], components: [{ type: "card" }], express: [] }`.
 - `validatePaymentMethodOptions()` accepts `{ card: {} }` and `{ embedded: {} }` and rejects unsupported, ambiguous, empty, or non-empty payloads.
 - `createPaymentSession()` creates a CT Payment with `paymentMethodInfo.method = "embedded"` for drop-in.
-- `isNuveiPayment()` recognizes drop-in-started Payments for DMN fallback resolution.
+- `isNuveiPayment()` recognizes drop-in-started Payments for DMN fallback resolution before and after DMN method updates such as `embedded -> cc_card`.
 - Existing card tests continue passing.
 
 Build and validation commands:
@@ -472,7 +489,8 @@ Required evidence files:
 | `processor/src/services/ct-payment-creation.service.ts` | Creates CT Payments for drop-in attempts with safe display name. |
 | `enabler/src/payment-enabler/payment-enabler.ts` | Drop-in builder contract matches commercetools template. |
 | `enabler/src/payment-enabler/checkout-enabler.ts` | Checkout-facing `Enabler` supports `createDropinBuilder("embedded")`. |
-| `enabler/src/components/simply-connect-dropin.ts` | New Simply Connect DropIn component renders `checkout.js`, gates through `prePayment`, and confirms through processor. |
+| `enabler/src/dropin/simply-connect-dropin.ts` | New Simply Connect DropIn component renders `checkout.js`, gates through `prePayment`, and confirms through processor. |
+| `enabler/src/components/simply-connect-card.ts` | Removed after consolidation; Simply Connect is exposed only as DropIn. |
 | `enabler/src/services/simply-connect-sdk.ts` | Typing includes needed callbacks and loader retry is safe. |
 | `examples/nuvei-web-ui/*` | Harness can exercise the Checkout-facing drop-in path. |
 | `README.md` and `docs/*` | Docs describe Merchant Center Drop-in setup and card-only MVP constraint. |
@@ -492,8 +510,10 @@ Required evidence files:
 | --- | --- |
 | Checkout may not invoke `onPayButtonClick` for DropIn exactly like local template harnesses. | Use Nuvei `prePayment` and verify with real Complete Checkout evidence. |
 | Merchant Center may require exact template type `embedded`. | Use `embedded` because it matches the commercetools template; verify in Merchant Center Add payment integration. |
+| Nuvei `prePayment` callback arguments may differ from the assumed object shape. | Implement the callback defensively and verify the exact shape in sandbox. |
 | Nuvei `pmWhitelist: ["cc_card"]` value may differ by account/config. | Verify in Nuvei sandbox; if Nuvei account uses another identifier, adjust before demo evidence. |
 | Simply Connect may not echo `merchant_unique_id` into every DMN. | Keep session-token fallback and capture actual DMN fields in sandbox. |
+| DMNs may update `paymentMethodInfo.method` from `embedded` to Nuvei card metadata. | Recognize Nuvei Payments by non-empty `interfaceId`, not only by registry method names. |
 | Drop-in pending states may outlive the browser confirm call. | Keep `pending` non-terminal and let DMN finalize. Do not mark success without Nuvei approval. |
 | Application `activePaymentComponentType` may prevent using web component and drop-in in one Checkout Application. | Use a dedicated demo Application for DropIn if needed. |
 
@@ -502,22 +522,26 @@ Required evidence files:
 1. Does Merchant Center show `embedded` as the Drop-in option immediately after `/operations/payment-components` advertises it?
 2. Does Complete Checkout call `createDropinBuilder("embedded")` or another type string for Drop-in integrations?
 3. Does Checkout pass a usable `onPayButtonClick` callback into DropIn builder config?
-4. Does Nuvei Simply Connect card-only whitelist require `cc_card` for this merchant account?
-5. Which exact fields appear in real Simply Connect DMNs for `merchant_unique_id`, `sessionToken`, `clientUniqueId`, `PPP_TransactionID`, `TransactionID`, amount, currency, and status?
-6. Does Checkout treat a bounded pending-to-unsuccessful callback as recoverable, or does it need explicit `onPending` support?
+4. What exact argument shape does Nuvei pass to `prePayment` in this merchant sandbox?
+5. Does Nuvei Simply Connect card-only whitelist require `cc_card` for this merchant account?
+6. Which exact fields appear in real Simply Connect DMNs for `merchant_unique_id`, `sessionToken`, `clientUniqueId`, `PPP_TransactionID`, `TransactionID`, amount, currency, and status?
+7. Does Checkout treat a bounded pending-to-unsuccessful callback as recoverable, or does it need explicit `onPending` support?
 
 ## Implementation Order
 
 1. Update processor and enabler registries to advertise `card` component plus `embedded` drop-in.
-2. Add the enabler drop-in types and `SimplyConnectDropinBuilder`.
-3. Wire `Enabler.createDropinBuilder("embedded")` to the Simply Connect drop-in.
-4. Add `prePayment` gating and safe callback handling.
-5. Update processor validation for `embedded` session creation.
-6. Update unit and contract tests.
-7. Update local harness and docs.
-8. Run build/test/connect validation.
-9. User performs manual deployment/install if needed.
-10. Capture real Nuvei sandbox and real commercetools Complete Checkout evidence.
+2. Expand `DropinType` response schema to include `embedded`.
+3. Add the enabler drop-in types and `SimplyConnectDropinBuilder`.
+4. Wire `Enabler.createDropinBuilder("embedded")` to the Simply Connect drop-in.
+5. Remove the old Simply Connect card component/enabler path.
+6. Add defensive `prePayment` gating and safe callback handling.
+7. Update processor validation for `embedded` session creation.
+8. Make `isNuveiPayment()` resilient to method-name changes.
+9. Update unit and contract tests.
+10. Update local harness and docs.
+11. Run build/test/connect validation.
+12. User performs manual deployment/install if needed.
+13. Capture real Nuvei sandbox and real commercetools Complete Checkout evidence.
 
 ## Acceptance Criteria
 
