@@ -157,10 +157,23 @@ export class NuveiClient {
     );
   }
 
-  async getPaymentStatus(params: { sessionToken: string }): Promise<PaymentStatusResponse> {
-    return this.sendRequest<PaymentStatusResponse>("getPaymentStatus", {
-      sessionToken: params.sessionToken,
-    });
+  /**
+   * Fetches Nuvei payment status by session token.
+   *
+   * When `signal` is supplied, the caller owns the deadline and the client's
+   * built-in request timeout is bypassed.
+   */
+  async getPaymentStatus(params: {
+    sessionToken: string;
+    signal?: AbortSignal;
+  }): Promise<PaymentStatusResponse> {
+    return this.sendRequest<PaymentStatusResponse>(
+      "getPaymentStatus",
+      {
+        sessionToken: params.sessionToken,
+      },
+      params.signal,
+    );
   }
 
   async isReachable(): Promise<boolean> {
@@ -308,10 +321,10 @@ export class NuveiClient {
   private async sendRequest<ResponseType>(
     endpoint: string,
     payload: NuveiRequestPayload,
+    signal?: AbortSignal,
   ): Promise<ResponseType> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-
+    const controller = signal ? undefined : new AbortController();
+    const timeout = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : undefined;
     log.info("Nuvei API request", { endpoint, payload: this.redactPayload(payload) });
 
     try {
@@ -319,7 +332,7 @@ export class NuveiClient {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
-        signal: controller.signal,
+        signal: signal ?? controller?.signal,
       });
 
       const responseBody = (await response.json()) as { errCode?: number | string };
@@ -339,7 +352,7 @@ export class NuveiClient {
 
       return responseBody as ResponseType;
     } finally {
-      clearTimeout(timeout);
+      if (timeout) clearTimeout(timeout);
     }
   }
 

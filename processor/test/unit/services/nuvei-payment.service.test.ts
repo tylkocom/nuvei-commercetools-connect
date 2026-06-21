@@ -404,13 +404,19 @@ describe("NuveiPaymentService", () => {
   });
 
   describe("processor payment method registry", () => {
-    it("accepts exactly card", () => {
-      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card"]);
-      expect(isSupportedPaymentMethod("embedded")).toBe(false);
+    it("accepts card component and embedded drop-in", () => {
+      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
+      expect(isSupportedPaymentMethod("embedded")).toBe(true);
       expect(isSupportedPaymentMethod("dropin")).toBe(false);
       expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "card")).toMatchObject({
         kind: "component",
         advertisedType: "card",
+        transitional: false,
+        pspMetadata: {},
+      });
+      expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "embedded")).toMatchObject({
+        kind: "dropin",
+        advertisedType: "embedded",
         transitional: false,
         pspMetadata: {},
       });
@@ -421,11 +427,11 @@ describe("NuveiPaymentService", () => {
   // getSupportedPaymentComponents()
   // -------------------------------------------------------------------------
   describe("getSupportedPaymentComponents()", () => {
-    it("returns registry-derived card component and no dropins", async () => {
+    it("returns registry-derived card component and embedded drop-in", async () => {
       const { service } = createService();
       const result = await service.getSupportedPaymentComponents();
       expect(result).toEqual({
-        dropins: [],
+        dropins: [{ type: "embedded" }],
         components: [{ type: "card" }],
         express: [],
       });
@@ -788,14 +794,20 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it("rejects unsupported payment method 'embedded' before Nuvei or commercetools side effects", async () => {
+    it("passes paymentMethod 'embedded' when paymentMethodOptions contains embedded", async () => {
       const { service } = createService();
 
-      await expect(
-        service.createPaymentSession({ paymentMethodOptions: { embedded: {} } }),
-      ).rejects.toMatchObject({
-        code: PublicPaymentErrorCode.METHOD_UNSUPPORTED,
-      });
+      mockGetCart.mockResolvedValue({ id: "cart-1", version: 1, cartState: "Active" });
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "USD" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-embedded" });
+
+      await service.createPaymentSession({ paymentMethodOptions: { embedded: {} } });
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethod: "embedded",
+        }),
+      );
     });
 
     it("passes paymentMethod 'card' when no options are provided", async () => {
@@ -814,7 +826,7 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it.each(["paypal", "dropin", "wechatpay"])(
+    it.each(["paypal", "dropin", "wechatpay", "hpp"])(
       "rejects unsupported payment method %s before Nuvei or commercetools side effects",
       async (unsupportedMethod) => {
         const { service } = createService();
@@ -843,8 +855,10 @@ describe("NuveiPaymentService", () => {
       ["empty method key", { paymentMethodOptions: { "": {} } }],
       ["non-object options", []],
       ["non-object paymentMethodOptions", { paymentMethodOptions: [] }],
-      ["non-object method payload", { paymentMethodOptions: { card: null } }],
-      ["non-empty method payload", { paymentMethodOptions: { card: { unexpected: true } } }],
+      ["non-object card payload", { paymentMethodOptions: { card: null } }],
+      ["non-empty card payload", { paymentMethodOptions: { card: { unexpected: true } } }],
+      ["non-object embedded payload", { paymentMethodOptions: { embedded: null } }],
+      ["non-empty embedded payload", { paymentMethodOptions: { embedded: { unexpected: true } } }],
     ])("rejects malformed %s before Nuvei or commercetools side effects", async (_, options) => {
       const { service } = createService();
 

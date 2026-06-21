@@ -208,6 +208,29 @@ describe("NuveiClient", () => {
       expect(capturedBody!.checksum).toBeUndefined();
       expect(capturedBody!.sessionToken).toBe("session-abc");
     });
+
+    it("threads an external abort signal into the request", async () => {
+      let capturedSignal: AbortSignal | undefined;
+      const controller = new AbortController();
+
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async (_url: string | URL | Request, init?: RequestInit) => {
+          capturedSignal = init?.signal as AbortSignal | undefined;
+          return new Response(
+            JSON.stringify({
+              status: "SUCCESS",
+              transactionStatus: "APPROVED",
+              errCode: 0,
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          );
+        },
+      );
+
+      await client.getPaymentStatus({ sessionToken: "session-abc", signal: controller.signal });
+
+      expect(capturedSignal).toBe(controller.signal);
+    });
   });
 
   // ---------------------------------------------------------------------------

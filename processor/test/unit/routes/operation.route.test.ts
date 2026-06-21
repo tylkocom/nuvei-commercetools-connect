@@ -314,7 +314,7 @@ describe("operation routes", () => {
 
       expect(paymentService.getSupportedPaymentComponents).toHaveBeenCalledOnce();
       expect(expectedPaymentComponentsFromRegistry()).toEqual({
-        dropins: [],
+        dropins: [{ type: "embedded" }],
         components: [{ type: "card" }],
         express: [],
       });

@@ -760,12 +760,26 @@ describe("NuveiPaymentService – DMN processing", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
-    it("resolves merchant_unique_id as cart ID when Nuvei does not send a session token", async () => {
+    it("resolves method-updated drop-in payment by cart transaction identity", async () => {
       const { service } = createService();
       const payment = makeDmnMockPayment({
         id: "payment-from-cart",
         interfaceId: "nuvei-session-token",
-        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+        paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Initial",
+            interactionId: "nuvei-session-token",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Success",
+            interactionId: "50001",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
       } as any);
       const body = {
         ...dmnAuthOk,
@@ -803,9 +817,67 @@ describe("NuveiPaymentService – DMN processing", () => {
         defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
       );
 
-      await service.processNuveiDmn(body);
+      await expect(service.processNuveiDmn(body)).resolves.toBeUndefined();
 
       expect(mockGetCart).toHaveBeenCalledWith({ id: "cart-123" });
+      expect(mockFindPaymentsByInterfaceId).not.toHaveBeenCalled();
+      expect(mockConvertDmnToPaymentUpdate).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("resolves method-updated drop-in payment by Nuvei session binding", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-cart",
+        interfaceId: "nuvei-session-token",
+        paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Initial",
+            interactionId: "nuvei-session-token",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: [{ typeId: "payment", id: "payment-from-cart" }] },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        if (id === "payment-from-cart") {
+          return payment;
+        }
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await expect(service.processNuveiDmn(body)).resolves.toBeUndefined();
+
       expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ merchant_unique_id: "payment-from-cart" }),
         1000,
@@ -813,6 +885,213 @@ describe("NuveiPaymentService – DMN processing", () => {
       expect(mockUpdatePayment).toHaveBeenCalledWith(
         expect.objectContaining({ id: "payment-from-cart" }),
       );
+    });
+
+    it("does not resolve cart-id DMNs to foreign payments with a matching interface transaction", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "foreign-payment",
+        interfaceId: "foreign-session-token",
+        paymentMethodInfo: { paymentInterface: "foreign-checkout-interface", method: "Visa" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Initial",
+            interactionId: "foreign-session-token",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: [{ typeId: "payment", id: "foreign-payment" }] },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        if (id === "foreign-payment") {
+          return payment;
+        }
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "foreign-session-token", clientUniqueId: "other-cart" }),
+      );
+
+      await expect(service.processNuveiDmn(body)).rejects.toThrow(
+        "Missing DMN session token for Payment fallback",
+      );
+
+      expect(mockNuveiClientInstance.getPaymentStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionToken: "foreign-session-token",
+          signal: expect.any(AbortSignal),
+        }),
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("rejects cart-id DMNs when too many session-bound fallback candidates exist", async () => {
+      const { service } = createService();
+      const payments = Array.from({ length: 4 }, (_, index) => {
+        const sessionToken = `session-token-${index}`;
+        return makeDmnMockPayment({
+          id: `payment-${index}`,
+          interfaceId: sessionToken,
+          paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              state: "Initial",
+              interactionId: sessionToken,
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        } as any);
+      });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: payments.map((payment) => ({ typeId: "payment", id: payment.id })) },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        const payment = payments.find((candidate) => candidate.id === id);
+        if (payment) return payment;
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+
+      await expect(
+        service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" }),
+      ).rejects.toThrow("Too many session-bound Payments found for DMN cart reference");
+
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("does not let session-bound overflow block a static Nuvei cart candidate", async () => {
+      const { service } = createService();
+      const staticPayment = makeDmnMockPayment({
+        id: "static-nuvei-payment",
+        interfaceId: "nuvei-session-token",
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "card" },
+        transactions: [
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Initial",
+            interactionId: "nuvei-session-token",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+          {
+            type: PaymentTransactions.AUTHORIZATION,
+            state: "Success",
+            interactionId: "50001",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+          },
+        ],
+      } as any);
+      const sessionBoundPayments = Array.from({ length: 4 }, (_, index) => {
+        const sessionToken = `foreign-session-token-${index}`;
+        return makeDmnMockPayment({
+          id: `foreign-payment-${index}`,
+          interfaceId: sessionToken,
+          paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              state: "Initial",
+              interactionId: sessionToken,
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        } as any);
+      });
+      const payments = [staticPayment, ...sessionBoundPayments];
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: payments.map((payment) => ({ typeId: "payment", id: payment.id })) },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw new Error("The Resource with ID 'cart-123' was not found.");
+        }
+        const payment = payments.find((candidate) => candidate.id === id);
+        if (payment) return payment;
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+
+      await expect(
+        service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" }),
+      ).resolves.toBeUndefined();
+
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("bounds session-bound fallback verification time", async () => {
+      vi.useFakeTimers();
+      try {
+        const { service } = createService();
+        const payment = makeDmnMockPayment({
+          id: "payment-from-cart",
+          interfaceId: "nuvei-session-token",
+          paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              state: "Initial",
+              interactionId: "nuvei-session-token",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        } as any);
+
+        mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+        mockGetCart.mockResolvedValue({
+          id: "cart-123",
+          version: 7,
+          paymentInfo: { payments: [{ typeId: "payment", id: "payment-from-cart" }] },
+        });
+        mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+          if (id === "cart-123") {
+            throw new Error("The Resource with ID 'cart-123' was not found.");
+          }
+          if (id === "payment-from-cart") return payment;
+          throw new Error(`Unexpected payment lookup: ${id}`);
+        });
+        mockNuveiClientInstance.getPaymentStatus.mockReturnValue(new Promise(() => undefined));
+
+        const processing = expect(
+          service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" }),
+        ).rejects.toThrow("Missing DMN session token for Payment fallback");
+        await vi.advanceTimersByTimeAsync(3_000);
+
+        await processing;
+        expect(mockNuveiClientInstance.getPaymentStatus).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sessionToken: "nuvei-session-token",
+            signal: expect.any(AbortSignal),
+          }),
+        );
+        expect(mockUpdatePayment).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("resolves cart-id DMN to the Payment that already has the Nuvei transaction id", async () => {

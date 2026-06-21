@@ -17,7 +17,8 @@ import {
 } from "./types/operation.type.js";
 import {
   PAYMENT_METHOD_REGISTRY,
-  SupportedPaymentComponentsSchemaDTO,
+  type SupportedPaymentComponentsSchemaDTO,
+  type SupportedPaymentMethod,
   isSupportedPaymentMethod,
 } from "../dtos/operations/payment-components.dto.js";
 import {
@@ -101,6 +102,9 @@ const FALLBACK_TRANSACTION_ID_KEYS = [
   "transactionID",
 ] as const;
 
+const MAX_SESSION_BOUND_DMN_CANDIDATES = 3;
+const DMN_SESSION_VERIFICATION_TIMEOUT_MS = 3_000;
+
 type NuveiTerminalIdentitySource = "ppp" | "transactionId" | "sessionToken";
 
 type NuveiTerminalIdentity = {
@@ -114,6 +118,25 @@ function getNonEmptyString(body: Record<string, unknown>, key: string): string |
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function withAbortTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+
+  return Promise.race([operation(controller.signal), timeoutPromise]).finally(() =>
+    clearTimeout(timeout),
+  );
 }
 
 /** Extract the canonical Nuvei PPP transaction ID from a Nuvei status/DMN body. */
@@ -235,7 +258,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return `${token.slice(0, 6)}...[redacted]...${token.slice(-4)}`;
   }
 
-  public validatePaymentMethodOptions(options?: unknown): "card" {
+  public validatePaymentMethodOptions(options?: unknown): SupportedPaymentMethod {
     if (options === undefined) {
       return "card";
     }
@@ -650,7 +673,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
    */
   public async getSupportedPaymentComponents(): Promise<SupportedPaymentComponentsSchemaDTO> {
     return {
-      dropins: [],
+      dropins: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "dropin").map(
+        (entry) => ({
+          type: entry.advertisedType,
+        }),
+      ),
       components: PAYMENT_METHOD_REGISTRY.filter((entry) => entry.kind === "component").map(
         (entry) => ({
           type: entry.advertisedType,
@@ -1390,18 +1417,69 @@ export class NuveiPaymentService extends AbstractPaymentService {
     };
   }
 
-  private isNuveiPayment(payment: Payment): boolean {
-    const info = payment.paymentMethodInfo;
-    if (info?.paymentInterface === NUVEI_PAYMENT_INTERFACE) return true;
-    // Checkout-session payments carry the per-attempt payment interface that
-    // commercetools Checkout dictates (see CtPaymentCreationService), so the
-    // static identifier no longer matches. Recognize them by the method the
-    // connector registered plus the stored Nuvei session token.
+  private hasNuveiSessionBinding(payment: Payment): boolean {
     return (
       typeof payment.interfaceId === "string" &&
       payment.interfaceId.length > 0 &&
-      isSupportedPaymentMethod(info?.method ?? "")
+      (payment.transactions ?? []).some(
+        (transaction) => transaction.interactionId === payment.interfaceId,
+      )
     );
+  }
+
+  private async isNuveiVerifiedSessionBoundPayment(
+    payment: Payment,
+    cartId: string,
+  ): Promise<boolean> {
+    if (!this.hasNuveiSessionBinding(payment)) return false;
+
+    const sessionToken = payment.interfaceId as string;
+    try {
+      const statusBody = (await withAbortTimeout(
+        (signal) => nuveiClient().getPaymentStatus({ sessionToken, signal }),
+        DMN_SESSION_VERIFICATION_TIMEOUT_MS,
+        "Nuvei session verification timed out",
+      )) as Record<string, unknown>;
+
+      if (statusBody.sessionToken !== undefined && statusBody.sessionToken !== sessionToken) {
+        return false;
+      }
+
+      if (statusBody.clientUniqueId === undefined || String(statusBody.clientUniqueId) !== cartId) {
+        return false;
+      }
+
+      this.assertNuveiStatusMatchesPayment(statusBody, payment, cartId, false);
+      return true;
+    } catch (error) {
+      log.warn("Ignoring cart-linked Payment that did not verify as a Nuvei session.", {
+        cartId,
+        paymentId: payment.id,
+        reason: error instanceof Error ? error.name : typeof error,
+      });
+      return false;
+    }
+  }
+
+  private async getNuveiVerifiedSessionBoundPayments(
+    payments: Payment[],
+    cartId: string,
+  ): Promise<Payment[]> {
+    if (payments.length > MAX_SESSION_BOUND_DMN_CANDIDATES) {
+      throw new Error("Too many session-bound Payments found for DMN cart reference");
+    }
+
+    const verified = await Promise.all(
+      payments.map(async (payment) =>
+        (await this.isNuveiVerifiedSessionBoundPayment(payment, cartId)) ? payment : undefined,
+      ),
+    );
+
+    return verified.filter((payment): payment is Payment => payment !== undefined);
+  }
+
+  private isNuveiPayment(payment: Payment): boolean {
+    return payment.paymentMethodInfo?.paymentInterface === NUVEI_PAYMENT_INTERFACE;
   }
 
   private paymentMatchesDmnAmount(
@@ -1464,9 +1542,21 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const payments = await Promise.all(
       paymentIds.map((id) => this.ctPaymentService.getPayment({ id })),
     );
-    const candidates = payments.filter(
-      (payment) => this.isNuveiPayment(payment) && this.paymentMatchesDmnAmount(payment, dmnAmount),
+    const amountMatches = payments.filter((payment) =>
+      this.paymentMatchesDmnAmount(payment, dmnAmount),
     );
+    const staticNuveiCandidates = amountMatches.filter((payment) => this.isNuveiPayment(payment));
+    const sessionBoundCandidates = amountMatches.filter(
+      (payment) => !this.isNuveiPayment(payment) && this.hasNuveiSessionBinding(payment),
+    );
+    // Prefer statically identified connector Payments. Session-bound verification is a
+    // bounded fallback for Checkout-session interface IDs and must not let unrelated
+    // cart-linked session candidates block an already identifiable Nuvei Payment.
+    const verifiedSessionBoundCandidates =
+      staticNuveiCandidates.length === 0
+        ? await this.getNuveiVerifiedSessionBoundPayments(sessionBoundCandidates, cartId)
+        : [];
+    const candidates = [...staticNuveiCandidates, ...verifiedSessionBoundCandidates];
 
     if (candidates.length === 0) {
       return undefined;

@@ -10,6 +10,7 @@ import { log } from "../libs/logger/index.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
 import {
   METHOD_NAMES,
+  PAYMENT_METHOD_INFO_METHODS,
   isSupportedPaymentMethod,
 } from "../dtos/operations/payment-components.dto.js";
 
@@ -42,8 +43,10 @@ export class CtPaymentCreationService {
     cart: Cart;
     paymentMethod?: string;
   }): Promise<string> {
-    const paymentMethod = opts.paymentMethod ?? "nuvei";
-    // commercetools Checkout binds a Payment to its checkout transaction by
+    const requestedPaymentMethod = opts.paymentMethod ?? "nuvei";
+    const paymentMethodInfoMethod = isSupportedPaymentMethod(requestedPaymentMethod)
+      ? PAYMENT_METHOD_INFO_METHODS[requestedPaymentMethod]
+      : requestedPaymentMethod;
     // matching paymentMethodInfo.paymentInterface against the per-attempt
     // payment interface it passes through the session metadata. Falling back
     // to the static connector identifier keeps non-Checkout flows working,
@@ -55,9 +58,11 @@ export class CtPaymentCreationService {
       interfaceId: opts.interactionId,
       paymentMethodInfo: {
         paymentInterface,
-        method: paymentMethod,
+        method: paymentMethodInfoMethod,
         name: {
-          en: isSupportedPaymentMethod(paymentMethod) ? METHOD_NAMES[paymentMethod] : "Nuvei",
+          en: isSupportedPaymentMethod(requestedPaymentMethod)
+            ? METHOD_NAMES[requestedPaymentMethod]
+            : "Nuvei",
         },
       },
       ...(opts.cart.customerId
