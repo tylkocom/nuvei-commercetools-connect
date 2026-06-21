@@ -94,4 +94,89 @@ describe("loadSimplyConnectSdk", () => {
     expect(existingScript.addEventListener).toHaveBeenCalledWith("load", expect.any(Function));
     expect(mockCreateElement).not.toHaveBeenCalled();
   });
+
+  it("can retry after a failed script load", async () => {
+    const mockCheckout = vi.fn();
+    const windowStub: { checkout?: typeof mockCheckout } = {};
+    vi.stubGlobal("window", windowStub);
+
+    const scripts: Array<Record<string, any>> = [];
+    const mockCreateElement = vi.fn(() => {
+      const scriptEl = { remove: vi.fn() };
+      scripts.push(scriptEl);
+      return scriptEl;
+    });
+    vi.stubGlobal("document", {
+      querySelector: vi.fn().mockReturnValue(null),
+      createElement: mockCreateElement,
+      head: { appendChild: vi.fn() },
+    });
+
+    const { loadSimplyConnectSdk } = await import("../../src/services/simply-connect-sdk");
+    const firstAttempt = loadSimplyConnectSdk();
+    scripts[0].onerror();
+    await expect(firstAttempt).rejects.toThrow("Failed to load Nuvei SDK script");
+
+    const secondAttempt = loadSimplyConnectSdk();
+    windowStub.checkout = mockCheckout;
+    scripts[1].onload();
+
+    await expect(secondAttempt).resolves.toBe(mockCheckout);
+    expect(mockCreateElement).toHaveBeenCalledTimes(2);
+    expect(scripts[0].remove).toHaveBeenCalledOnce();
+  });
+
+  it("fails and removes a newly appended script when loading times out", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("window", {});
+
+      const scriptEl = { remove: vi.fn() };
+      vi.stubGlobal("document", {
+        querySelector: vi.fn().mockReturnValue(null),
+        createElement: vi.fn().mockReturnValue(scriptEl),
+        head: { appendChild: vi.fn() },
+      });
+
+      const { loadSimplyConnectSdk } = await import("../../src/services/simply-connect-sdk");
+      const promise = loadSimplyConnectSdk();
+      const assertion = expect(promise).rejects.toThrow("Timed out loading Nuvei SDK script");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await assertion;
+      expect(scriptEl.remove).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("fails and removes an existing script when its load event never resolves checkout", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("window", {});
+
+      const existingScript = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        remove: vi.fn(),
+      };
+      vi.stubGlobal("document", {
+        querySelector: vi.fn().mockReturnValue(existingScript),
+        createElement: vi.fn(),
+        head: { appendChild: vi.fn() },
+      });
+
+      const { loadSimplyConnectSdk } = await import("../../src/services/simply-connect-sdk");
+      const promise = loadSimplyConnectSdk();
+      const assertion = expect(promise).rejects.toThrow("Timed out loading Nuvei SDK script");
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      await assertion;
+      expect(existingScript.removeEventListener).toHaveBeenCalledWith("load", expect.any(Function));
+      expect(existingScript.removeEventListener).toHaveBeenCalledWith("error", expect.any(Function));
+      expect(existingScript.remove).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

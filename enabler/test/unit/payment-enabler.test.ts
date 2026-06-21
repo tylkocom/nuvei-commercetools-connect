@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NuveiEnabler, NuveiSimplyConnectEnabler, NuveiWebSdkEnabler } from "../../src/index";
 import { apiService } from "../../src/services/api-service";
 import type { EnablerOptions } from "../../src/payment-enabler/payment-enabler";
 import * as pe from "../../src/payment-enabler/payment-enabler";
-import * as scSdk from "../../src/services/simply-connect-sdk";
-import * as wsSdk from "../../src/services/web-sdk";
 
 function makeEnablerOptions(overrides: Partial<EnablerOptions> = {}): EnablerOptions {
   return {
@@ -74,13 +71,14 @@ describe("validateEnablerOptions", () => {
 });
 
 describe("enabler mirrored method registry", () => {
-  it("contains only card in deterministic order", () => {
+  it("contains card component and embedded drop-in in deterministic order", () => {
     expect(pe.PaymentMethod.card).toBe("card");
-    expect(pe.SUPPORTED_PAYMENT_METHODS).toEqual(["card"]);
-    expect(pe.PAYMENT_METHOD_REGISTRY.map((entry) => entry.key)).toEqual(["card"]);
+    expect(pe.PaymentMethod.embedded).toBe("embedded");
+    expect(pe.SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
+    expect(pe.PAYMENT_METHOD_REGISTRY.map((entry) => entry.key)).toEqual(["card", "embedded"]);
   });
 
-  it("keeps PSP metadata empty for the card entry", () => {
+  it("keeps PSP metadata empty for the card and embedded entries", () => {
     expect(pe.PAYMENT_METHOD_REGISTRY).toEqual([
       expect.objectContaining({
         key: "card",
@@ -89,143 +87,14 @@ describe("enabler mirrored method registry", () => {
         transitional: false,
         pspMetadata: {},
       }),
+      expect.objectContaining({
+        key: "embedded",
+        kind: "dropin",
+        advertisedType: "embedded",
+        transitional: false,
+        pspMetadata: {},
+      }),
     ]);
-  });
-});
-
-describe("NuveiSimplyConnectEnabler", () => {
-  it("creates a card component builder", async () => {
-    const enabler = new NuveiSimplyConnectEnabler(makeEnablerOptions());
-
-    const builder = await enabler.createComponentBuilder("card");
-
-    expect(builder.componentHasSubmit).toBe(false);
-    expect(typeof builder.build).toBe("function");
-  });
-
-  it("rejects unsupported component types before SDK or processor side effects", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
-    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
-    const enabler = new NuveiSimplyConnectEnabler(makeEnablerOptions());
-
-    await expect(enabler.createComponentBuilder("paypal")).rejects.toMatchObject({
-      code: pe.PublicPaymentErrorCode.METHOD_UNSUPPORTED,
-      message: expect.stringContaining("Supported methods: card"),
-    });
-    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
-    expect(loadWebSdkSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-});
-
-describe("NuveiWebSdkEnabler", () => {
-  it("creates a card component builder", async () => {
-    const enabler = new NuveiWebSdkEnabler(makeEnablerOptions());
-
-    const builder = await enabler.createComponentBuilder("card");
-
-    expect(builder.componentHasSubmit).toBe(true);
-    expect(typeof builder.build).toBe("function");
-  });
-
-  it("rejects unsupported component types before SDK or processor side effects", async () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
-    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
-    const enabler = new NuveiWebSdkEnabler(makeEnablerOptions());
-
-    await expect(enabler.createComponentBuilder("paypal")).rejects.toMatchObject({
-      code: pe.PublicPaymentErrorCode.METHOD_UNSUPPORTED,
-      message: expect.stringContaining("Supported methods: card"),
-    });
-    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
-    expect(loadWebSdkSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-});
-
-describe("NuveiEnabler facade mode validation", () => {
-  it("accepts 'simply-connect' mode", () => {
-    expect(() => new NuveiEnabler(makeEnablerOptions(), "simply-connect")).not.toThrow();
-  });
-
-  it("accepts 'web-sdk' mode", () => {
-    expect(() => new NuveiEnabler(makeEnablerOptions(), "web-sdk")).not.toThrow();
-  });
-
-  it("throws METHOD_UNSUPPORTED before any side effect when mode is undefined", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
-    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
-    const explosiveOpts = Object.defineProperty({}, "processorUrl", {
-      get() {
-        throw new Error("validateEnablerOptions should not run");
-      },
-      configurable: true,
-    }) as EnablerOptions;
-
-    expect(
-      () => new NuveiEnabler(explosiveOpts, undefined as unknown as "simply-connect" | "web-sdk"),
-    ).toThrow(pe.PaymentSetupError);
-    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
-    expect(loadWebSdkSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("throws METHOD_UNSUPPORTED for unsupported mode 'hpp'", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
-    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
-    const explosiveOpts = Object.defineProperty({}, "processorUrl", {
-      get() {
-        throw new Error("validateEnablerOptions should not run");
-      },
-      configurable: true,
-    }) as EnablerOptions;
-
-    expect(
-      () => new NuveiEnabler(explosiveOpts, "hpp" as unknown as "simply-connect" | "web-sdk"),
-    ).toThrow(pe.PaymentSetupError);
-    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
-    expect(loadWebSdkSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("throws METHOD_UNSUPPORTED for empty string mode", () => {
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const loadSimplyConnectSpy = vi.spyOn(scSdk, "loadSimplyConnectSdk");
-    const loadWebSdkSpy = vi.spyOn(wsSdk, "loadWebSdk");
-    const explosiveOpts = Object.defineProperty({}, "processorUrl", {
-      get() {
-        throw new Error("validateEnablerOptions should not run");
-      },
-      configurable: true,
-    }) as EnablerOptions;
-
-    expect(
-      () => new NuveiEnabler(explosiveOpts, "" as unknown as "simply-connect" | "web-sdk"),
-    ).toThrow(pe.PaymentSetupError);
-    expect(loadSimplyConnectSpy).not.toHaveBeenCalled();
-    expect(loadWebSdkSpy).not.toHaveBeenCalled();
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
-
-  it("delegates createComponentBuilder to the simply connect mode", async () => {
-    const enabler = new NuveiEnabler(makeEnablerOptions(), "simply-connect");
-    const builder = await enabler.createComponentBuilder(pe.PaymentMethod.card);
-    expect(builder.componentHasSubmit).toBe(false);
-  });
-
-  it("delegates createComponentBuilder to the web sdk mode", async () => {
-    const enabler = new NuveiEnabler(makeEnablerOptions(), "web-sdk");
-    const builder = await enabler.createComponentBuilder(pe.PaymentMethod.card);
-    expect(builder.componentHasSubmit).toBe(true);
   });
 });
 
@@ -285,13 +154,4 @@ describe("EnablerOptions onPending", () => {
     expect(() => pe.validateEnablerOptions(makeEnablerOptions({ onPending }))).not.toThrow();
   });
 
-  it("NuveiSimplyConnectEnabler construction succeeds with onPending in options", () => {
-    const onPending = vi.fn();
-    expect(() => new NuveiSimplyConnectEnabler(makeEnablerOptions({ onPending }))).not.toThrow();
-  });
-
-  it("NuveiWebSdkEnabler construction succeeds with onPending in options", () => {
-    const onPending = vi.fn();
-    expect(() => new NuveiWebSdkEnabler(makeEnablerOptions({ onPending }))).not.toThrow();
-  });
 });

@@ -1,8 +1,11 @@
 import { WebSdkCardBuilder } from "../components/web-sdk-card.js";
+import { SimplyConnectDropinBuilder } from "../components/simply-connect-dropin.js";
 import { apiService, type ApiService, type ProcessorConfigResponse } from "../services/api-service.js";
 import type {
   CheckoutEnablerOptions,
   ComponentOptions,
+  DropinComponent,
+  DropinOptions,
   EnablerOptions,
   PaymentComponent,
   PaymentComponentBuilder,
@@ -37,6 +40,8 @@ function toNuveiOptions(
   };
 }
 
+type ProcessorConfigLoader = () => Promise<ProcessorConfigResponse>;
+
 /**
  * Checkout-facing enabler aligned with the commercetools payment-template API.
  *
@@ -57,11 +62,15 @@ export class Enabler implements PaymentEnabler {
       throw methodUnsupported(type, "component");
     }
 
-    return new CheckoutCardBuilder(this.options, this.getConfig());
+    return new CheckoutCardBuilder(this.options, () => this.getConfig());
   }
 
   async createDropinBuilder(type: string): Promise<PaymentDropinBuilder> {
-    throw methodUnsupported(type, "dropin");
+    if (type !== PaymentMethod.embedded) {
+      throw methodUnsupported(type, "dropin");
+    }
+
+    return new CheckoutDropinBuilder(this.options, () => this.getConfig());
   }
 
   async createExpressBuilder(type: string): Promise<PaymentExpressBuilder> {
@@ -88,32 +97,26 @@ export class Enabler implements PaymentEnabler {
   }
 
   private getConfig(): Promise<ProcessorConfigResponse> {
-    this.configPromise ??= this.api.getConfig();
+    this.configPromise ??= this.api.getConfig().catch((error: unknown) => {
+      this.configPromise = undefined;
+      throw error;
+    });
     return this.configPromise;
   }
 }
 
-class CheckoutCardBuilder implements PaymentComponentBuilder {
-  public componentHasSubmit = true;
+type DelegateFactory<TDelegate extends PaymentComponent> = (
+  options: EnablerOptions,
+) => TDelegate;
+
+class CheckoutDelegateComponent<TDelegate extends PaymentComponent> implements PaymentComponent {
+  private delegate: TDelegate | undefined;
+  private delegatePromise: Promise<TDelegate> | undefined;
 
   constructor(
     private readonly options: CheckoutEnablerOptions,
-    private readonly configPromise: Promise<ProcessorConfigResponse>,
-  ) {}
-
-  build(config: ComponentOptions): PaymentComponent {
-    return new CheckoutCardComponent(this.options, this.configPromise, config);
-  }
-}
-
-class CheckoutCardComponent implements PaymentComponent {
-  private delegate: PaymentComponent | undefined;
-  private delegatePromise: Promise<PaymentComponent> | undefined;
-
-  constructor(
-    private readonly options: CheckoutEnablerOptions,
-    private readonly configPromise: Promise<ProcessorConfigResponse>,
-    private readonly componentOptions: ComponentOptions,
+    private readonly loadConfig: ProcessorConfigLoader,
+    private readonly createDelegate: DelegateFactory<TDelegate>,
   ) {}
 
   async mount(selector: string): Promise<void> {
@@ -142,21 +145,59 @@ class CheckoutCardComponent implements PaymentComponent {
   }
 
   async isAvailable(): Promise<boolean> {
-    const delegate = await this.getDelegate();
-    return (await delegate.isAvailable?.()) ?? true;
+    try {
+      const delegate = await this.getDelegate();
+      return (await delegate.isAvailable?.()) ?? true;
+    } catch {
+      return false;
+    }
   }
 
-  private getDelegate(): Promise<PaymentComponent> {
+  private getDelegate(): Promise<TDelegate> {
     if (this.delegate) {
       return Promise.resolve(this.delegate);
     }
 
-    this.delegatePromise ??= this.configPromise.then((config) => {
-      const builder = new WebSdkCardBuilder(toNuveiOptions(this.options, config));
-      this.delegate = builder.build(this.componentOptions);
-      return this.delegate;
-    });
+    this.delegatePromise ??= this.loadConfig()
+      .then((config) => {
+        this.delegate = this.createDelegate(toNuveiOptions(this.options, config));
+        return this.delegate;
+      })
+      .catch((error: unknown) => {
+        this.delegatePromise = undefined;
+        throw error;
+      });
 
     return this.delegatePromise;
+  }
+}
+
+class CheckoutCardBuilder implements PaymentComponentBuilder {
+  public componentHasSubmit = true;
+
+  constructor(
+    private readonly options: CheckoutEnablerOptions,
+    private readonly loadConfig: ProcessorConfigLoader,
+  ) {}
+
+  build(config: ComponentOptions): PaymentComponent {
+    return new CheckoutDelegateComponent(this.options, this.loadConfig, (options) =>
+      new WebSdkCardBuilder(options).build(config),
+    );
+  }
+}
+
+class CheckoutDropinBuilder implements PaymentDropinBuilder {
+  public dropinHasSubmit = false;
+
+  constructor(
+    private readonly options: CheckoutEnablerOptions,
+    private readonly loadConfig: ProcessorConfigLoader,
+  ) {}
+
+  build(config: DropinOptions): DropinComponent {
+    return new CheckoutDelegateComponent<DropinComponent>(this.options, this.loadConfig, (options) =>
+      new SimplyConnectDropinBuilder(options).build(config),
+    );
   }
 }

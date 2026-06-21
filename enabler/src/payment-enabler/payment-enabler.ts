@@ -6,13 +6,18 @@
  * connector without Nuvei-specific constructor knowledge.
  */
 
-import { SUPPORTED_PAYMENT_METHODS } from "./method-registry.js";
+import {
+  SUPPORTED_PAYMENT_METHODS,
+  getComponentPaymentMethods,
+  getDropinPaymentMethods,
+} from "./method-registry.js";
 import type { PaymentMethodKey } from "./method-registry.js";
 export {
   PaymentMethod,
   PAYMENT_METHOD_REGISTRY,
   SUPPORTED_PAYMENT_METHODS,
   getComponentPaymentMethods,
+  getDropinPaymentMethods,
   getPaymentMethodRegistryEntry,
   isSupportedPaymentMethod,
 } from "./method-registry.js";
@@ -61,19 +66,18 @@ function configInvalid(field: string, expectation: string): PaymentSetupError {
 }
 
 export function methodUnsupported(method: string, kind: string): PaymentSetupError {
+  const supportedMethods = supportedMethodsForKind(kind);
   return new PaymentSetupError(
     PublicPaymentErrorCode.METHOD_UNSUPPORTED,
-    `Unsupported ${kind} payment method. Supported methods: ${SUPPORTED_PAYMENT_METHODS.join(", ")}.`,
+    `Unsupported ${kind} payment method. Supported methods: ${supportedMethods.join(", ")}.`,
     { method, kind },
   );
 }
 
-export function modeUnsupported(mode: unknown): PaymentSetupError {
-  return new PaymentSetupError(
-    PublicPaymentErrorCode.METHOD_UNSUPPORTED,
-    "Unsupported or missing Nuvei integration mode. Supported modes: simply-connect, web-sdk.",
-    { mode },
-  );
+function supportedMethodsForKind(kind: string): readonly string[] {
+  if (kind === "component") return getComponentPaymentMethods().map((entry) => entry.key);
+  if (kind === "dropin") return getDropinPaymentMethods().map((entry) => entry.key);
+  return SUPPORTED_PAYMENT_METHODS;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -130,7 +134,7 @@ export function validateEnablerOptions(opts: EnablerOptions): void {
 /** Entry point for creating payment components. */
 export interface PaymentEnabler {
   createComponentBuilder(type: PaymentMethodKey | string): Promise<PaymentComponentBuilder>;
-  createDropinBuilder?(type: string): Promise<PaymentDropinBuilder>;
+  createDropinBuilder(type: string): Promise<PaymentDropinBuilder>;
   createExpressBuilder?(type: string): Promise<PaymentExpressBuilder>;
   createStoredPaymentMethodBuilder?(type: string): Promise<StoredComponentBuilder>;
   isStoredPaymentMethodsEnabled?(): Promise<boolean>;
@@ -217,7 +221,32 @@ export type ComponentOptions = {
   onPayButtonClick?: () => Promise<void | SubmitOptions>;
 };
 
-export interface PaymentDropinBuilder extends PaymentComponentBuilder {}
+export type SafePaymentEventStage =
+  | "challengeStarted"
+  | "challengeEnded"
+  | "redirectionStarted"
+  | "redirectionEnded";
+
+export type SafePaymentEvent = {
+  stage: SafePaymentEventStage;
+};
+
+export type DropinOptions = ComponentOptions & {
+  /**
+   * Post-render notification. Errors are reported through `onError` but do not
+   * reject `mount()` because the Nuvei widget has already been initialized.
+   */
+  onDropinReady?: () => Promise<void>;
+  onPaymentEvent?: (event: SafePaymentEvent) => void;
+};
+
+export interface DropinComponent extends PaymentComponent {}
+
+export interface PaymentDropinBuilder {
+  dropinHasSubmit: boolean;
+  build(config: DropinOptions): DropinComponent;
+}
+
 export interface PaymentExpressBuilder extends PaymentComponentBuilder {}
 
 export type StoredComponentOptions = {
