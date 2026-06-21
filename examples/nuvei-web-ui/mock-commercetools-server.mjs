@@ -122,6 +122,37 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validatePaymentMethodOptions(body = {}) {
+  if (!isPlainObject(body)) return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
+
+  const paymentMethodOptions = body.paymentMethodOptions;
+  if (paymentMethodOptions === undefined) return { ok: true, paymentMethod: "card" };
+  if (!isPlainObject(paymentMethodOptions)) {
+    return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
+  }
+
+  const methods = Object.keys(paymentMethodOptions);
+  if (methods.length !== 1 || !methods[0]) {
+    return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
+  }
+
+  const [paymentMethod] = methods;
+  if (paymentMethod !== "card" && paymentMethod !== "embedded") {
+    return { ok: false, status: 422, code: "METHOD_UNSUPPORTED", message: "Payment method is not supported." };
+  }
+
+  const methodOptions = paymentMethodOptions[paymentMethod];
+  if (!isPlainObject(methodOptions) || Object.keys(methodOptions).length > 0) {
+    return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
+  }
+
+  return { ok: true, paymentMethod };
+}
+
 function createSession() {
   return {
     id: SESSION_ID,
@@ -473,8 +504,9 @@ app.get("/config", (req, res) => {
 app.get("/payment-components", (req, res) => {
   record("INBOUND", "Supported payment components", req);
   res.json({
-    components: ["card"],
-    dropins: [],
+    dropins: [{ type: "embedded" }],
+    components: [{ type: "card" }],
+    express: [],
   });
 });
 
@@ -484,6 +516,13 @@ app.post("/payments/session", async (req, res) => {
     testedFlow:
       "processor Nuvei openOrder creation path; calls real Nuvei sandbox when credentials are present",
   });
+
+  const paymentMethodResult = validatePaymentMethodOptions(req.body);
+  if (!paymentMethodResult.ok) {
+    return res
+      .status(paymentMethodResult.status)
+      .json({ code: paymentMethodResult.code, message: paymentMethodResult.message });
+  }
 
   const hasNuveiCreds =
     process.env.NUVEI_MERCHANT_ID &&
@@ -505,7 +544,8 @@ app.post("/payments/session", async (req, res) => {
       orderId = nuveiRes.orderId;
       console.log("Nuvei openOrder succeeded:", {
         orderId,
-        sessionToken: sessionToken?.slice(0, 8) + "...",
+        hasSessionToken: typeof sessionToken === "string" && sessionToken.length > 0,
+        sessionTokenLength: typeof sessionToken === "string" ? sessionToken.length : 0,
       });
     } catch (err) {
       console.error("Nuvei openOrder failed:", err.message, err.responseBody);
@@ -520,9 +560,7 @@ app.post("/payments/session", async (req, res) => {
   }
 
   ledger.payment.interfaceId = sessionToken;
-  ledger.payment.paymentMethodInfo.method = req.body?.paymentMethodOptions?.embedded
-    ? "embedded"
-    : "card";
+  ledger.payment.paymentMethodInfo.method = paymentMethodResult.paymentMethod;
 
   res.json({
     cartId: ledger.cart.id,

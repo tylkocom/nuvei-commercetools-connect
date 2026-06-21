@@ -151,8 +151,8 @@
         <h2 id="mode-heading">Mode selector</h2>
         <div class="mode-options">
           <label
-            ><input type="radio" name="mode" value="simply-connect" checked /> Simply Connect
-            card</label
+            ><input type="radio" name="mode" value="checkout-dropin" checked /> Enabler drop-in
+            (Merchant Center compatible)</label
           >
           <label><input type="radio" name="mode" value="web-sdk" /> Web SDK card</label>
         </div>
@@ -232,7 +232,7 @@
         </div>
 
         <div class="actions">
-          <button id="mount-card" type="button">Mount card</button>
+          <button id="mount-card" type="button">Mount payment</button>
           <button id="pay-button" class="secondary" type="button" hidden>Pay</button>
           <button id="export-evidence" class="secondary" type="button">Export Evidence</button>
         </div>
@@ -256,10 +256,7 @@
 
     <script type="module">
       // Phase 2 evidence capture entry point. Uses real enabler bundle and processor API.
-      import {
-        NuveiSimplyConnectEnabler,
-        NuveiWebSdkEnabler,
-      } from "../../enabler/public/connector-enabler.es.js?cb=1";
+      import { Enabler } from "../../enabler/public/connector-enabler.es.js?cb=1";
 
       const STAGE_B_SCENARIOS = new Set([
         "NUV-01-success-auth",
@@ -293,7 +290,7 @@
 
       function selectedMode() {
         const chosen = document.querySelector('input[name="mode"]:checked');
-        return chosen ? chosen.value : "simply-connect";
+        return chosen ? chosen.value : "checkout-dropin";
       }
 
       function selectedScenarioId() {
@@ -461,13 +458,35 @@
           processorUrlClass: processorUrlClass(options.processorUrl),
           sessionIdAliasCandidate: sessionIdAliasCandidate(options.sessionId),
         });
-        const enabler =
-          mode === "web-sdk"
-            ? new NuveiWebSdkEnabler(options)
-            : new NuveiSimplyConnectEnabler(options);
+        const enabler = new Enabler(options);
+        let builder;
+        if (mode === "web-sdk") {
+          builder = await enabler.createComponentBuilder("card");
+        } else {
+          builder = await enabler.createDropinBuilder("embedded");
+        }
 
-        const builder = await enabler.createComponentBuilder("card");
-        currentComponent = builder.build({});
+        appendEvidence("builder-selected", {
+          builderType: mode === "checkout-dropin" ? "dropin" : "component",
+          requestedType: mode === "checkout-dropin" ? "embedded" : "card",
+          componentHasSubmit:
+            typeof builder.componentHasSubmit === "boolean" ? builder.componentHasSubmit : null,
+          dropinHasSubmit: typeof builder.dropinHasSubmit === "boolean" ? builder.dropinHasSubmit : null,
+        });
+
+        const builderConfig =
+          mode === "checkout-dropin"
+            ? {
+                onPayButtonClick: async () => {
+                  appendEvidence("prePayment-invoked", { payload: { hostPayButtonVisible: false } });
+                },
+                onPaymentEvent: (event) => {
+                  appendEvidence("payment-event", { payload: event });
+                },
+              }
+            : {};
+
+        currentComponent = builder.build(builderConfig);
         await currentComponent.mount("#payment-container");
         mountedMode = mode;
         setPayButtonVisible(mode === "web-sdk");

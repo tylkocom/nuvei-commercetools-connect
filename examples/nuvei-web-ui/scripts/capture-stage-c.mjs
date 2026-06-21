@@ -17,7 +17,7 @@ const FINDINGS_PATH = path.join(EVIDENCE_ABS_ROOT, 'findings.json');
 const ALIAS_MAP_PATH = path.join(EVIDENCE_ABS_ROOT, 'aliases/alias-map.json');
 const STAGE = 'stage-c-local-browser-processor-dmn';
 const ENVIRONMENT = 'nuvei-sandbox-local-mock-ct';
-const DEFAULT_FRONTEND_MODE = 'simply-connect';
+const DEFAULT_FRONTEND_MODE = 'checkout-dropin';
 const SYNTHETIC_DERIVED = 'synthetic-derived-from-real-dmn';
 
 const STAGE_C_SCENARIOS = [

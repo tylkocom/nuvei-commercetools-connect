@@ -135,7 +135,7 @@ async function testMockCtCreateSession() {
   const { status, body } = await request(`${MOCK_CT_URL}/payments/session`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ paymentMethodOptions: { card: {} } }),
+    body: JSON.stringify({ paymentMethodOptions: { embedded: {} } }),
   });
   if (status !== 200) {
     fail("TEST-5", `Expected 200, got ${status}: ${JSON.stringify(body)}`);
@@ -145,7 +145,7 @@ async function testMockCtCreateSession() {
   assert(body.paymentReference, "Missing paymentReference");
   ok(
     "TEST-5",
-    `sessionToken=${body.sessionToken.slice(0, 12)}..., paymentReference=${body.paymentReference}`,
+    `hasSessionToken=true, sessionTokenLength=${body.sessionToken.length}, paymentReference=${body.paymentReference}`,
   );
   return body;
 }

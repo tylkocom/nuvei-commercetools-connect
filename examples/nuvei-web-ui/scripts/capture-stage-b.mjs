@@ -23,7 +23,7 @@ const SCENARIOS = new Set([
   'NUV-04-3ds-stepup-success',
   'NUV-04-3ds-stepup-failure-or-abandonment',
 ]);
-const FRONTEND_MODES = new Set(['simply-connect', 'web-sdk']);
+const FRONTEND_MODES = new Set(['checkout-dropin', 'simply-connect', 'web-sdk']);
 
 function parseArgs(args) {
   const parsed = {
@@ -207,7 +207,7 @@ function recordBlocker({ scenarioId, frontendMode, rawDir, reason, args }) {
     recordedAt: blocker.recordedAt,
     blocker: sanitizedBrowserBlocker,
   });
-  row.frontendMode = row.frontendMode === 'not-captured' || frontendMode === 'simply-connect' ? frontendMode : row.frontendMode;
+  row.frontendMode = row.frontendMode === 'not-captured' || frontendMode === 'checkout-dropin' ? frontendMode : row.frontendMode;
   row.environment = ENVIRONMENT;
   row.status = 'blocked';
   row.evidenceClassification = 'stage-b-browser-blocked';
@@ -324,7 +324,7 @@ function main() {
   const scenarioId = args.scenario;
   const frontendMode = args.frontendMode;
   if (!SCENARIOS.has(scenarioId)) throw new Error(`--scenario must be one of ${Array.from(SCENARIOS).join(', ')}`);
-  if (!FRONTEND_MODES.has(frontendMode)) throw new Error('--frontend-mode must be simply-connect or web-sdk');
+  if (!FRONTEND_MODES.has(frontendMode)) throw new Error('--frontend-mode must be checkout-dropin, simply-connect, or web-sdk');
   const rawDir = path.resolve(REPO_ROOT, args.ingestRawDir ?? path.join(RAW_WORKSPACE, 'stage-b', scenarioId, frontendMode));
   if (!isInside(rawDir, STAGE_B_RAW_ROOT)) throw new Error(`refusing to ingest outside ${path.relative(REPO_ROOT, STAGE_B_RAW_ROOT)}: ${rawDir}`);
   const reason = args.blockerReason ?? 'No raw browser export and processor/CT confirmation snapshots were available in the Stage B raw workspace for this non-interactive execution environment.';

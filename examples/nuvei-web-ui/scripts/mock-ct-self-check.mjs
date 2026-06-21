@@ -101,6 +101,14 @@ async function main() {
     assert.equal(payment.paymentStatus.interfaceCode, 'pending');
     assert.deepEqual(payment.transactions, []);
 
+    const unsupportedSession = await request('/payments/session', {
+      method: 'POST',
+      body: JSON.stringify({ paymentMethodOptions: { paypal: {} } }),
+    });
+    assert.equal(unsupportedSession.response.status, 422);
+    assert.equal(unsupportedSession.body.code, 'METHOD_UNSUPPORTED');
+    assert.equal(unsupportedSession.body.message, 'Payment method is not supported.');
+
     const updatedCart = await assertOk(`/${projectKey}/carts/cart-local-001`, {
       method: 'POST',
       body: JSON.stringify({
