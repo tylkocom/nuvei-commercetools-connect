@@ -58,7 +58,7 @@ deployAs:
           required: false
       securedConfiguration:
         - key: CTP_CLIENT_ID
-          description: commercetools client ID with manage_payments, manage_orders, view_sessions, view_api_clients, manage_checkout_payment_intents & introspect_oauth_tokens scopes
+          description: commercetools client ID with manage_payments, manage_orders, view_sessions, view_api_clients, manage_checkout_payment_intents, manage_checkout_transactions & introspect_oauth_tokens scopes
           required: true
         - key: CTP_CLIENT_SECRET
           description: commercetools client secret
