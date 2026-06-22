@@ -14,7 +14,7 @@ import type {
   CheckoutConfig,
   CheckoutResult,
   PrePaymentCallback,
-  PrePaymentControls,
+  PrePaymentPayload,
   SimplyConnectPaymentEvent,
 } from "../services/simply-connect-sdk.js";
 import { loadSimplyConnectSdk } from "../services/simply-connect-sdk.js";
@@ -22,7 +22,6 @@ import { loadSimplyConnectSdk } from "../services/simply-connect-sdk.js";
 // Card-only by design: non-card Simply Connect APMs stay hidden until each method has
 // dedicated Nuvei setup, DMN mapping, operation support, fixtures, and runbook evidence.
 const SIMPLY_CONNECT_CARD_WHITELIST = ["cc_card"] as const;
-const PRE_PAYMENT_REJECTION_MESSAGE = "Payment could not be started.";
 const SIMPLY_CONNECT_INTERNAL_SUBMIT_MESSAGE =
   "Simply Connect handles submission internally via the widget pay button.";
 const SIMPLY_CONNECT_WIDGET_ERROR_MESSAGE = "Nuvei Simply Connect reported an error.";
@@ -60,6 +59,7 @@ class SimplyConnectDropinComponent implements DropinComponent {
   private sessionToken = "";
   private initPromise: Promise<void> | undefined;
   private container: Element | undefined;
+  private dropinReadyFired = false;
 
   constructor(
     private readonly baseOptions: EnablerOptions,
@@ -124,10 +124,11 @@ class SimplyConnectDropinComponent implements DropinComponent {
 
     checkout({
       sessionToken: this.sessionToken,
-      merchant_unique_id: this.paymentReference,
-      merchantUniqueId: this.paymentReference,
-      merchantUniqueID: this.paymentReference,
-      env: this.baseOptions.env === "test" ? "int" : "prod",
+      // Default to Nuvei integration ("int") for every non-production environment.
+      // `EnablerOptions.env` is "test" | "production", but a stray runtime value
+      // must never fall through to "prod" (live) — only an explicit "production"
+      // maps to prod.
+      env: this.baseOptions.env === "production" ? "prod" : "int",
       merchantId: this.baseOptions.merchantId,
       merchantSiteId: this.baseOptions.merchantSiteId,
       amount: paymentRes.amount,
@@ -140,6 +141,17 @@ class SimplyConnectDropinComponent implements DropinComponent {
       },
       renderTo: selector,
       ...this.checkoutOverrides(paymentRes),
+      // Real post-render readiness signal (checkout.js: `onReady?.({loaded:true})`).
+      // Placed after the overrides spread so a future override can never shadow
+      // the real Nuvei readiness signal. Drives `onDropinReady` once the widget
+      // is actually interactive — never fired eagerly after `checkout()` returns.
+      //
+      // Failure assumption: if rendering fails, Nuvei surfaces it via `onError`
+      // (wired below) rather than going silent, so the host is never left
+      // waiting indefinitely for a readiness signal that will never come.
+      onReady: () => {
+        this.fireOnDropinReady();
+      },
       onResult: (result: CheckoutResult) => {
         this.handleCheckoutResult(result);
       },
@@ -148,33 +160,37 @@ class SimplyConnectDropinComponent implements DropinComponent {
           paymentReference: this.paymentReference,
         });
       },
-      onPending: () => {
-        this.baseOptions.onPending?.({ paymentReference: this.paymentReference });
-      },
     });
 
     this.mounted = true;
-    try {
-      await this.componentOptions.onDropinReady?.();
-    } catch (error) {
-      this.baseOptions.onError?.(error, { paymentReference: this.paymentReference });
-    }
+  }
+
+  private fireOnDropinReady(): void {
+    // Single-fire: Nuvei documents `onReady` as fire-once, but guard defensively
+    // so a duplicate emission (e.g. re-render after a challenge dismissal) can
+    // never deliver a second readiness signal to the host.
+    if (this.dropinReadyFired) return;
+    this.dropinReadyFired = true;
+    // Defer the host callback into a `.then` so BOTH synchronous throws and async
+    // rejections become promise rejections caught by `.catch` — a sync throw from
+    // a non-async callback would otherwise escape into Nuvei's `checkout.js`.
+    Promise.resolve()
+      .then(() => this.componentOptions.onDropinReady?.())
+      .catch((error) => {
+        this.baseOptions.onError?.(error, { paymentReference: this.paymentReference });
+      });
   }
 
   private checkoutOverrides(_paymentRes: PaymentSessionResponse): SimplyConnectCheckoutOverrides {
     return {
       pmWhitelist: [...SIMPLY_CONNECT_CARD_WHITELIST],
-      prePayment: ((controlsOrResolve, positionalReject) => {
-        const controls = normalizePrePaymentControls(controlsOrResolve, positionalReject);
-        if (!controls) {
-          const error = new Error("Nuvei prePayment controls were invalid.");
-          this.baseOptions.onError?.(error, { paymentReference: this.paymentReference });
-          if (!rejectInvalidPrePaymentControls(controlsOrResolve, positionalReject)) {
-            throw error;
-          }
-          return;
-        }
-        void this.prePayment(controls.resolve, controls.reject);
+      // Verified Simply Connect v1 contract (checkout.js): Nuvei calls
+      // `prePayment(payload)` with a single masked-card payload object and chains
+      // `.then()` on the return value. Resolve !== false means proceed; resolve ===
+      // false (or a rejected promise) means abort. The payload carries masked
+      // cardholder data and is intentionally ignored — never logged or forwarded.
+      prePayment: ((_payload: PrePaymentPayload) => {
+        return this.prePayment();
       }) satisfies PrePaymentCallback,
       onPaymentEvent: (event: SimplyConnectPaymentEvent) => {
         const stage = safePaymentEventStage(event);
@@ -185,18 +201,21 @@ class SimplyConnectDropinComponent implements DropinComponent {
     };
   }
 
-  private async prePayment(resolve: () => void, reject: (reason?: string) => void): Promise<void> {
+  private async prePayment(): Promise<boolean> {
     try {
       await this.componentOptions.onPayButtonClick?.();
-      resolve();
+      return true;
     } catch (error) {
       this.baseOptions.onError?.(error, { paymentReference: this.paymentReference });
-      reject(PRE_PAYMENT_REJECTION_MESSAGE);
+      return false;
     }
   }
 
   private handleCheckoutResult(result: CheckoutResult): void {
-    if (result.cancelled) {
+    // Strict boolean check mirrors Nuvei's own `true === e.cancelled` guard so a
+    // malformed/truthy non-boolean value can never short-circuit a real outcome
+    // into an unsuccessful completion. The processor remains the source of truth.
+    if (result.cancelled === true) {
       this.baseOptions.onComplete?.({ isSuccess: false, paymentReference: this.paymentReference });
       this.cleanupCheckoutOverlay();
       return;
@@ -224,10 +243,16 @@ class SimplyConnectDropinComponent implements DropinComponent {
 function safePaymentEventStage(event: SimplyConnectPaymentEvent): SafePaymentEventStage | undefined {
   let stage: unknown;
   if (typeof event === "string") {
+    // Verified shape is always an object with `eventType` (below). This bare-string
+    // branch is retained as deliberate defensive handling for an unverified but
+    // plausible emission path — it is cheap, type-permitted, and still gated by the
+    // whitelist below, so it can only ever forward a known-safe stage name.
     stage = event;
   } else if (typeof event === "object" && event !== null) {
     const record = event as Record<string, unknown>;
-    stage = record.stage ?? record.eventName ?? record.name ?? record.type;
+    // Verified Simply Connect v1 contract: payment events are emitted as
+    // `onPaymentEvent.call(void 0, e)` where the stage lives on `e.eventType`.
+    stage = record.eventType;
   }
 
   if (typeof stage !== "string") return undefined;
@@ -236,48 +261,6 @@ function safePaymentEventStage(event: SimplyConnectPaymentEvent): SafePaymentEve
 
 function isSafePaymentEventStage(stage: string): stage is SafePaymentEventStage {
   return Object.hasOwn(SAFE_PAYMENT_EVENT_STAGES, stage);
-}
-
-function normalizePrePaymentControls(
-  controlsOrResolve: PrePaymentControls | (() => void),
-  positionalReject?: (reason?: string) => void,
-): PrePaymentControls | undefined {
-  if (typeof controlsOrResolve === "function") {
-    return typeof positionalReject === "function"
-      ? { resolve: controlsOrResolve, reject: positionalReject }
-      : undefined;
-  }
-
-  if (
-    typeof controlsOrResolve === "object" &&
-    controlsOrResolve !== null &&
-    typeof controlsOrResolve.resolve === "function" &&
-    typeof controlsOrResolve.reject === "function"
-  ) {
-    return controlsOrResolve;
-  }
-
-  return undefined;
-}
-
-function rejectInvalidPrePaymentControls(
-  controlsOrResolve: PrePaymentControls | (() => void),
-  positionalReject?: (reason?: string) => void,
-): boolean {
-  if (typeof positionalReject === "function") {
-    positionalReject(PRE_PAYMENT_REJECTION_MESSAGE);
-    return true;
-  }
-
-  if (typeof controlsOrResolve === "object" && controlsOrResolve !== null) {
-    const reject = (controlsOrResolve as Partial<PrePaymentControls>).reject;
-    if (typeof reject === "function") {
-      reject(PRE_PAYMENT_REJECTION_MESSAGE);
-      return true;
-    }
-  }
-
-  return false;
 }
 
 function makeSafeWidgetError(error: unknown): Error {

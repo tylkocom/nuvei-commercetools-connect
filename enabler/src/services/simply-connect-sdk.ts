@@ -3,10 +3,22 @@
 /** @deprecated Use CheckoutResult. */
 export type NuveiResult = CheckoutResult;
 
+/**
+ * Result object Nuvei passes to `onResult`. Verified against Simply Connect v1
+ * `checkout.js`: the status is NOT consistently carried by a single field — Nuvei
+ * may populate `transactionStatus`, `status`, or `result` depending on the path
+ * (card auth vs. APM vs. error). Error detail arrives as `errorDescription`
+ * and/or `reason`. Any field may be absent on a given call, so every field is
+ * optional. The enabler treats the processor (not this object) as the source of
+ * truth for the final outcome; it only reads `cancelled` directly.
+ */
 export interface CheckoutResult {
-  transactionStatus: string;
+  transactionStatus?: string;
+  status?: string;
+  result?: string;
   transactionId?: string;
   errCode?: number | string;
+  errorDescription?: string;
   reason?: string;
   sessionToken?: string;
   userPaymentOptionId?: string;
@@ -20,22 +32,40 @@ export interface CheckoutResult {
 
 export type SimplyConnectPaymentEvent = string | Record<string, unknown>;
 
-export type PrePaymentControls = {
-  resolve: () => void;
-  reject: (reason?: string) => void;
+/**
+ * Payload Nuvei passes to `prePayment`. Shape verified against Simply Connect v1
+ * `checkout.js`: Nuvei builds a single object carrying the masked card / payment
+ * option, then chains `.then()` on the callback's return value.
+ *
+ * SECURITY: this object carries masked cardholder data (e.g. `ccCardNumber` is
+ * `bin****last4`, plus name, bin, expiry). Per project policy it MUST NOT be
+ * logged, forwarded to the processor, or surfaced to Checkout. The enabler reads
+ * none of these fields — it only awaits Checkout's `onPayButtonClick` gate and
+ * returns a boolean.
+ */
+export type PrePaymentPayload = {
+  paymentOption?: {
+    card?: Record<string, unknown>;
+    alternativePaymentMethod?: Record<string, unknown>;
+    upo?: Record<string, unknown>;
+  };
+  savePM?: boolean;
+  amount?: string | number;
+  currency?: string;
 };
 
-export type PrePaymentCallback = (
-  controlsOrResolve: PrePaymentControls | (() => void),
-  reject?: (reason?: string) => void,
-) => void;
+/**
+ * Verified Simply Connect `prePayment` contract: Nuvei invokes the callback with
+ * a single payload object and expects a Promise in return.
+ * - Resolve to anything other than literal `false` -> Nuvei proceeds with authorization.
+ * - Resolve to exactly `false` -> Nuvei aborts the payment.
+ * - Reject the promise -> Nuvei aborts and treats the rejection reason as the error.
+ */
+export type PrePaymentCallback = (payload: PrePaymentPayload) => Promise<boolean | void>;
 
 export type CheckoutConfig = {
   sessionToken: string;
-  merchant_unique_id?: string;
-  merchantUniqueId?: string;
-  merchantUniqueID?: string;
-  env: "int" | "prod";
+  env: "int" | "prod" | "test" | "qa";
   merchantSiteId: string;
   merchantId: string;
   country?: string;
@@ -48,9 +78,14 @@ export type CheckoutConfig = {
   renderTo: string;
   pmWhitelist?: readonly string[];
   prePayment?: PrePaymentCallback;
+  /**
+   * Fired by Simply Connect once the widget has rendered
+   * (`onReady?.({loaded:true})` in checkout.js). This is the real post-render
+   * readiness signal — the enabler uses it to drive `onDropinReady`.
+   */
+  onReady?: (payload?: { loaded?: boolean }) => void;
   onResult: (result: CheckoutResult) => void;
   onError?: (error: unknown) => void;
-  onPending?: (result?: CheckoutResult) => void;
   onPaymentEvent?: (event: SimplyConnectPaymentEvent) => void;
 };
 

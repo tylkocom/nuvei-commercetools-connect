@@ -82,9 +82,6 @@ describe("SimplyConnectDropinBuilder", () => {
     expect(mockCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionToken: "known-session-token",
-        merchant_unique_id: "payment-ref-123",
-        merchantUniqueId: "payment-ref-123",
-        merchantUniqueID: "payment-ref-123",
         env: "int",
         merchantId: "merchant-123",
         merchantSiteId: "site-456",
@@ -93,14 +90,26 @@ describe("SimplyConnectDropinBuilder", () => {
         country: "DE",
         renderTo: "#payment-container",
         pmWhitelist: ["cc_card"],
+        onReady: expect.any(Function),
         prePayment: expect.any(Function),
         onResult: expect.any(Function),
         onError: expect.any(Function),
-        onPending: expect.any(Function),
         onPaymentEvent: expect.any(Function),
       }),
     );
-    expect(onDropinReady).toHaveBeenCalledOnce();
+
+    // merchant_unique_id is never passed client-side (checkout.js ignores it; DMN
+    // correlation is server-side via sessionToken fallback).
+    const configArg = mockCheckout.mock.calls[0][0] as Record<string, unknown>;
+    expect(configArg).not.toHaveProperty("merchant_unique_id");
+    expect(configArg).not.toHaveProperty("merchantUniqueId");
+    expect(configArg).not.toHaveProperty("merchantUniqueID");
+    expect(configArg).not.toHaveProperty("onPending");
+
+    // onDropinReady is driven by Nuvei's real onReady signal, not fired eagerly.
+    expect(onDropinReady).not.toHaveBeenCalled();
+    (configArg as { onReady: () => void }).onReady();
+    await vi.waitFor(() => expect(onDropinReady).toHaveBeenCalledOnce());
     expect(onDropinReady).toHaveBeenCalledAfter(mockCheckout);
   });
 
@@ -118,35 +127,62 @@ describe("SimplyConnectDropinBuilder", () => {
     });
 
     await expect(dropin.mount("#payment-container")).resolves.toBeUndefined();
+    const checkoutConfig = mockCheckout.mock.calls[0][0] as { onReady: () => void };
+    checkoutConfig.onReady();
+
+    await vi.waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(readyError, { paymentReference: "payment-ref-123" }),
+    );
     expect(onDropinReady).toHaveBeenCalledOnce();
-    expect(onError).toHaveBeenCalledWith(readyError, { paymentReference: "payment-ref-123" });
     await expect(dropin.mount("#payment-container")).resolves.toBeUndefined();
     expect(mockCreatePayment).toHaveBeenCalledOnce();
   });
 
-  it("prePayment resolves after Checkout pre-submit gating succeeds", async () => {
+  it("onReady fires onDropinReady exactly once even if Nuvei emits it twice", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
-    const onPayButtonClick = vi.fn().mockResolvedValue({ storePaymentDetails: true });
+    const onDropinReady = vi.fn().mockResolvedValue(undefined);
     mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockPaymentSession();
 
-    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions()).build({ onPayButtonClick });
+    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions()).build({ onDropinReady });
     await dropin.mount("#payment-container");
 
-    const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      prePayment: (controls: { resolve: () => void; reject: (reason?: string) => void }) => void;
-    };
-    const resolve = vi.fn();
-    const reject = vi.fn();
-    checkoutConfig.prePayment({ resolve, reject });
+    const checkoutConfig = mockCheckout.mock.calls[0][0] as { onReady: () => void };
+    checkoutConfig.onReady();
+    checkoutConfig.onReady();
 
-    await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
-    expect(onPayButtonClick).toHaveBeenCalledOnce();
-    expect(reject).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(onDropinReady).toHaveBeenCalledOnce());
   });
 
-  it("prePayment supports positional resolve and reject callbacks", async () => {
+  it("onReady reports a synchronous throw from onDropinReady via onError instead of escaping", async () => {
+    stubDocument();
+    const mockCheckout = vi.fn();
+    const syncReadyError = new Error("sync readiness failure");
+    const onDropinReady = vi.fn(() => {
+      throw syncReadyError;
+    });
+    const onError = vi.fn();
+    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
+    mockPaymentSession();
+
+    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions({ onError })).build({
+      onDropinReady,
+    });
+    await dropin.mount("#payment-container");
+
+    // A synchronous throw must NOT escape into the caller; it is caught and routed
+    // through onError exactly like an async rejection.
+    const checkoutConfig = mockCheckout.mock.calls[0][0] as { onReady: () => void };
+    expect(() => checkoutConfig.onReady()).not.toThrow();
+
+    await vi.waitFor(() =>
+      expect(onError).toHaveBeenCalledWith(syncReadyError, { paymentReference: "payment-ref-123" }),
+    );
+    expect(onDropinReady).toHaveBeenCalledOnce();
+  });
+
+  it("prePayment resolves to true so Nuvei proceeds after Checkout gating succeeds", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
     const onPayButtonClick = vi.fn().mockResolvedValue(undefined);
@@ -157,64 +193,44 @@ describe("SimplyConnectDropinBuilder", () => {
     await dropin.mount("#payment-container");
 
     const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      prePayment: (resolve: () => void, reject: (reason?: string) => void) => void;
+      prePayment: (payload: unknown) => Promise<boolean | void>;
     };
-    const resolve = vi.fn();
-    const reject = vi.fn();
-    checkoutConfig.prePayment(resolve, reject);
+    const maskedPayload = {
+      paymentOption: { card: { ccCardNumber: "411111******1111", bin: "411111" } },
+      savePM: false,
+    };
 
-    await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
-    expect(reject).not.toHaveBeenCalled();
+    await expect(checkoutConfig.prePayment(maskedPayload)).resolves.toBe(true);
+    expect(onPayButtonClick).toHaveBeenCalledOnce();
   });
 
-  it("prePayment reports invalid callback controls safely", async () => {
+  it("prePayment never forwards the Nuvei masked-card payload to onPayButtonClick", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
-    const onError = vi.fn();
+    const onPayButtonClick = vi.fn().mockResolvedValue(undefined);
     mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
     mockPaymentSession();
 
-    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions({ onError })).build({});
+    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions()).build({ onPayButtonClick });
     await dropin.mount("#payment-container");
 
     const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      prePayment: (controls: unknown) => void;
+      prePayment: (payload: unknown) => Promise<boolean | void>;
     };
-    const reject = vi.fn();
-    checkoutConfig.prePayment({ reject });
-
-    expect(onError).toHaveBeenCalledWith(expect.any(Error), {
-      paymentReference: "payment-ref-123",
-    });
-    expect((onError.mock.calls[0][0] as Error).message).toBe(
-      "Nuvei prePayment controls were invalid.",
-    );
-    expect(reject).toHaveBeenCalledWith("Payment could not be started.");
-  });
-
-  it("prePayment throws a safe error when invalid controls include no reject path", async () => {
-    stubDocument();
-    const mockCheckout = vi.fn();
-    const onError = vi.fn();
-    mockLoadSimplyConnectSdk.mockResolvedValue(mockCheckout);
-    mockPaymentSession();
-
-    const dropin = new SimplyConnectDropinBuilder(makeEnablerOptions({ onError })).build({});
-    await dropin.mount("#payment-container");
-
-    const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      prePayment: (controls: unknown) => void;
+    const maskedPayload = {
+      paymentOption: { card: { ccCardNumber: "411111******1111", ccNameOnCard: "SHOPPER" } },
     };
 
-    expect(() => checkoutConfig.prePayment("garbage")).toThrow(
-      "Nuvei prePayment controls were invalid.",
-    );
-    expect(onError).toHaveBeenCalledWith(expect.any(Error), {
-      paymentReference: "payment-ref-123",
-    });
+    await checkoutConfig.prePayment(maskedPayload);
+
+    // onPayButtonClick receives zero arguments — the masked-card payload and its
+    // sensitive fields (ccCardNumber, ccNameOnCard) must never be forwarded into
+    // Checkout's gating callback.
+    expect(onPayButtonClick).toHaveBeenCalledOnce();
+    expect(onPayButtonClick).toHaveBeenCalledWith();
   });
 
-  it("prePayment rejects with a generic safe message when gating fails", async () => {
+  it("prePayment resolves to false when Checkout pre-submit gating throws", async () => {
     stubDocument();
     const mockCheckout = vi.fn();
     const validationError = new Error("terms missing for shopper 42");
@@ -229,14 +245,12 @@ describe("SimplyConnectDropinBuilder", () => {
     await dropin.mount("#payment-container");
 
     const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      prePayment: (controls: { resolve: () => void; reject: (reason?: string) => void }) => void;
+      prePayment: (payload: unknown) => Promise<boolean | void>;
     };
-    const resolve = vi.fn();
-    const reject = vi.fn();
-    checkoutConfig.prePayment({ resolve, reject });
+    const maskedPayload = { paymentOption: { card: { ccCardNumber: "411111******1111" } } };
 
-    await vi.waitFor(() => expect(reject).toHaveBeenCalledWith("Payment could not be started."));
-    expect(resolve).not.toHaveBeenCalled();
+    await expect(checkoutConfig.prePayment(maskedPayload)).resolves.toBe(false);
+    expect(onPayButtonClick).toHaveBeenCalledOnce();
     expect(onError).toHaveBeenCalledWith(validationError, { paymentReference: "payment-ref-123" });
   });
 
@@ -251,7 +265,7 @@ describe("SimplyConnectDropinBuilder", () => {
     await dropin.mount("#payment-container");
 
     const checkoutConfig = mockCheckout.mock.calls[0][0] as {
-      onResult: (result: { transactionStatus: string; sessionToken?: string }) => void;
+      onResult: (result: { transactionStatus?: string; sessionToken?: string }) => void;
     };
     checkoutConfig.onResult({ transactionStatus: "APPROVED", sessionToken: "browser-result-token" });
 
@@ -360,10 +374,14 @@ describe("SimplyConnectDropinBuilder", () => {
     const checkoutConfig = mockCheckout.mock.calls[0][0] as {
       onPaymentEvent: (event: unknown) => void;
     };
-    checkoutConfig.onPaymentEvent({ stage: "challengeStarted", cardNumber: "4111111111111111" });
-    checkoutConfig.onPaymentEvent({ stage: "rawPayload", sessionToken: "secret" });
+    // Verified checkout.js contract: the stage lives on `eventType`. The widget
+    // payload may also carry sensitive card data, which must not be forwarded.
+    checkoutConfig.onPaymentEvent({ eventType: "challengeStarted", cardNumber: "4111111111111111" });
+    checkoutConfig.onPaymentEvent({ eventType: "rawPayload", sessionToken: "secret" });
+    checkoutConfig.onPaymentEvent({ eventType: "redirectionEnded", threeD: { version: "2.2.0" } });
 
-    expect(onPaymentEvent).toHaveBeenCalledOnce();
+    expect(onPaymentEvent).toHaveBeenCalledTimes(2);
     expect(onPaymentEvent).toHaveBeenCalledWith({ stage: "challengeStarted" });
+    expect(onPaymentEvent).toHaveBeenCalledWith({ stage: "redirectionEnded" });
   });
 });
