@@ -18,9 +18,9 @@ export type ProcessorConfigResponse = {
   environment: "test" | "production" | string;
   merchantId: string;
   merchantSiteId: string;
+  simplyConnectPaymentMethod?: "card" | "blik";
 };
 
-/** Shape of the response returned by `POST /payments/session`. */
 export type PaymentSessionResponse = {
   cartId: string;
   sessionToken: string;
@@ -28,6 +28,10 @@ export type PaymentSessionResponse = {
   merchantReturnUrl?: string;
   amount: string;
   currency: string;
+  uiMethod?: "card" | "blik" | "embedded";
+  paymentMethod?: "card" | "blik";
+  integrationSurface?: "web-sdk" | "simply-connect";
+  countryCode?: string;
 };
 
 /**
@@ -65,7 +69,9 @@ export type ConfirmPaymentPollingOptions = {
 
 function waitForNextConfirmAttempt(delayMs: number): Promise<void> {
   if (delayMs <= 0) return Promise.resolve();
-  return new Promise((resolve) => globalThis.setTimeout(resolve, delayMs));
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, delayMs);
+  });
 }
 
 const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const;

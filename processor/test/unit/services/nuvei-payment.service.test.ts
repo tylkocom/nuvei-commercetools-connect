@@ -28,6 +28,7 @@ vi.mock("../../../src/clients/nuvei.client", () => ({
   nuveiClient: () => mockNuveiClientInstance,
 }));
 
+
 vi.mock("../../../src/config/config", () => ({
   getConfig: () => ({
     nuveiEnv: "test",
@@ -48,6 +49,7 @@ vi.mock("../../../src/config/config", () => ({
     healthCheckTimeout: 5000,
     returnUrl: "https://example.com/return",
     buildCommit: "6cd68f6d3c2f0b0f0f4d0b0db1e7a1c2f3e4f5a6",
+    simplyConnectPaymentMethod: "card",
   }),
   config: {},
 }));
@@ -274,6 +276,7 @@ describe("NuveiPaymentService", () => {
         environment: "test",
         merchantId: "merchant-123",
         merchantSiteId: "site-456",
+        simplyConnectPaymentMethod: "card",
       });
     });
   });
@@ -404,13 +407,20 @@ describe("NuveiPaymentService", () => {
   });
 
   describe("processor payment method registry", () => {
-    it("accepts card component and embedded drop-in", () => {
-      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
+    it("accepts card, BLIK component, and embedded drop-in", () => {
+      expect(SUPPORTED_PAYMENT_METHODS).toEqual(["card", "blik", "embedded"]);
+      expect(isSupportedPaymentMethod("blik")).toBe(true);
       expect(isSupportedPaymentMethod("embedded")).toBe(true);
       expect(isSupportedPaymentMethod("dropin")).toBe(false);
       expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "card")).toMatchObject({
         kind: "component",
         advertisedType: "card",
+        transitional: false,
+        pspMetadata: {},
+      });
+      expect(PAYMENT_METHOD_REGISTRY.find((entry) => entry.key === "blik")).toMatchObject({
+        kind: "component",
+        advertisedType: "blik",
         transitional: false,
         pspMetadata: {},
       });
@@ -427,17 +437,16 @@ describe("NuveiPaymentService", () => {
   // getSupportedPaymentComponents()
   // -------------------------------------------------------------------------
   describe("getSupportedPaymentComponents()", () => {
-    it("returns registry-derived card component and embedded drop-in", async () => {
+    it("returns card, BLIK component, and embedded drop-in by default", async () => {
       const { service } = createService();
       const result = await service.getSupportedPaymentComponents();
       expect(result).toEqual({
         dropins: [{ type: "embedded" }],
-        components: [{ type: "card" }],
+        components: [{ type: "card" }, { type: "blik" }],
         express: [],
       });
     });
   });
-
   // -------------------------------------------------------------------------
   // capturePayment()
   // -------------------------------------------------------------------------
@@ -538,6 +547,20 @@ describe("NuveiPaymentService", () => {
 
       expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
     });
+
+    it("rejects BLIK capture without calling settleTransaction", async () => {
+      const { service } = createService();
+
+      const result = await service.capturePayment({
+        payment: makeMockPayment({
+          paymentMethodInfo: { method: "blik" },
+        }),
+        amount: { centAmount: 1000, currencyCode: "PLN" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(mockNuveiClientInstance.settleTransaction).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -615,6 +638,19 @@ describe("NuveiPaymentService", () => {
       expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
       expect(result.pspReference).toBe("void-tx-1");
     });
+
+    it("rejects BLIK cancel without calling voidTransaction", async () => {
+      const { service } = createService();
+
+      const result = await service.cancelPayment({
+        payment: makeMockPayment({
+          paymentMethodInfo: { method: "blik" },
+        }),
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(mockNuveiClientInstance.voidTransaction).not.toHaveBeenCalled();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -668,6 +704,51 @@ describe("NuveiPaymentService", () => {
           relatedTransactionId: "charge-tx-1",
         }),
       );
+    });
+
+    it("uses a successful Charge transaction for BLIK refunds", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.refundTransaction.mockResolvedValue({
+        transactionId: "refund-tx-1",
+        status: "SUCCESS",
+        errCode: 0,
+        transactionStatus: "APPROVED",
+      });
+
+      await service.refundPayment({
+        payment: makeMockPayment({
+          interfaceId: "session-token-1",
+          paymentMethodInfo: { method: "blik" },
+          transactions: [
+            { type: "Charge", state: "Initial", interactionId: "session-token-1" },
+            { type: "Charge", state: "Success", interactionId: "charge-tx-1" },
+          ],
+        }),
+        amount: { centAmount: 1000, currencyCode: "PLN" },
+      });
+
+      expect(mockNuveiClientInstance.refundTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          relatedTransactionId: "charge-tx-1",
+        }),
+      );
+    });
+
+    it("rejects BLIK refund before a Charge transaction", async () => {
+      const { service } = createService();
+
+      const result = await service.refundPayment({
+        payment: makeMockPayment({
+          interfaceId: "session-token-1",
+          paymentMethodInfo: { method: "blik" },
+          transactions: [{ type: "Charge", state: "Initial", interactionId: "session-token-1" }],
+        }),
+        amount: { centAmount: 1000, currencyCode: "PLN" },
+      });
+
+      expect(result.outcome).toBe(PaymentModificationStatus.REJECTED);
+      expect(mockNuveiClientInstance.refundTransaction).not.toHaveBeenCalled();
     });
 
     it("returns RECEIVED for asynchronous PENDING refunds", async () => {
@@ -826,7 +907,121 @@ describe("NuveiPaymentService", () => {
       );
     });
 
-    it.each(["paypal", "dropin", "wechatpay", "hpp"])(
+
+    it("creates BLIK sessions after PLN/PL shopper prerequisites pass", async () => {
+      const cartClient = makeCtCartClientMock({
+        customerEmail: "shopper@example.com",
+        billingAddress: {
+          country: "PL",
+          firstName: "Jan",
+          lastName: "Kowalski",
+        },
+        shippingAddress: { country: "PL" },
+      });
+      const { service } = createService(cartClient);
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1234, currencyCode: "PLN" });
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-blik" });
+
+      const result = await service.createPaymentSession({ paymentMethodOptions: { blik: {} } });
+
+      expect(mockNuveiClientInstance.openOrder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amount: "12.34",
+          currency: "PLN",
+          billingAddress: {
+            country: "PL",
+            email: "shopper@example.com",
+            firstName: "Jan",
+            lastName: "Kowalski",
+          },
+          userDetails: {
+            country: "PL",
+            email: "shopper@example.com",
+            firstName: "Jan",
+            lastName: "Kowalski",
+          },
+        }),
+      );
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentMethod: "blik" }),
+      );
+      expect(result).toMatchObject({
+        uiMethod: "blik",
+        paymentMethod: "blik",
+        integrationSurface: "web-sdk",
+        countryCode: "PL",
+      });
+    });
+
+    it("rejects BLIK non-PLN carts before openOrder", async () => {
+      const cartClient = makeCtCartClientMock({
+        customerEmail: "shopper@example.com",
+        billingAddress: {
+          country: "PL",
+          firstName: "Jan",
+          lastName: "Kowalski",
+        },
+      });
+      const { service } = createService(cartClient);
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "EUR" });
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { blik: {} } }),
+      ).rejects.toMatchObject({
+        code: PublicPaymentErrorCode.REQUEST_MALFORMED,
+        diagnostics: expect.objectContaining({ category: "blik_currency_invalid" }),
+      });
+
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it("rejects BLIK non-PL billing or shipping countries before openOrder", async () => {
+      const cartClient = makeCtCartClientMock({
+        customerEmail: "shopper@example.com",
+        billingAddress: {
+          country: "PL",
+          firstName: "Jan",
+          lastName: "Kowalski",
+        },
+        shippingAddress: { country: "DE" },
+      });
+      const { service } = createService(cartClient);
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "PLN" });
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { blik: {} } }),
+      ).rejects.toMatchObject({
+        code: PublicPaymentErrorCode.REQUEST_MALFORMED,
+        diagnostics: expect.objectContaining({ category: "blik_country_invalid" }),
+      });
+
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it("rejects BLIK carts missing PL shopper identity before openOrder", async () => {
+      const cartClient = makeCtCartClientMock({
+        billingAddress: {
+          country: "PL",
+          firstName: "Jan",
+        },
+      });
+      const { service } = createService(cartClient);
+      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1000, currencyCode: "PLN" });
+
+      await expect(
+        service.createPaymentSession({ paymentMethodOptions: { blik: {} } }),
+      ).rejects.toMatchObject({
+        code: PublicPaymentErrorCode.REQUEST_MALFORMED,
+        diagnostics: expect.objectContaining({ category: "blik_shopper_identity_missing" }),
+      });
+
+      expect(mockNuveiClientInstance.openOrder).not.toHaveBeenCalled();
+      expect(mockHandleCtPaymentCreation).not.toHaveBeenCalled();
+    });
+
+    it.each(["paypal", "dropin", "wechatpay", "hpp", "apmgw_BLIK"])(
       "rejects unsupported payment method %s before Nuvei or commercetools side effects",
       async (unsupportedMethod) => {
         const { service } = createService();
@@ -859,6 +1054,8 @@ describe("NuveiPaymentService", () => {
       ["non-empty card payload", { paymentMethodOptions: { card: { unexpected: true } } }],
       ["non-object embedded payload", { paymentMethodOptions: { embedded: null } }],
       ["non-empty embedded payload", { paymentMethodOptions: { embedded: { unexpected: true } } }],
+      ["non-object BLIK payload", { paymentMethodOptions: { blik: null } }],
+      ["non-empty BLIK payload", { paymentMethodOptions: { blik: { blik_code: "777777" } } }],
     ])("rejects malformed %s before Nuvei or commercetools side effects", async (_, options) => {
       const { service } = createService();
 
@@ -907,6 +1104,9 @@ describe("NuveiPaymentService", () => {
         merchantReturnUrl: "https://example.com/return",
         amount: "10.00",
         currency: "USD",
+        uiMethod: "card",
+        paymentMethod: "card",
+        integrationSurface: "web-sdk",
       });
     });
 
@@ -1123,6 +1323,29 @@ describe("NuveiPaymentService", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
+    it("existing failed Charge for planned amount returns rejected without Nuvei lookup", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Charge",
+              state: "Failure",
+              interactionId: "dmn-charge-failure-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      expect(mockNuveiClientInstance.getPaymentStatus).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
     it("approved status without PPP uses transactionId even when Initial session transaction exists", async () => {
       const { service } = createService();
       mockGetPayment.mockResolvedValue(
@@ -1197,6 +1420,63 @@ describe("NuveiPaymentService", () => {
           transaction: expect.objectContaining({ interactionId: "session-token-1" }),
         }),
       );
+    });
+
+    it("writes BLIK Sale confirmations as Charge terminal transactions", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          amountPlanned: { centAmount: 1000, currencyCode: "PLN" },
+          paymentMethodInfo: { method: "blik" },
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "APPROVED",
+        transactionType: "Sale",
+        PPP_TransactionID: "ppp-blik-sale-1",
+        amount: "10.00",
+        currency: "PLN",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          transaction: expect.objectContaining({
+            type: "Charge",
+            state: "Success",
+            interactionId: "ppp-blik-sale-1",
+          }),
+        }),
+      );
+    });
+
+    it("does not repeat an already-recorded BLIK Sale Charge failure", async () => {
+      const { service } = createService();
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          amountPlanned: { centAmount: 1000, currencyCode: "PLN" },
+          paymentMethodInfo: { method: "blik" },
+          transactions: [{ type: "Charge", state: "Failure", interactionId: "ppp-blik-fail-1" }],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "DECLINED",
+        transactionType: "Sale",
+        PPP_TransactionID: "ppp-blik-fail-1",
+        amount: "10.00",
+        currency: "PLN",
+      });
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "rejected" });
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
     it("approved status without any Nuvei transaction id uses session token as fallback id", async () => {
@@ -1366,6 +1646,7 @@ describe("NuveiPaymentService", () => {
     ])(
       "inconclusive/unknown Nuvei status (%s) returns { outcome: 'pending' } without CT write (D-03, D-08, D-09, D-17)",
       async (_, statusOverrides) => {
+
         const { service } = createService();
         mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
         mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
@@ -1476,6 +1757,30 @@ describe("NuveiPaymentService", () => {
       };
 
       await service.processNuveiDmn(body);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("BLIK DMN duplicate Charge PPP skips update before any ambiguous write", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "nuvei-tx-100",
+          paymentMethodInfo: { method: "blik" },
+          transactions: [{ type: "Charge", state: "Success", interactionId: "ppp-blik-1" }],
+        }),
+      );
+
+      await service.processNuveiDmn({
+        merchant_unique_id: "payment-1",
+        PPP_TransactionID: "ppp-blik-1",
+        transactionType: "Sale",
+        ppp_status: "OK",
+        totalAmount: "10.00",
+        currency: "PLN",
+        payment_method: "apmgw_BLIK",
+      });
 
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });

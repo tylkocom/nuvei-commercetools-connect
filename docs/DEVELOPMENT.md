@@ -45,6 +45,8 @@ This repository has no root-level `package.json`; install and run each package w
 
    <!-- VERIFY: Confirm the Nuvei API base URL and merchant credentials for the target Nuvei account before running against a real environment. -->
 
+   Web SDK BLIK is available by default. Use PLN carts with Polish billing/shipping country and a Nuvei merchant account where BLIK is enabled when testing that path.
+
 4. Build both Connect applications before validating or packaging the connector:
 
    ```bash

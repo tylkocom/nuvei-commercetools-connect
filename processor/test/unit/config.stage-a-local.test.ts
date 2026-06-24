@@ -76,4 +76,5 @@ describe("validateConfig Stage A local mock CT exception", () => {
       "https://shelfmarket-dev.public.cloud.oklyt.pl",
     ]);
   });
+
 });

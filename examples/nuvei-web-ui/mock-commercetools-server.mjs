@@ -114,6 +114,64 @@ const INITIAL_PAYMENT_ID = "payment-local-001";
 const LOCAL_OAUTH_TOKEN = "mock-ct-access-token";
 const OAUTH_SCOPE = "manage_project manage_checkout_payment_intents manage_checkout_transactions introspect_oauth_tokens view_sessions manage_payments";
 
+function mockCartCurrency() {
+  return "PLN";
+}
+
+function componentPaymentMethods() {
+  return [{ type: "card" }, { type: "blik" }];
+}
+
+function allowedPaymentMethods() {
+  return componentPaymentMethods().map((method) => method.type);
+}
+
+function selectionForUiMethod(uiMethod) {
+  if (uiMethod === "embedded") return { uiMethod, paymentMethod: "card", integrationSurface: "simply-connect" };
+  return { uiMethod, paymentMethod: uiMethod, integrationSurface: "web-sdk" };
+}
+
+function isBlikDmn(body) {
+  return String(body.payment_method ?? body.paymentMethod ?? body.paymentMethodName ?? "").toLowerCase() === "apmgw_blik";
+}
+
+function paymentMethodInfoForTender(tender) {
+  return tender === "blik"
+    ? { paymentInterface: "nuvei", method: "blik", name: { en: "BLIK" } }
+    : { paymentInterface: "nuvei", method: "card", name: { en: "Card" } };
+}
+
+function initialTransactionTypeForTender(tender) {
+  return tender === "blik" ? "Charge" : "Authorization";
+}
+
+function successInterfaceCodeForTransaction(type) {
+  if (type === "Authorization") return "authorized";
+  if (type === "Charge") return "paid";
+  if (type === "Refund") return "refunded";
+  if (type === "CancelAuthorization") return "cancelled";
+  return "pending";
+}
+
+function stateFromNuveiStatus(status) {
+  if (status === "OK" || status === "SUCCESS" || status === "APPROVED") return "Success";
+  if (status === "PENDING") return "Pending";
+  return "Failure";
+}
+
+function transactionTypeFromDmn(body) {
+  const transactionType = String(body.transactionType ?? "Auth");
+  if (isBlikDmn(body) || transactionType === "Sale" || transactionType === "Settle") return "Charge";
+  if (transactionType === "Credit") return "Refund";
+  if (transactionType === "Void") return "CancelAuthorization";
+  return "Authorization";
+}
+
+function applyTenderMetadataFromDmn(body) {
+  if (!isBlikDmn(body)) return;
+  ledger.payment.paymentMethodInfo = paymentMethodInfoForTender("blik");
+}
+
 function money(centAmount = 1000, currencyCode = "EUR", fractionDigits = 2) {
   return { centAmount, currencyCode, fractionDigits };
 }
@@ -130,7 +188,9 @@ function validatePaymentMethodOptions(body = {}) {
   if (!isPlainObject(body)) return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
 
   const paymentMethodOptions = body.paymentMethodOptions;
-  if (paymentMethodOptions === undefined) return { ok: true, paymentMethod: "card" };
+  if (paymentMethodOptions === undefined) {
+    return { ok: true, paymentMethod: "card", selection: selectionForUiMethod("card") };
+  }
   if (!isPlainObject(paymentMethodOptions)) {
     return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
   }
@@ -141,7 +201,7 @@ function validatePaymentMethodOptions(body = {}) {
   }
 
   const [paymentMethod] = methods;
-  if (paymentMethod !== "card" && paymentMethod !== "embedded") {
+  if (paymentMethod !== "card" && paymentMethod !== "embedded" && paymentMethod !== "blik") {
     return { ok: false, status: 422, code: "METHOD_UNSUPPORTED", message: "Payment method is not supported." };
   }
 
@@ -150,7 +210,7 @@ function validatePaymentMethodOptions(body = {}) {
     return { ok: false, status: 400, code: "REQUEST_MALFORMED", message: "Payment setup request is malformed." };
   }
 
-  return { ok: true, paymentMethod };
+  return { ok: true, paymentMethod, selection: selectionForUiMethod(paymentMethod) };
 }
 
 function createSession() {
@@ -162,7 +222,7 @@ function createSession() {
       cartRef: { id: CART_ID, typeId: "cart" },
     },
     metadata: {
-      allowedPaymentMethods: ["card"],
+      allowedPaymentMethods: allowedPaymentMethods(),
       processorUrl: process.env.PROCESSOR_URL ?? "http://localhost:8080",
       paymentInterface: "nuvei",
       merchantReturnUrl: "http://localhost:8089/return",
@@ -179,21 +239,17 @@ function createCart() {
     paymentInfo: {
       payments: [{ id: INITIAL_PAYMENT_ID, typeId: "payment" }],
     },
-    totalPrice: money(),
+    totalPrice: money(1000, mockCartCurrency()),
   };
 }
 
-function createPayment({ id = INITIAL_PAYMENT_ID, interfaceId = null, amountPlanned = money(), paymentMethodInfo, transactions = [] } = {}) {
+function createPayment({ id = INITIAL_PAYMENT_ID, interfaceId = null, amountPlanned = money(1000, mockCartCurrency()), paymentMethodInfo, transactions = [] } = {}) {
   return {
     id,
     version: 1,
     interfaceId,
     amountPlanned: clone(amountPlanned),
-    paymentMethodInfo: paymentMethodInfo ?? {
-      paymentInterface: "nuvei",
-      method: "card",
-      name: { en: "Card" },
-    },
+    paymentMethodInfo: paymentMethodInfo ?? paymentMethodInfoForTender("card"),
     transactions: clone(transactions),
     paymentStatus: {
       interfaceCode: "pending",
@@ -215,6 +271,30 @@ function createLedger() {
 
 let ledger = createLedger();
 
+function sanitizeForLog(value) {
+  if (Array.isArray(value)) return value.map((item) => sanitizeForLog(item));
+  if (!isPlainObject(value)) return value;
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entryValue]) => {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey.includes("authorization") ||
+        normalizedKey.includes("token") ||
+        normalizedKey.includes("checksum") ||
+        normalizedKey.includes("secret") ||
+        normalizedKey.includes("cardnumber") ||
+        normalizedKey === "cvv" ||
+        normalizedKey === "blik_code" ||
+        normalizedKey === "code"
+      ) {
+        return [key, "[redacted]"];
+      }
+      return [key, sanitizeForLog(entryValue)];
+    }),
+  );
+}
+
 function record(direction, label, req, extra = {}) {
   const entry = {
     at: new Date().toISOString(),
@@ -222,9 +302,9 @@ function record(direction, label, req, extra = {}) {
     label,
     method: req.method,
     path: req.originalUrl,
-    headers: req.headers,
-    body: req.body,
-    rawBody: req.rawBody ?? "",
+    headers: sanitizeForLog(req.headers),
+    body: sanitizeForLog(req.body),
+    rawBody: req.rawBody ? "[redacted-raw-body]" : "",
     ...extra,
   };
 
@@ -501,14 +581,17 @@ app.get("/config", (req, res) => {
   });
 });
 
-app.get("/payment-components", (req, res) => {
+function sendPaymentComponents(req, res) {
   record("INBOUND", "Supported payment components", req);
   res.json({
     dropins: [{ type: "embedded" }],
-    components: [{ type: "card" }],
+    components: componentPaymentMethods(),
     express: [],
   });
-});
+}
+
+app.get("/payment-components", sendPaymentComponents);
+app.get("/operations/payment-components", sendPaymentComponents);
 
 app.post("/payments/session", async (req, res) => {
   record("INBOUND", "Create payment session", req, {
@@ -548,10 +631,10 @@ app.post("/payments/session", async (req, res) => {
         sessionTokenLength: typeof sessionToken === "string" ? sessionToken.length : 0,
       });
     } catch (err) {
-      console.error("Nuvei openOrder failed:", err.message, err.responseBody);
+      console.error("Nuvei openOrder failed:", err.message);
       return res.status(502).json({
         message: "Nuvei openOrder failed",
-        detail: err.responseBody || err.message,
+        detail: err.message,
       });
     }
   } else {
@@ -559,8 +642,19 @@ app.post("/payments/session", async (req, res) => {
     console.log("No Nuvei creds found; returning mock session token.");
   }
 
+  const { selection } = paymentMethodResult;
   ledger.payment.interfaceId = sessionToken;
-  ledger.payment.paymentMethodInfo.method = paymentMethodResult.paymentMethod;
+  ledger.payment.amountPlanned = clone(ledger.cart.totalPrice);
+  ledger.payment.paymentMethodInfo = paymentMethodInfoForTender(selection.paymentMethod);
+  ledger.payment.transactions = [
+    {
+      id: crypto.randomUUID(),
+      type: initialTransactionTypeForTender(selection.paymentMethod),
+      state: "Initial",
+      amount: ledger.payment.amountPlanned,
+      interactionId: sessionToken,
+    },
+  ];
 
   res.json({
     cartId: ledger.cart.id,
@@ -569,6 +663,10 @@ app.post("/payments/session", async (req, res) => {
     merchantReturnUrl: "http://localhost:8089/return",
     amount: (ledger.cart.totalPrice.centAmount / 100).toFixed(2),
     currency: ledger.cart.totalPrice.currencyCode,
+    uiMethod: selection.uiMethod,
+    paymentMethod: selection.paymentMethod,
+    integrationSurface: selection.integrationSurface,
+    ...(selection.paymentMethod === "blik" ? { countryCode: "PL" } : {}),
     ...(orderId ? { orderId } : {}),
   });
 });
@@ -581,10 +679,11 @@ app.post("/payments/confirm/:id", (req, res) => {
 
   const transactionId = `mock-nuvei-transaction-${crypto.randomUUID()}`;
   ledger.payment.interfaceId = req.body?.sessionToken ?? ledger.payment.interfaceId;
-  ledger.payment.paymentStatus.interfaceCode = "authorized";
+  const type = initialTransactionTypeForTender(ledger.payment.paymentMethodInfo.method);
+  ledger.payment.paymentStatus.interfaceCode = successInterfaceCodeForTransaction(type);
   upsertTransaction({
     id: crypto.randomUUID(),
-    type: "Authorization",
+    type,
     state: "Success",
     amount: ledger.payment.amountPlanned,
     interactionId: transactionId,
@@ -602,7 +701,6 @@ app.post("/webhooks/nuvei", (req, res) => {
 
   const body = req.body ?? {};
   const status = String(body.Status ?? body.ppp_status ?? "OK").toUpperCase();
-  const transactionType = String(body.transactionType ?? "Auth");
   const interactionId = transactionIdFromBody(body);
   const amount = {
     centAmount: amountFromBody(body),
@@ -610,16 +708,9 @@ app.post("/webhooks/nuvei", (req, res) => {
     fractionDigits: 2,
   };
 
-  const type =
-    transactionType === "Settle"
-      ? "Charge"
-      : transactionType === "Credit"
-        ? "Refund"
-        : transactionType === "Void"
-          ? "CancelAuthorization"
-          : "Authorization";
-
-  const state = status === "OK" || status === "SUCCESS" ? "Success" : "Failure";
+  applyTenderMetadataFromDmn(body);
+  const type = transactionTypeFromDmn(body);
+  const state = stateFromNuveiStatus(status);
 
   const result = upsertTransaction({
     id: crypto.randomUUID(),
@@ -629,13 +720,8 @@ app.post("/webhooks/nuvei", (req, res) => {
     interactionId,
   });
 
-  if (type === "Authorization" && state === "Success")
-    ledger.payment.paymentStatus.interfaceCode = "authorized";
-  if (type === "Charge" && state === "Success") ledger.payment.paymentStatus.interfaceCode = "paid";
-  if (type === "Refund" && state === "Success")
-    ledger.payment.paymentStatus.interfaceCode = "refunded";
-  if (type === "CancelAuthorization" && state === "Success")
-    ledger.payment.paymentStatus.interfaceCode = "cancelled";
+  if (state === "Success") ledger.payment.paymentStatus.interfaceCode = successInterfaceCodeForTransaction(type);
+  if (state === "Pending") ledger.payment.paymentStatus.interfaceCode = "pending";
 
   res.json({
     ok: true,

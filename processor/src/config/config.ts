@@ -56,6 +56,8 @@ export const config = {
 
   // Payment Providers config
   returnUrl: process.env.RETURN_URL || "",
+  simplyConnectPaymentMethod:
+    (process.env.NUVEI_SIMPLY_CONNECT_PAYMENT_METHOD || "card") as "card" | "blik",
   corsAllowedOrigins: (process.env.CORS_ALLOWED_ORIGINS || "")
     .split(/[;,]/)
     .map((origin) => origin.trim())

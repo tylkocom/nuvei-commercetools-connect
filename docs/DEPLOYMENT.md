@@ -206,7 +206,7 @@ Recommended checks:
      https://<processor-service-url>/operations/payment-components
    ```
 
-   Expected response: `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }], "express": [] }`. This exposes Web Components `card` and Drop-in `embedded` while keeping non-card APMs disabled until method-specific reconciliation evidence exists.
+   Expected response by default: `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }, { "type": "blik" }], "express": [] }`. This exposes Web Components `card` and `blik` plus Drop-in `embedded`; BLIK still requires Nuvei account enablement, PLN/PL cart data, and sandbox evidence before production claims.
 
 5. Run a test checkout flow that creates a payment session through `POST /payments/session` with `X-Session-ID`, confirms an approved Nuvei widget result through `POST /payments/confirm/:id`, and verifies that the commercetools Payment receives the expected transaction update.
 

@@ -5,6 +5,7 @@ vi.mock("../../src/services/simply-connect-sdk", () => ({
 }));
 
 import * as scSdk from "../../src/services/simply-connect-sdk";
+import type { SafeChargeCardField, SafeChargeInstance } from "../../src/services/web-sdk";
 
 describe("loadWebSdk", () => {
   beforeEach(() => {
@@ -162,6 +163,51 @@ describe("loadWebSdk", () => {
     const { WEB_SDK_URL } = await import("../../src/services/web-sdk");
     expect(WEB_SDK_URL).toBe(
       "https://cdn.safecharge.com/safecharge_resources/v1/websdk/safecharge.js",
+    );
+  });
+
+  it("types card and BLIK createPayment payloads with optional getApms", async () => {
+    const cardField: SafeChargeCardField = { attach: vi.fn() };
+    const instance: SafeChargeInstance = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue(cardField) }),
+      createPayment: vi.fn(),
+      getApms: vi.fn((_params, callback) =>
+        callback({ paymentMethods: [{ paymentMethod: "apmgw_BLIK" }] }),
+      ),
+    };
+    const callback = vi.fn();
+
+    instance.createPayment(
+      {
+        sessionToken: "session-token",
+        paymentOption: cardField,
+      },
+      callback,
+    );
+    instance.createPayment(
+      {
+        sessionToken: "session-token",
+        paymentOption: {
+          alternativePaymentMethod: {
+            paymentMethod: "apmgw_BLIK",
+            blik_code: "777777",
+          },
+        },
+        savePM: false,
+      },
+      callback,
+    );
+    instance.getApms?.({ currencyCode: "PLN", countryCode: "PL" }, callback);
+
+    const withoutGetApms: SafeChargeInstance = {
+      fields: instance.fields,
+      createPayment: instance.createPayment,
+    };
+    expect(withoutGetApms.getApms).toBeUndefined();
+    expect(instance.createPayment).toHaveBeenCalledTimes(2);
+    expect(instance.getApms).toHaveBeenCalledWith(
+      { currencyCode: "PLN", countryCode: "PL" },
+      callback,
     );
   });
 });

@@ -55,6 +55,19 @@ describe("Checkout-facing Enabler", () => {
     expect(mockGetConfig).not.toHaveBeenCalled();
   });
 
+  it("routes BLIK as a component builder with submit support", async () => {
+    const enabler = new Enabler({
+      processorUrl: "https://processor.example.com",
+      sessionId: "session-123",
+    });
+
+    const builder = await enabler.createComponentBuilder("blik");
+
+    expect(builder.componentHasSubmit).toBe(true);
+    expect(mockGetConfig).not.toHaveBeenCalled();
+    await expect(enabler.createDropinBuilder("blik")).rejects.toBeInstanceOf(PaymentSetupError);
+  });
+
   it("exposes template optional methods with unsupported/empty behavior", async () => {
     mockGetConfig.mockResolvedValue({
       environment: "test",
@@ -89,7 +102,7 @@ describe("Checkout-facing Enabler", () => {
     });
 
     await expect(enabler.createComponentBuilder("embedded")).rejects.toMatchObject({
-      message: "Unsupported component payment method. Supported methods: card.",
+      message: "Unsupported component payment method. Supported methods: card, blik.",
     });
     await expect(enabler.createDropinBuilder("card")).rejects.toMatchObject({
       message: "Unsupported dropin payment method. Supported methods: embedded.",

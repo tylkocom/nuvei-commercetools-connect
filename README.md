@@ -52,7 +52,7 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 | Path | Purpose |
 | --- | --- |
 | `connect.yaml` | commercetools Connect deployment descriptor. Defines the `enabler` assets application, the `processor` service application, deployment scripts, and required configuration keys. |
-| `enabler/` | Browser-side Nuvei wrapper built with TypeScript and Vite. It exports the Checkout-facing `Enabler` adapter for `card` components and `embedded` drop-ins. |
+| `enabler/` | Browser-side Nuvei wrapper built with TypeScript and Vite. It exports the Checkout-facing `Enabler` adapter for `card` and `blik` components plus `embedded` drop-ins. |
 | `processor/` | Fastify service that creates Nuvei payment sessions, confirms widget results, handles commercetools payment operations, and processes Nuvei DMN webhooks. |
 | `examples/nuvei-web-ui/` | Local Express mock server and browser evidence harness for exercising connector flows with mocked commercetools state. |
 | `docs/` | Operational, deployment, architecture, testing, and Nuvei setup documentation. |
@@ -61,7 +61,7 @@ The CI workflow uses Node.js 20. The package lockfiles are npm lockfiles; there 
 
 ### Mount the card component
 
-`enabler/src/index.ts` exports the Checkout-facing `Enabler` adapter, plus `PaymentMethod`, `PaymentComponentBuilder`, `PaymentDropinBuilder`, `SimplyConnectDropinBuilder`, and `WebSdkCardBuilder`. Migration note: legacy `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, and `SimplyConnectCardBuilder` exports were removed; use `new Enabler(...).createComponentBuilder("card")` for Web SDK card and `new Enabler(...).createDropinBuilder("embedded")` for Simply Connect.
+`enabler/src/index.ts` exports the Checkout-facing `Enabler` adapter, plus `PaymentMethod`, `PaymentComponentBuilder`, `PaymentDropinBuilder`, `SimplyConnectDropinBuilder`, `WebSdkCardBuilder`, and `WebSdkBlikBuilder`. Migration note: legacy `NuveiSimplyConnectEnabler`, `NuveiWebSdkEnabler`, `NuveiEnabler`, and `SimplyConnectCardBuilder` exports were removed; use `new Enabler(...).createComponentBuilder("card")` for Web SDK card, `new Enabler(...).createComponentBuilder("blik")` for Web SDK BLIK, and `new Enabler(...).createDropinBuilder("embedded")` for Simply Connect.
 ```ts
 import { Enabler } from "@nuvei-commercetools/enabler";
 
@@ -122,6 +122,40 @@ await dropin.mount("#payment-container");
 
 Expected result: `POST /payments/session` is called with `{ "paymentMethodOptions": { "embedded": {} } }`, Nuvei Simply Connect renders in-place, and the checkout config includes `pmWhitelist: ["cc_card"]` so the first drop-in demo remains card-only.
 
+
+### Mount the Web SDK BLIK component
+
+Web SDK BLIK is available by default as a Web Components integration. Use it only where BLIK prerequisites are satisfied: Nuvei account enablement, PLN currency, Polish shopper country, and sandbox evidence before production claims.
+
+```ts
+import { Enabler } from "@nuvei-commercetools/enabler";
+
+const enabler = new Enabler({
+  processorUrl: "https://service-<id>.<region>.gcp.commercetools.app",
+  sessionId: "<checkout-session-id>",
+  locale: "pl",
+  countryCode: "PL",
+  onComplete: ({ isSuccess, paymentReference }) => {
+    console.log({ isSuccess, paymentReference });
+  },
+  onPending: ({ paymentReference }) => {
+    console.log({ pendingPaymentReference: paymentReference });
+  },
+  onError: console.error,
+});
+
+const builder = await enabler.createComponentBuilder("blik");
+const component = builder.build({
+  onPayButtonClick: async () => {
+    // Check terms acceptance or final order readiness here.
+  },
+});
+await component.mount("#payment-container");
+await component.submit();
+```
+
+Expected result: `POST /payments/session` is called with `{ "paymentMethodOptions": { "blik": {} } }`, the session response contains safe method metadata such as `uiMethod: "blik"`, `paymentMethod: "blik"`, `integrationSurface: "web-sdk"`, and `countryCode: "PL"`, and the BLIK code is collected by the browser component for Nuvei Web SDK only. The code is never sent to the processor.
+
 ### Create a payment session through the processor
 
 The processor registers payment routes under `/payments` in `processor/src/server/plugins/nuvei-payment.plugin.ts`.
@@ -145,11 +179,15 @@ Expected response shape:
   "paymentReference": "<commercetools-payment-id>",
   "merchantReturnUrl": "<return-url>",
   "amount": "10.00",
-  "currency": "EUR"
+  "currency": "<cart-currency>",
+  "uiMethod": "embedded",
+  "paymentMethod": "card",
+  "integrationSurface": "simply-connect",
+  "countryCode": "<country-code-if-returned>"
 }
 ```
 
-Use `{ "paymentMethodOptions": { "card": {} } }` for the Web Components card path and `{ "paymentMethodOptions": { "embedded": {} } }` for the Simply Connect drop-in path. The local example harness defaults to the Checkout-facing drop-in path and can switch to the same `Enabler` card component route for Web SDK comparison.
+Use `{ "paymentMethodOptions": { "card": {} } }` for the Web Components card path, `{ "paymentMethodOptions": { "blik": {} } }` for the Web SDK BLIK path, and `{ "paymentMethodOptions": { "embedded": {} } }` for the Simply Connect drop-in path. The local example harness defaults to the Checkout-facing drop-in path and can switch to the same `Enabler` component route for Web SDK card or BLIK comparison.
 
 <!-- VERIFY: Replace the placeholder processor URL with the actual deployed Connect service URL for the target deployment. -->
 
@@ -165,16 +203,16 @@ import {
 } from "@nuvei-commercetools/enabler";
 
 console.log(getComponentPaymentMethods().map((method) => method.key));
-// ["card"]
+// ["card", "blik"]
 
 console.log(getDropinPaymentMethods().map((method) => method.key));
 // ["embedded"]
 
-console.log(PaymentMethod.card, PaymentMethod.embedded);
-// "card" "embedded"
+console.log(PaymentMethod.card, PaymentMethod.blik, PaymentMethod.embedded);
+// "card" "blik" "embedded"
 ```
 
-`GET /operations/payment-components` returns `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }], "express": [] }`. Non-card Nuvei APMs are intentionally not exposed until each method has reconciliation and runbook evidence.
+`GET /operations/payment-components` returns `{ "dropins": [{ "type": "embedded" }], "components": [{ "type": "card" }, { "type": "blik" }], "express": [] }` by default. BLIK still requires Nuvei account enablement, PLN/PL shopper data, and sandbox evidence before production claims.
 
 ### Merchant Center Drop-in setup
 

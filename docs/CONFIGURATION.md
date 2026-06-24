@@ -36,7 +36,7 @@ Do not expose `CTP_CLIENT_SECRET`, `NUVEI_SECRET_KEY`, or other credential value
 | `CTP_CHECKOUT_APPLICATION_KEY` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. Keep only if your deployment tooling or external setup requires it. |
 | `CTP_SCOPE` | Not used by current source | None | Present in the checked-in dotenv files, but no source file reads this variable. The required commercetools API scopes are documented in `connect.yaml` under `CTP_CLIENT_ID`: `manage_checkout_payment_intents`, `manage_checkout_transactions`, `manage_payments`, `manage_orders`, `view_sessions`, `view_api_clients`, and `introspect_oauth_tokens`. |
 
-The Simply Connect drop-in is intentionally card-only in this implementation. The browser enabler passes `pmWhitelist: ["cc_card"]`; there is no runtime configuration flag for enabling wallets or regional APMs until each method has separate Nuvei setup, DMN mapping, operation support, fixtures, and runbook evidence.
+The Simply Connect drop-in remains card-only by default through `pmWhitelist: ["cc_card"]`. Web SDK BLIK is a separate component path available from `/payment-components` by default; it still requires BLIK-specific Nuvei account setup, PLN/PL cart data, DMN mapping, operation support, fixtures, and runbook evidence before production claims.
 
 The processor health endpoint reports the running commit hash using the first available value from `GIT_COMMIT_SHA`, `GITHUB_SHA`, `VCS_REF`, `COMMIT_SHA`, or the local Git checkout `HEAD`.
 

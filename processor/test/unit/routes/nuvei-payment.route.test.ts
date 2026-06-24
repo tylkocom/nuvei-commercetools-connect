@@ -170,6 +170,11 @@ describe("payment routes", () => {
       sessionToken: "session-token-1",
       paymentReference: "payment-1",
       merchantReturnUrl: "https://example.com/return",
+      amount: "10.00",
+      currency: "USD",
+      uiMethod: "card",
+      paymentMethod: "card",
+      integrationSurface: "web-sdk",
     });
 
     const postRoute = app.routes.find(
@@ -188,6 +193,11 @@ describe("payment routes", () => {
       sessionToken: "session-token-1",
       paymentReference: "payment-1",
       merchantReturnUrl: "https://example.com/return",
+      amount: "10.00",
+      currency: "USD",
+      uiMethod: "card",
+      paymentMethod: "card",
+      integrationSurface: "web-sdk",
     });
   });
 

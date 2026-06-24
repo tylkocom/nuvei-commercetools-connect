@@ -7,6 +7,10 @@ export const PaymentResponseSchema = Type.Object({
   merchantReturnUrl: Type.String(),
   amount: Type.String(),
   currency: Type.String(),
+  uiMethod: Type.Union([Type.Literal("card"), Type.Literal("blik"), Type.Literal("embedded")]),
+  paymentMethod: Type.Union([Type.Literal("card"), Type.Literal("blik")]),
+  integrationSurface: Type.Union([Type.Literal("web-sdk"), Type.Literal("simply-connect")]),
+  countryCode: Type.Optional(Type.String()),
 });
 
 export type PaymentResponseSchemaDTO = Static<typeof PaymentResponseSchema>;

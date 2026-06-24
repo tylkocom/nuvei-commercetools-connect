@@ -1,4 +1,5 @@
 import { WebSdkCardBuilder } from "../components/web-sdk-card.js";
+import { WebSdkBlikBuilder } from "../components/web-sdk-blik.js";
 import { SimplyConnectDropinBuilder } from "../components/simply-connect-dropin.js";
 import { apiService, type ApiService, type ProcessorConfigResponse } from "../services/api-service.js";
 import type {
@@ -37,6 +38,9 @@ function toNuveiOptions(
     merchantId: config.merchantId,
     merchantSiteId: config.merchantSiteId,
     env: normalizeNuveiEnvironment(config.environment),
+    ...(config.simplyConnectPaymentMethod && {
+      simplyConnectPaymentMethod: config.simplyConnectPaymentMethod,
+    }),
   };
 }
 
@@ -58,11 +62,15 @@ export class Enabler implements PaymentEnabler {
   }
 
   async createComponentBuilder(type: string): Promise<PaymentComponentBuilder> {
-    if (type !== PaymentMethod.card) {
-      throw methodUnsupported(type, "component");
+    if (type === PaymentMethod.card) {
+      return new CheckoutCardBuilder(this.options, () => this.getConfig());
     }
 
-    return new CheckoutCardBuilder(this.options, () => this.getConfig());
+    if (type === PaymentMethod.blik) {
+      return new CheckoutBlikBuilder(this.options, () => this.getConfig());
+    }
+
+    throw methodUnsupported(type, "component");
   }
 
   async createDropinBuilder(type: string): Promise<PaymentDropinBuilder> {
@@ -183,6 +191,21 @@ class CheckoutCardBuilder implements PaymentComponentBuilder {
   build(config: ComponentOptions): PaymentComponent {
     return new CheckoutDelegateComponent(this.options, this.loadConfig, (options) =>
       new WebSdkCardBuilder(options).build(config),
+    );
+  }
+}
+
+class CheckoutBlikBuilder implements PaymentComponentBuilder {
+  public componentHasSubmit = true;
+
+  constructor(
+    private readonly options: CheckoutEnablerOptions,
+    private readonly loadConfig: ProcessorConfigLoader,
+  ) {}
+
+  build(config: ComponentOptions): PaymentComponent {
+    return new CheckoutDelegateComponent(this.options, this.loadConfig, (options) =>
+      new WebSdkBlikBuilder(options).build(config),
     );
   }
 }

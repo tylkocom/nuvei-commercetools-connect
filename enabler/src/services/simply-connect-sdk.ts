@@ -77,6 +77,8 @@ export type CheckoutConfig = {
   billingAddress?: Record<string, string>;
   renderTo: string;
   pmWhitelist?: readonly string[];
+  savePM?: string;
+  apmConfig?: Record<string, Record<string, string>>;
   prePayment?: PrePaymentCallback;
   /**
    * Fired by Simply Connect once the widget has rendered

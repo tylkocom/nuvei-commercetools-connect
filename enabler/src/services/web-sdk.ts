@@ -6,29 +6,63 @@ export type SafeChargeResult = {
   errCode?: string | number;
   errorDescription?: string;
   cancelled?: boolean;
+  redirectUrl?: string;
 };
 
 export interface SafeChargeCardField {
   attach(el: Element): void;
 }
 
+export type SafeChargeAlternativePaymentMethod = {
+  alternativePaymentMethod: {
+    paymentMethod: "apmgw_BLIK";
+    blik_code: string;
+  };
+};
+
+export type SafeChargePaymentOption = SafeChargeCardField | SafeChargeAlternativePaymentMethod;
+
+export type SafeChargeCreatePaymentParams = {
+  sessionToken: string;
+  clientUniqueId?: string;
+  merchant_unique_id?: string;
+  merchantUniqueId?: string;
+  merchantUniqueID?: string;
+  cardHolderName?: string;
+  paymentOption: SafeChargePaymentOption;
+  billingAddress?: Record<string, string>;
+  userDetails?: Record<string, string>;
+  deviceDetails?: Record<string, string>;
+  savePM?: boolean | "false" | "true";
+};
+
+export type SafeChargeApm = {
+  paymentMethod: string;
+  paymentMethodDisplayName?: Array<{ language: string; message: string }>;
+  countries?: string[];
+  currencies?: string[];
+  logoURL?: string;
+  fields?: Array<{ name: string; type: string; caption?: unknown[] }>;
+};
+
+export type SafeChargeGetApmsResult = {
+  paymentMethods?: SafeChargeApm[];
+  status?: string;
+  errCode?: string | number;
+  reason?: string;
+};
+
 export interface SafeChargeInstance {
   fields(opts: { fonts?: Array<{ cssUrl: string }> }): {
     create(type: "card", opts: object): SafeChargeCardField;
   };
   createPayment(
-    params: {
-      sessionToken: string;
-      clientUniqueId?: string;
-      merchant_unique_id?: string;
-      merchantUniqueId?: string;
-      merchantUniqueID?: string;
-      cardHolderName?: string;
-      paymentOption: SafeChargeCardField;
-      billingAddress?: Record<string, string>;
-      savePM?: boolean;
-    },
+    params: SafeChargeCreatePaymentParams,
     callback: (res: SafeChargeResult) => void,
+  ): void;
+  getApms?(
+    params: { currencyCode: string; countryCode: string; languageCode?: string },
+    callback: (res: SafeChargeGetApmsResult) => void,
   ): void;
 }
 
@@ -41,6 +75,15 @@ export type SafeChargeFactory = (opts: {
 export type SafeChargeLoaderOptions = Parameters<SafeChargeFactory>[0];
 
 declare global {
+
+  interface PromiseConstructor {
+    withResolvers<T>(): {
+      promise: Promise<T>;
+      resolve: (value: T | PromiseLike<T>) => void;
+      reject: (reason?: unknown) => void;
+    };
+  }
+
   interface Window {
     SafeCharge?: SafeChargeFactory;
   }
@@ -60,52 +103,59 @@ export function loadWebSdk(opts: SafeChargeLoaderOptions): Promise<SafeChargeIns
     return wsLoadPromise;
   }
 
-  wsLoadPromise = new Promise<SafeChargeInstance>((resolve, reject) => {
-    const existing = document.querySelector(
-      `script[src="${WEB_SDK_URL}"]`,
-    ) as HTMLScriptElement | null;
-
-    if (existing) {
-      if (window.SafeCharge) {
-        resolve(window.SafeCharge(opts));
-        return;
-      }
-
-      existing.addEventListener(
-        "load",
-        () => {
-          if (window.SafeCharge) {
-            resolve(window.SafeCharge(opts));
-          } else {
-            reject(new Error("Nuvei SafeCharge factory not found after script load"));
-          }
-        },
-        { once: true },
-      );
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("Failed to load Nuvei Web SDK script")),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = WEB_SDK_URL;
-    script.crossOrigin = "anonymous";
-    script.referrerPolicy = "no-referrer";
-    script.onload = () => {
-      if (window.SafeCharge) {
-        resolve(window.SafeCharge(opts));
-        return;
-      }
-      reject(new Error("Nuvei SafeCharge factory not found after script load"));
-    };
-    script.onerror = () => reject(new Error("Failed to load Nuvei Web SDK script"));
-    document.head.appendChild(script);
-  }).finally(() => {
+  let resolve!: (value: SafeChargeInstance | PromiseLike<SafeChargeInstance>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<SafeChargeInstance>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  wsLoadPromise = promise.finally(() => {
     wsLoadPromise = undefined;
   });
+
+  const existing = document.querySelector(
+    `script[src="${WEB_SDK_URL}"]`,
+  ) as HTMLScriptElement | null;
+
+  if (existing) {
+    const existingSafeCharge = window.SafeCharge as SafeChargeFactory | undefined;
+    if (existingSafeCharge) {
+      resolve(existingSafeCharge(opts));
+      return wsLoadPromise;
+    }
+
+    existing.addEventListener(
+      "load",
+      () => {
+        if (window.SafeCharge) {
+          resolve(window.SafeCharge(opts));
+        } else {
+          reject(new Error("Nuvei SafeCharge factory not found after script load"));
+        }
+      },
+      { once: true },
+    );
+    existing.addEventListener(
+      "error",
+      () => reject(new Error("Failed to load Nuvei Web SDK script")),
+      { once: true },
+    );
+    return wsLoadPromise;
+  }
+
+  const script = document.createElement("script");
+  script.src = WEB_SDK_URL;
+  script.crossOrigin = "anonymous";
+  script.referrerPolicy = "no-referrer";
+  script.onload = () => {
+    if (window.SafeCharge) {
+      resolve(window.SafeCharge(opts));
+      return;
+    }
+    reject(new Error("Nuvei SafeCharge factory not found after script load"));
+  };
+  script.onerror = () => reject(new Error("Failed to load Nuvei Web SDK script"));
+  document.head.appendChild(script);
 
   return wsLoadPromise;
 }

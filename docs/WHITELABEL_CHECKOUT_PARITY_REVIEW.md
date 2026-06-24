@@ -18,9 +18,9 @@ The main template-compatibility gaps identified below have been addressed in the
 
 ## Executive verdict
 
-The browser enabler now exposes the template-compatible Checkout entry point. `Enabler` is the single Checkout-facing adapter: Checkout selects a configured Web Components integration and calls `createComponentBuilder("card")`, or selects a Drop-in integration and calls `createDropinBuilder("embedded")`.
+The browser enabler now exposes the template-compatible Checkout entry point. `Enabler` is the single Checkout-facing adapter: Checkout selects a configured Web Components integration and calls `createComponentBuilder("card")`, calls `createComponentBuilder("blik")` for Web SDK BLIK, or selects a Drop-in integration and calls `createDropinBuilder("embedded")`.
 
-The previous Nuvei-specific facade classes have been removed from the public entry point. Remaining production follow-up is sandbox evidence for real Nuvei Web SDK and Simply Connect callback/DMN fields.
+The previous Nuvei-specific facade classes have been removed from the public entry point. Remaining production follow-up is sandbox evidence for real Nuvei Web SDK card, Web SDK BLIK, and Simply Connect callback/DMN fields.
 
 ## Compatibility map
 
@@ -30,12 +30,12 @@ The previous Nuvei-specific facade classes have been removed from the public ent
 | UMD global | Vite `lib.name = "Connector"`. | Vite `lib.name = "Connector"`; built UMD assigns `globalThis.Connector`. | Compatible. |
 | Constructor | `new Enabler({ processorUrl, sessionId, locale?, countryCode?, onComplete?, onError? })`. | `new Enabler({ processorUrl, sessionId, locale?, countryCode?, onComplete?, onError?, onPending? })`; Nuvei merchant config is fetched from the processor. | Compatible. |
 | Runtime config | Enabler fetches `GET /operations/config` with `X-Session-Id` during setup. | Checkout-facing `Enabler` fetches `/operations/config` before building card or drop-in UI. | Compatible. |
-| Component builder | `createComponentBuilder(type)` plus drop-in, express, and stored-payment builders. | `createComponentBuilder("card")` and `createDropinBuilder("embedded")` are implemented; express/stored methods reject safely. | Compatible for supported surfaces. |
-| Component lifecycle | `mount(selector): Promise<void>`, `submit({ storePaymentDetails? }): Promise<void>`. | Card and drop-in components return promises; drop-in `submit()` rejects defensively because Nuvei owns the internal pay button. | Compatible. |
-| `componentHasSubmit` / `dropinHasSubmit` handling | Checkout/harness uses submit flags to decide whether host or PSP owns the Pay button. | Web SDK card uses `componentHasSubmit = true`; Simply Connect drop-in uses `dropinHasSubmit = false` and gates through `prePayment`. | Compatible. |
+| Component builder | `createComponentBuilder(type)` plus drop-in, express, and stored-payment builders. | `createComponentBuilder("card")`, `createComponentBuilder("blik")`, and `createDropinBuilder("embedded")` are implemented; express/stored methods reject safely. | Compatible for supported surfaces. |
+| Component lifecycle | `mount(selector): Promise<void>`, `submit({ storePaymentDetails? }): Promise<void>`. | Card, BLIK, and drop-in components return promises; drop-in `submit()` rejects defensively because Nuvei owns the internal pay button. | Compatible. |
+| `componentHasSubmit` / `dropinHasSubmit` handling | Checkout/harness uses submit flags to decide whether host or PSP owns the Pay button. | Web SDK card and BLIK use `componentHasSubmit = true`; Simply Connect drop-in uses `dropinHasSubmit = false` and gates through `prePayment`. | Compatible. |
 | Payment callback shape | `onComplete({ isSuccess, paymentReference })`; `onError(error, { paymentReference? })`. | Browser callbacks expose safe template-compatible result/context payloads and do not forward Nuvei session tokens. | Compatible. |
 | Enabler processor calls | Template enabler calls `/payments`, `/stored-payment-methods`, `/operations/config`. | Nuvei enabler calls `/operations/config`, `/payments/session`, and `/payments/confirm/:id`; no stored route calls. | Different by PSP design; OK behind compatible enabler. |
-| Payment components route | `/operations/payment-components` returns `{ dropins, components, express }`. | Same shape; advertises Drop-in `embedded` and Web Components `card`. | Compatible. |
+| Payment components route | `/operations/payment-components` returns `{ dropins, components, express }`. | Same shape; advertises Drop-in `embedded` and Web Components `card`/`blik` by default. | Compatible for supported surfaces. |
 
 ## Findings
 
@@ -225,15 +225,15 @@ Sandbox browser evidence is still needed for CDN failure and recovery behavior u
 
 - Processor exposes `/operations/config`, `/operations/status`, `/operations/payment-components`, `/operations/payment-intents/:id`, and `/operations/transactions` with the same broad auth split as the template: `processor/src/routes/operation.route.ts:39-158`.
 - Processor advertises the standard `{ dropins, components, express }` payment-components response shape: `processor/src/dtos/operations/payment-components.dto.ts:77-83`.
-- The current advertisement is card-first but no longer card-only: `dropins: [{ type: "embedded" }]`, `components: [{ type: "card" }]`, and `express: []`. Non-card APMs remain disabled by the Simply Connect `pmWhitelist`.
-- Web SDK mode remains the external-submit model (`componentHasSubmit = true`); the Simply Connect drop-in is the Merchant Center-compatible PSP-submit model (`dropinHasSubmit = false`).
+- The current advertisement is card-first but no longer card-only: `dropins: [{ type: "embedded" }]`, `components: [{ type: "card" }, { type: "blik" }]`, and `express: []` by default. BLIK still requires method-specific Nuvei setup and sandbox evidence before production claims.
+- Web SDK card and BLIK modes remain the external-submit model (`componentHasSubmit = true`); the Simply Connect drop-in is the Merchant Center-compatible PSP-submit model (`dropinHasSubmit = false`).
 
 ## Recommended clean cutover
 
 1. Keep the Checkout-facing `Enabler` adapter as the only Merchant Center entry point.
 2. Keep Vite UMD `lib.name` aligned with the commercetools loader contract once confirmed in whitelabel evidence.
 3. Keep the adapter constructor one-argument and template-compatible. Fetch Nuvei config through `GET /operations/config`.
-4. Use Web SDK `card` for external-submit card components and Simply Connect `embedded` for the Merchant Center-compatible drop-in path.
+4. Use Web SDK `card` and `blik` for external-submit components, and Simply Connect `embedded` for the Merchant Center-compatible drop-in path.
 5. Preserve promise-based lifecycle methods and template submit parameter compatibility.
 6. Keep public callback payloads template-shaped; never pass session tokens to `onComplete`.
 7. Resolve any remaining Nuvei DMN field ambiguity with real sandbox evidence before production claims.

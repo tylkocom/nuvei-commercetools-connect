@@ -203,6 +203,12 @@ export type EnablerOptions = CheckoutEnablerOptions & {
   merchantSiteId: string;
   /** Nuvei environment: "test" maps to SafeCharge integration, "production" to live. */
   env: "test" | "production";
+  /**
+   * Simply Connect payment method mode. "card" (default) renders a card-only
+   * widget; "blik" renders a BLIK-only widget with pmWhitelist apmgw_BLIK.
+   * Sourced from the processor config endpoint.
+   */
+  simplyConnectPaymentMethod?: "card" | "blik";
 };
 
 /** Result returned to the host when payment completion is known. */

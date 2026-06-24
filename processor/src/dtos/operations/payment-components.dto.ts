@@ -1,7 +1,7 @@
 import { Static, Type } from "@sinclair/typebox";
 
 type PaymentComponentKind = "component" | "dropin";
-type SupportedPaymentMethodLiteral = "card" | "embedded";
+type SupportedPaymentMethodLiteral = "card" | "blik" | "embedded";
 
 export type PaymentMethodRegistryEntry = {
   key: SupportedPaymentMethodLiteral;
@@ -28,6 +28,14 @@ export const PAYMENT_METHOD_REGISTRY = [
     pspMetadata: {},
   },
   {
+    key: "blik",
+    kind: "component",
+    advertisedType: "blik",
+    displayName: "BLIK",
+    transitional: false,
+    pspMetadata: {},
+  },
+  {
     key: "embedded",
     kind: "dropin",
     advertisedType: "embedded",
@@ -40,12 +48,11 @@ export const PAYMENT_METHOD_REGISTRY = [
 export const SUPPORTED_PAYMENT_METHODS = PAYMENT_METHOD_REGISTRY.map((entry) => entry.key);
 
 export type SupportedPaymentMethod = (typeof SUPPORTED_PAYMENT_METHODS)[number];
-
-export const PAYMENT_METHOD_INFO_METHODS: Record<SupportedPaymentMethod, "card"> = {
+export const PAYMENT_METHOD_INFO_METHODS: Record<SupportedPaymentMethod, "card" | "blik"> = {
   card: "card",
+  blik: "blik",
   embedded: "card",
 };
-
 export const METHOD_NAMES: Record<SupportedPaymentMethod, string> = Object.fromEntries(
   PAYMENT_METHOD_REGISTRY.map((entry) => [entry.key, entry.displayName]),
 ) as Record<SupportedPaymentMethod, string>;

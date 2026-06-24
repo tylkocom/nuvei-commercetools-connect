@@ -195,7 +195,7 @@ The `examples/nuvei-web-ui/` package provides the Express mock server and browse
 | File | Purpose |
 | --- | --- |
 | `examples/nuvei-web-ui/mock-commercetools-server.mjs` | Mock server with a local cart/payment ledger and connector-like endpoints. |
-| `examples/nuvei-web-ui/index.html` | Browser entry point for Simply Connect and Web SDK card modes. |
+| `examples/nuvei-web-ui/index.html` | Browser entry point for Simply Connect, Web SDK card, and Web SDK BLIK modes. |
 | `examples/nuvei-web-ui/README.md` | Local setup, scripts, and evidence-capture workflow. |
 
 Install and start the harness:
@@ -204,6 +204,8 @@ Install and start the harness:
 npm install --prefix examples/nuvei-web-ui
 npm start --prefix examples/nuvei-web-ui
 ```
+
+The local BLIK contract path is available by default. The mock server advertises `blik` in `/payment-components`, accepts `{ paymentMethodOptions: { blik: {} } }`, uses PLN mock cart currency, and mirrors BLIK `Charge`/DMN semantics for local development only.
 
 The mock server defaults to port `8089` and exposes:
 
@@ -219,6 +221,12 @@ POST /webhooks/nuvei
 POST /payment-intents/:id
 ```
 
+Run the mock contract self-check:
+
+```bash
+npm --prefix examples/nuvei-web-ui run mock:ct:self-check
+```
+
 The fixed mock IDs are:
 
 | Item | Value |
@@ -226,13 +234,13 @@ The fixed mock IDs are:
 | Cart ID | `cart-local-001` |
 | Payment ID | `payment-local-001` |
 | Amount | `10.00` |
-| Currency | `EUR` |
+| Currency | `PLN` |
 
 Use the harness to verify connector behavior while watching browser DevTools, processor logs, tunnel inspector output, `/ledger`, and the Nuvei sandbox dashboard.
 
 ## Manual sandbox scenarios
 
-`docs/TEST_SCENARIOS.md` is the source of truth for end-to-end functional scenarios. It covers static validation, configuration and status endpoints, supported payment components, card authorization in Simply Connect and Web SDK modes, 3DS, declines, capture, partial capture, cancel, refund, partial refund, reverse, DMN idempotency, invalid checksums, payment correlation failures, amount/currency mismatch, session auth rejection, Nuvei outage handling, custom storefront usage, deployment scripts, and documentation readiness.
+`docs/TEST_SCENARIOS.md` is the source of truth for end-to-end functional scenarios. It covers static validation, configuration and status endpoints, supported payment components, card authorization in Simply Connect and Web SDK modes, Web SDK BLIK local/custom-storefront mode, 3DS, declines, capture, partial capture, cancel, refund, partial refund, reverse, DMN idempotency, invalid checksums, payment correlation failures, amount/currency mismatch, session auth rejection, Nuvei outage handling, custom storefront usage, deployment scripts, and documentation readiness. Local BLIK mock passes do not prove production readiness.
 
 For each manual scenario, record:
 

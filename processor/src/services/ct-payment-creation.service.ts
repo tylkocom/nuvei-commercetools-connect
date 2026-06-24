@@ -41,12 +41,17 @@ export class CtPaymentCreationService {
     interactionId: string;
     amountPlanned: { centAmount: number; currencyCode: string };
     cart: Cart;
-    paymentMethod?: string;
+    paymentMethod?: "card" | "blik" | "embedded" | string;
+    tender?: "card" | "blik";
   }): Promise<string> {
-    const requestedPaymentMethod = opts.paymentMethod ?? "nuvei";
+    const requestedPaymentMethod = opts.tender === "blik" ? "blik" : (opts.paymentMethod ?? "nuvei");
     const paymentMethodInfoMethod = isSupportedPaymentMethod(requestedPaymentMethod)
       ? PAYMENT_METHOD_INFO_METHODS[requestedPaymentMethod]
       : requestedPaymentMethod;
+    const initialTransactionType =
+      paymentMethodInfoMethod === "blik"
+        ? PaymentTransactions.CHARGE
+        : PaymentTransactions.AUTHORIZATION;
     // matching paymentMethodInfo.paymentInterface against the per-attempt
     // payment interface it passes through the session metadata. Falling back
     // to the static connector identifier keeps non-Checkout flows working,
@@ -60,9 +65,12 @@ export class CtPaymentCreationService {
         paymentInterface,
         method: paymentMethodInfoMethod,
         name: {
-          en: isSupportedPaymentMethod(requestedPaymentMethod)
-            ? METHOD_NAMES[requestedPaymentMethod]
-            : "Nuvei",
+          en:
+            paymentMethodInfoMethod === "blik"
+              ? "BLIK"
+              : isSupportedPaymentMethod(requestedPaymentMethod)
+                ? METHOD_NAMES[requestedPaymentMethod]
+                : "Nuvei",
         },
       },
       ...(opts.cart.customerId
@@ -72,7 +80,7 @@ export class CtPaymentCreationService {
           : null),
       transactions: [
         {
-          type: PaymentTransactions.AUTHORIZATION,
+          type: initialTransactionType,
           amount: opts.amountPlanned,
           state: "Initial",
           interactionId: opts.interactionId,

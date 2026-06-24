@@ -155,6 +155,7 @@
             (Merchant Center compatible)</label
           >
           <label><input type="radio" name="mode" value="web-sdk" /> Web SDK card</label>
+          <label><input type="radio" name="mode" value="web-sdk-blik" /> Web SDK BLIK</label>
         </div>
       </section>
 
@@ -177,7 +178,7 @@
               id="operator-notes"
               name="operator-notes"
               rows="3"
-              placeholder="Record sandbox card profile, 3DS path, blocker, or browser setup notes. Do not enter sensitive payment data."
+              placeholder="Record sandbox card/BLIK profile, 3DS path, blocker, or browser setup notes. Do not enter sensitive payment data or BLIK codes."
             ></textarea>
           </div>
         </div>
@@ -435,6 +436,10 @@
                     paymentReference: body?.paymentReference,
                     amount: body?.amount,
                     currency: body?.currency,
+                    uiMethod: body?.uiMethod,
+                    paymentMethod: body?.paymentMethod,
+                    integrationSurface: body?.integrationSurface,
+                    countryCode: body?.countryCode,
                   }
                 : { route, httpStatus: response.status, outcome: body?.outcome };
               appendEvidence(route === "payments-session" ? "payment-session-created" : "processor-confirm-response", { payload });
@@ -444,7 +449,7 @@
         return response;
       };
 
-      async function mountCard() {
+      async function mountPayment() {
         clearLog();
         paymentContainer.textContent = "";
         currentComponent = null;
@@ -459,16 +464,17 @@
           sessionIdAliasCandidate: sessionIdAliasCandidate(options.sessionId),
         });
         const enabler = new Enabler(options);
+        const requestedType = mode === "web-sdk-blik" ? "blik" : mode === "web-sdk" ? "card" : "embedded";
         let builder;
-        if (mode === "web-sdk") {
-          builder = await enabler.createComponentBuilder("card");
+        if (mode === "web-sdk" || mode === "web-sdk-blik") {
+          builder = await enabler.createComponentBuilder(requestedType);
         } else {
-          builder = await enabler.createDropinBuilder("embedded");
+          builder = await enabler.createDropinBuilder(requestedType);
         }
 
         appendEvidence("builder-selected", {
           builderType: mode === "checkout-dropin" ? "dropin" : "component",
-          requestedType: mode === "checkout-dropin" ? "embedded" : "card",
+          requestedType,
           componentHasSubmit:
             typeof builder.componentHasSubmit === "boolean" ? builder.componentHasSubmit : null,
           dropinHasSubmit: typeof builder.dropinHasSubmit === "boolean" ? builder.dropinHasSubmit : null,
@@ -484,18 +490,24 @@
                   appendEvidence("payment-event", { payload: event });
                 },
               }
-            : {};
+            : mode === "web-sdk-blik"
+              ? {
+                  onPayButtonClick: async () => {
+                    appendEvidence("prePayment-invoked", { payload: { hostPayButtonVisible: true } });
+                  },
+                }
+              : {};
 
         currentComponent = builder.build(builderConfig);
         await currentComponent.mount("#payment-container");
         mountedMode = mode;
-        setPayButtonVisible(mode === "web-sdk");
-        appendEvidence("mounted", { hostPayButtonVisible: mode === "web-sdk" });
+        setPayButtonVisible(mode === "web-sdk" || mode === "web-sdk-blik");
+        appendEvidence("mounted", { hostPayButtonVisible: mode === "web-sdk" || mode === "web-sdk-blik" });
         appendLog("mounted", { mode });
       }
 
       mountButton.addEventListener("click", () => {
-        mountCard().catch((error) => {
+        mountPayment().catch((error) => {
           const payload = callbackErrorPayload(error);
           appendEvidence("mount-error", { payload });
           appendLog("mount-error", payload);
@@ -505,7 +517,7 @@
       payButton.addEventListener("click", async () => {
         appendEvidence("pay-click", { hostPayButtonVisible: !payButton.hidden });
         if (!currentComponent || typeof currentComponent.submit !== "function") {
-          appendLog("pay-error", "Pay is only available after mounting the Web SDK card.");
+          appendLog("pay-error", "Pay is only available after mounting a Web SDK component.");
           return;
         }
 

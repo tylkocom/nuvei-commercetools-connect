@@ -15,7 +15,7 @@
 | [9. 3DS Frictionless Approval](#scenario-9-3ds-frictionless-approval) | Verifies frictionless 3DS approvals complete without shopper challenge and reconcile correctly. |
 | [10. 3DS Step-Up Challenge Approval](#scenario-10-3ds-step-up-challenge-approval) | Verifies challenge-based 3DS approvals complete and return to the expected checkout state. |
 | [11. 3DS Challenge Failure Or Abandonment](#scenario-11-3ds-challenge-failure-or-abandonment) | Verifies failed or abandoned 3DS flows do not create false successful payments. |
-| [12. Drop-in And Card Harness](#scenario-12-drop-in-and-card-harness) | Verifies the example page can mount the Checkout-facing drop-in and switch to explicit card modes. |
+| [12. Drop-in, Card, And BLIK Harness](#scenario-12-drop-in-card-and-blik-harness) | Verifies the example page can mount the Checkout-facing drop-in and switch to explicit card/BLIK modes. |
 | [13. Unsupported Payment Method](#scenario-13-unsupported-payment-method) | Verifies unsupported payment methods are rejected by both enabler and processor. |
 | [14. Capture Authorized Payment](#scenario-14-capture-authorized-payment) | Verifies delayed capture settles a successful authorization using the correct Nuvei transaction. |
 | [15. Partial Capture](#scenario-15-partial-capture) | Verifies partial capture works correctly or is explicitly rejected as unsupported. |
@@ -167,14 +167,14 @@ Steps:
 
 1. Send `GET {PROCESSOR_URL}/operations/payment-components` with a valid JWT.
 2. Confirm `dropins` contains exactly `{ "type": "embedded" }`.
-3. Confirm `components` contains exactly `{ "type": "card" }`.
-4. Confirm `express` is empty and unsupported production methods such as wallets, PayPal, Google Pay, Apple Pay, and regional APMs are not advertised until implemented.
-5. Compare this response with Checkout-facing `Enabler.createComponentBuilder("card")`, `Enabler.createDropinBuilder("embedded")`, and the Nuvei-specific enablers used by the local harness.
+3. Confirm `components` contains exactly `{ "type": "card" }` and `{ "type": "blik" }`.
+4. Confirm `express` is empty and unsupported production methods such as wallets, PayPal, Google Pay, Apple Pay, and undeveloped regional APMs are not advertised.
+5. Compare this response with Checkout-facing `Enabler.createComponentBuilder("card")`, `Enabler.createComponentBuilder("blik")`, and `Enabler.createDropinBuilder("embedded")`.
 
 Expected result:
 
-- Processor advertises only implemented methods: Web Components `card` and Drop-in `embedded`.
-- Enabler can build every advertised method; the embedded builder reports `dropinHasSubmit = false`.
+- Processor advertises implemented methods: Web Components `card`, Web SDK BLIK `blik`, and Drop-in `embedded`.
+- Enabler can build every advertised method; the embedded builder reports `dropinHasSubmit = false`, and component builders report host-submit behavior.
 - Unsupported methods fail with actionable safe errors.
 
 ## Scenario 5: Enabler SDK Loading
@@ -329,9 +329,9 @@ Expected result:
 - Failure state is recorded if Nuvei provides a final failed status.
 - Later DMNs do not incorrectly mark the payment successful.
 
-## Scenario 12: Drop-in And Card Harness
+## Scenario 12: Drop-in, Card, And BLIK Harness
 
-Purpose: Confirm the example harness can mount both Checkout-facing Enabler routes: Simply Connect drop-in and Web SDK card component.
+Purpose: Confirm the example harness can mount Checkout-facing Enabler routes: Simply Connect drop-in, Web SDK card component, and Web SDK BLIK component.
 
 Steps:
 
@@ -340,15 +340,18 @@ Steps:
 3. Confirm the evidence buffer records `builder-selected` with `builderType: "dropin"`, `requestedType: "embedded"`, and `dropinHasSubmit: false`.
 4. Start a payment through the Nuvei-owned pay button and confirm `prePayment-invoked` appears without raw session tokens or card data.
 5. Switch to Web SDK card mode and mount the card again.
-6. Confirm the host Pay button appears only in Web SDK mode.
-7. Observe the result log for onComplete, onError, or onPending output.
+6. Confirm the host Pay button appears in Web SDK card mode.
+7. Switch to Web SDK BLIK mode and mount the BLIK component.
+8. Confirm the evidence buffer records `builder-selected` with `requestedType: "blik"` and that the session request shape is `{ paymentMethodOptions: { blik: {} } }`.
+9. Observe the result log for onComplete, onError, or onPending output.
 
 Expected result:
 
-- The example page renders the mode selector and card/drop-in container.
+- The example page renders the mode selector and card/drop-in/BLIK container.
 - Enabler drop-in mode uses `Enabler.createDropinBuilder("embedded")` and sends `{ paymentMethodOptions: { embedded: {} } }`.
-- Web SDK mode uses `Enabler.createComponentBuilder("card")`.
-- The evidence harness can drive the Merchant Center-compatible drop-in path and the Web SDK comparison card mode without exposing raw Nuvei tokens.
+- Web SDK card mode uses `Enabler.createComponentBuilder("card")`.
+- Web SDK BLIK mode uses `Enabler.createComponentBuilder("blik")`; local mock BLIK results create CT `Charge` semantics and do not send a BLIK code to the processor.
+- The evidence harness can drive the Merchant Center-compatible drop-in path, the Web SDK comparison card mode, and local BLIK mode without exposing raw Nuvei tokens, raw browser results, PANs, or BLIK codes.
 
 ## Scenario 13: Unsupported Payment Method
 

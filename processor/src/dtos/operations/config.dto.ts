@@ -7,6 +7,7 @@ export const ConfigResponseSchema = Type.Object({
   environment: Type.String(),
   merchantId: Type.String(),
   merchantSiteId: Type.String(),
+  simplyConnectPaymentMethod: Type.Union([Type.Literal("card"), Type.Literal("blik")]),
 });
 
 export type ConfigResponseSchemaDTO = Static<typeof ConfigResponseSchema>;

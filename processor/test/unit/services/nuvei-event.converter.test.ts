@@ -39,6 +39,23 @@ describe("NuveiEventConverter", () => {
     });
   });
 
+  it("maps Nuvei BLIK DMNs to BLIK payment method metadata", () => {
+    const update = new NuveiEventConverter().convertDmnToPaymentUpdate(
+      {
+        ...baseDmn,
+        transactionType: "Sale",
+        payment_method: "apmgw_BLIK",
+        cardCompany: "ShouldNotWin",
+        cardType: "Should not win",
+      },
+      1000,
+    );
+
+    expect(update.transactions[0].type).toBe("Charge");
+    expect(update.paymentMethod).toBe("blik");
+    expect(update.paymentMethodName).toEqual({ en: "BLIK" });
+  });
+
   it("maps an approved fiscal status to Success", () => {
     const update = new NuveiEventConverter().convertDmnToPaymentUpdate({
       ...baseDmn,

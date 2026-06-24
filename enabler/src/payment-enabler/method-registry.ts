@@ -1,5 +1,6 @@
 export enum PaymentMethod {
   card = "card",
+  blik = "blik",
   embedded = "embedded",
 }
 
@@ -21,6 +22,14 @@ export const PAYMENT_METHOD_REGISTRY = [
     kind: "component",
     advertisedType: PaymentMethod.card,
     displayName: "Nuvei card",
+    transitional: false,
+    pspMetadata: {},
+  },
+  {
+    key: PaymentMethod.blik,
+    kind: "component",
+    advertisedType: PaymentMethod.blik,
+    displayName: "BLIK",
     transitional: false,
     pspMetadata: {},
   },

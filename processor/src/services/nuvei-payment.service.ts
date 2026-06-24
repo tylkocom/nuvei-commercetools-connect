@@ -81,6 +81,29 @@ export class DmnChecksumInvalidError extends Error {
   }
 }
 
+type CheckoutUiMethod = "card" | "blik" | "embedded";
+type NuveiTender = "card" | "blik";
+type NuveiIntegrationSurface = "web-sdk" | "simply-connect";
+
+type PaymentSelection =
+  | { uiMethod: "card"; tender: "card"; surface: "web-sdk" }
+  | { uiMethod: "blik"; tender: "blik"; surface: "web-sdk" }
+  | { uiMethod: "embedded"; tender: "card"; surface: "simply-connect" }
+  | { uiMethod: "embedded"; tender: "blik"; surface: "simply-connect" };
+
+type PaymentSessionResponse = {
+  cartId: string;
+  sessionToken: string;
+  paymentReference: string;
+  merchantReturnUrl: string;
+  amount: string;
+  currency: string;
+  uiMethod: CheckoutUiMethod;
+  paymentMethod: NuveiTender;
+  integrationSurface: NuveiIntegrationSurface;
+  countryCode?: string;
+};
+
 // ---------------------------------------------------------------------------
 // Nuvei terminal identity constants
 // Prefer PPP_TransactionID when Nuvei provides it, but getPaymentStatus can
@@ -258,9 +281,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return `${token.slice(0, 6)}...[redacted]...${token.slice(-4)}`;
   }
 
-  public validatePaymentMethodOptions(options?: unknown): SupportedPaymentMethod {
+  public validatePaymentMethodOptions(options?: unknown): PaymentSelection {
     if (options === undefined) {
-      return "card";
+      return { uiMethod: "card", tender: "card", surface: "web-sdk" };
     }
 
     if (!this.isPlainObject(options)) {
@@ -272,7 +295,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const paymentMethodOptions = (options as { paymentMethodOptions?: unknown })
       .paymentMethodOptions;
     if (paymentMethodOptions === undefined) {
-      return "card";
+      return { uiMethod: "card", tender: "card", surface: "web-sdk" };
     }
 
     if (!this.isPlainObject(paymentMethodOptions)) {
@@ -303,14 +326,41 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     const methodOptions = (paymentMethodOptions as Record<string, unknown>)[paymentMethod];
-    if (!this.isPlainObject(methodOptions) || Object.keys(methodOptions).length > 0) {
+    if (!this.isPlainObject(methodOptions)) {
       throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
         category: "method_payload_invalid",
         requestedMethod: paymentMethod,
       });
     }
 
-    return paymentMethod;
+    const optionKeys = Object.keys(methodOptions);
+    if (optionKeys.length === 0) {
+      if (paymentMethod === "card") {
+        return { uiMethod: "card", tender: "card", surface: "web-sdk" };
+      }
+
+      if (paymentMethod === "blik") {
+        return { uiMethod: "blik", tender: "blik", surface: "web-sdk" };
+      }
+
+      return { uiMethod: "embedded", tender: "card", surface: "simply-connect" };
+    }
+
+    // BLIK intent: the only supported non-empty embedded payload.
+    // { embedded: { paymentMethod: "blik" } } → embedded drop-in rendering BLIK.
+    if (
+      paymentMethod === "embedded" &&
+      optionKeys.length === 1 &&
+      optionKeys[0] === "paymentMethod" &&
+      methodOptions.paymentMethod === "blik"
+    ) {
+      return { uiMethod: "embedded", tender: "blik", surface: "simply-connect" };
+    }
+
+    throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+      category: "method_payload_invalid",
+      requestedMethod: paymentMethod,
+    });
   }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -351,14 +401,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
       return "approved";
     }
 
-    const hasFailedAuthorization = transactions.some(
+    const hasFailedPayment = transactions.some(
       (tx) =>
         tx.state === "Failure" &&
-        tx.type === PaymentTransactions.AUTHORIZATION &&
+        (tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE) &&
         this.transactionMatchesPlannedAmount(payment, tx),
     );
 
-    return hasFailedAuthorization ? "rejected" : undefined;
+    return hasFailedPayment ? "rejected" : undefined;
   }
 
   private hasTerminalTransaction(
@@ -379,6 +429,28 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
       return tx.amount.centAmount === amount.centAmount && tx.amount.currencyCode === amount.currencyCode;
     });
+  }
+
+  private getConfirmTerminalTransactionType(
+    statusBody: Record<string, unknown>,
+  ): typeof PaymentTransactions.AUTHORIZATION | typeof PaymentTransactions.CHARGE {
+    const transactionType = statusBody.transactionType;
+    return transactionType === "Sale" || transactionType === "Settle"
+      ? PaymentTransactions.CHARGE
+      : PaymentTransactions.AUTHORIZATION;
+  }
+
+  private isBlikPayment(payment: Payment): boolean {
+    return payment.paymentMethodInfo?.method === "blik";
+  }
+
+  private rejectedModificationForUnsupportedOperation(
+    payment: Payment,
+  ): PaymentProviderModificationResponse {
+    return {
+      outcome: PaymentModificationStatus.REJECTED,
+      pspReference: payment.interfaceId ?? payment.id,
+    };
   }
 
   private dmnTerminalTransactionAlreadyRecorded(
@@ -578,6 +650,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       environment: config.nuveiEnv,
       merchantId: config.nuveiMerchantId,
       merchantSiteId: config.nuveiMerchantSiteId,
+      simplyConnectPaymentMethod: config.simplyConnectPaymentMethod,
     };
   }
 
@@ -733,6 +806,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async capturePayment(
     request: CapturePaymentRequest,
   ): Promise<PaymentProviderModificationResponse> {
+    if (this.isBlikPayment(request.payment)) {
+      log.warn("Capture is not supported for BLIK payments.", {
+        paymentId: request.payment.id,
+      });
+      return this.rejectedModificationForUnsupportedOperation(request.payment);
+    }
+
     try {
       const interfaceId =
         this.getTransactionInteractionId(request.payment, PaymentTransactions.AUTHORIZATION) ??
@@ -789,6 +869,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async cancelPayment(
     request: CancelPaymentRequest,
   ): Promise<PaymentProviderModificationResponse> {
+    if (this.isBlikPayment(request.payment)) {
+      log.warn("Cancel is not supported for BLIK payments.", {
+        paymentId: request.payment.id,
+      });
+      return this.rejectedModificationForUnsupportedOperation(request.payment);
+    }
+
     try {
       const interfaceId =
         this.getTransactionInteractionId(request.payment, PaymentTransactions.AUTHORIZATION) ??
@@ -845,9 +932,19 @@ export class NuveiPaymentService extends AbstractPaymentService {
     request: RefundPaymentRequest,
   ): Promise<PaymentProviderModificationResponse> {
     try {
+      const chargeInteractionId = this.getTransactionInteractionId(
+        request.payment,
+        PaymentTransactions.CHARGE,
+      );
+      if (this.isBlikPayment(request.payment) && !request.transactionId && !chargeInteractionId) {
+        log.warn("Refund is not supported for BLIK payments before a Charge transaction.", {
+          paymentId: request.payment.id,
+        });
+        return this.rejectedModificationForUnsupportedOperation(request.payment);
+      }
       const interfaceId =
         request.transactionId ??
-        this.getTransactionInteractionId(request.payment, PaymentTransactions.CHARGE) ??
+        chargeInteractionId ??
         (request.payment.interfaceId as string);
       const amount = request.amount;
       const formattedAmount = this.formatAmount(amount);
@@ -1119,18 +1216,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
    * @param options - Optional payment method options
    * @returns Promise with cartId, sessionToken, paymentReference, merchantReturnUrl
    */
-  public async createPaymentSession(options?: unknown): Promise<{
-    cartId: string;
-    sessionToken: string;
-    paymentReference: string;
-    merchantReturnUrl: string;
-    amount: string;
-    currency: string;
-  }> {
+  public async createPaymentSession(options?: unknown): Promise<PaymentSessionResponse> {
     let frozenByUs = false;
     let lockedCartId: string | undefined;
     try {
-      const paymentMethod = this.validatePaymentMethodOptions(options);
+      const selection = this.validatePaymentMethodOptions(options);
       const cartId = getCartIdFromContext();
       const fetchedCart = await this.ctCartService.getCart({ id: cartId });
 
@@ -1148,11 +1238,20 @@ export class NuveiPaymentService extends AbstractPaymentService {
         cartId: cart.id,
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
-        paymentMethod,
+        uiMethod: selection.uiMethod,
+        paymentMethod: selection.tender,
       });
 
       const notificationUrl = this.getDmnNotificationUrl();
       const shopperDetails = this.cartShopperDetails(cart);
+      if (selection.tender === "blik") {
+        if (selection.surface === "simply-connect" && getConfig().simplyConnectPaymentMethod !== "blik") {
+          throw new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
+            category: "blik_not_enabled",
+          });
+        }
+        this.validateBlikSessionPrerequisites(cart, amountPlanned, shopperDetails);
+      }
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
@@ -1167,7 +1266,8 @@ export class NuveiPaymentService extends AbstractPaymentService {
         interactionId: sessionToken,
         amountPlanned,
         cart,
-        paymentMethod,
+        paymentMethod: selection.uiMethod,
+        tender: selection.tender,
       });
 
       const config = getConfig();
@@ -1186,6 +1286,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
         merchantReturnUrl,
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
+        uiMethod: selection.uiMethod,
+        paymentMethod: selection.tender,
+        integrationSurface: selection.surface,
+        ...(shopperDetails?.country && { countryCode: shopperDetails.country }),
       };
     } catch (error) {
       if (frozenByUs && lockedCartId) {
@@ -1211,10 +1315,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
    *
    * Returns a tri-state outcome: approved, rejected, or pending.
    *
-   * CT terminal Authorization transactions prefer Nuvei PPP identity when
-   * available. If getPaymentStatus returns terminal approval/decline without
-   * PPP, we still commit the final result using Nuvei transactionId, or the
-   * already-bound session token as the last stable idempotency key.
+   * CT terminal payment transactions prefer Nuvei PPP identity when available.
+   * If getPaymentStatus returns terminal approval/decline without PPP, we still
+   * commit the final result using Nuvei transactionId, or the already-bound
+   * session token as the last stable idempotency key.
    *
    * @param paymentReference - The CT Payment ID
    * @param sessionToken - The Nuvei session token
@@ -1263,14 +1367,15 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const terminalIdentity = extractNuveiTerminalIdentity(statusBody, sessionToken);
     const transactionState: "Success" | "Failure" = outcome === "approved" ? "Success" : "Failure";
 
+    const terminalTransactionType = this.getConfirmTerminalTransactionType(statusBody);
     const alreadyRecorded = this.hasTerminalTransaction(ctPayment, {
-      type: PaymentTransactions.AUTHORIZATION,
+      type: terminalTransactionType,
       state: transactionState,
       interactionId: terminalIdentity.interactionId,
     });
 
     if (alreadyRecorded) {
-      log.info("Terminal Authorization already recorded – short-circuiting.", {
+      log.info("Terminal payment transaction already recorded – short-circuiting.", {
         paymentReference,
         interactionId: terminalIdentity.interactionId,
         identitySource: terminalIdentity.source,
@@ -1279,8 +1384,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
       return { outcome };
     }
 
-    log.info("Writing CT terminal Authorization.", {
+    log.info("Writing CT terminal payment transaction.", {
       paymentReference,
+      transactionType: terminalTransactionType,
       interactionId: terminalIdentity.interactionId,
       identitySource: terminalIdentity.source,
       state: transactionState,
@@ -1290,7 +1396,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       id: ctPayment.id,
       pspReference: terminalIdentity.pspReference,
       transaction: {
-        type: PaymentTransactions.AUTHORIZATION,
+        type: terminalTransactionType,
         amount: ctPayment.amountPlanned,
         state: transactionState,
         interactionId: terminalIdentity.interactionId,
@@ -1340,6 +1446,38 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ...(address?.firstName && { firstName: address.firstName }),
       ...(address?.lastName && { lastName: address.lastName }),
     };
+  }
+
+  private validateBlikSessionPrerequisites(
+    cart: Cart,
+    amountPlanned: { currencyCode: string },
+    shopperDetails?: OpenOrderBillingAddress,
+  ): void {
+    if (amountPlanned.currencyCode !== "PLN") {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "blik_currency_invalid",
+      });
+    }
+
+    const countries = [cart.billingAddress?.country, cart.shippingAddress?.country].filter(
+      (country): country is string => typeof country === "string" && country.length > 0,
+    );
+    if (countries.length === 0 || countries.some((country) => country !== "PL")) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "blik_country_invalid",
+      });
+    }
+
+    if (
+      shopperDetails?.country !== "PL" ||
+      !shopperDetails.email ||
+      !shopperDetails.firstName ||
+      !shopperDetails.lastName
+    ) {
+      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
+        category: "blik_shopper_identity_missing",
+      });
+    }
   }
 
   /**

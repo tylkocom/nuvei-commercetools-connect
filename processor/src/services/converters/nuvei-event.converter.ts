@@ -83,6 +83,10 @@ function parseCentAmount(amount: unknown, currencyCode: string): number {
   return Math.round(parsedAmount * 10 ** getCurrencyFractionDigits(currencyCode));
 }
 
+function isBlikPaymentMethod(paymentMethod: string | undefined): boolean {
+  return paymentMethod === "apmgw_BLIK";
+}
+
 export class NuveiEventConverter {
   /**
    * Converts a Nuvei DMN (Direct Merchant Notification) body into a structured
@@ -126,16 +130,25 @@ export class NuveiEventConverter {
       plannedCentAmount,
     );
 
+    const paymentMethod = getOptionalString(body, "payment_method");
     const cardCompany = getOptionalString(body, "cardCompany");
     const cardType = getOptionalString(body, "cardType");
+    const isBlik = isBlikPaymentMethod(paymentMethod);
+
+    const mappedPaymentMethod = isBlik ? "blik" : cardCompany;
+    const mappedPaymentMethodName = isBlik
+      ? { en: "BLIK" }
+      : cardType
+        ? { en: cardType }
+        : undefined;
 
     return {
       id: paymentId,
       pspReference: pppTransactionId,
       transactions: [transaction],
       ...(interfaceCode && { interfaceCode }),
-      ...(cardCompany && { paymentMethod: cardCompany }),
-      ...(cardType && { paymentMethodName: { en: cardType } }),
+      ...(mappedPaymentMethod && { paymentMethod: mappedPaymentMethod }),
+      ...(mappedPaymentMethodName && { paymentMethodName: mappedPaymentMethodName }),
       totalCentAmount,
     };
   }

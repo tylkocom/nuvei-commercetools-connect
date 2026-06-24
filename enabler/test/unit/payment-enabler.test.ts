@@ -71,19 +71,34 @@ describe("validateEnablerOptions", () => {
 });
 
 describe("enabler mirrored method registry", () => {
-  it("contains card component and embedded drop-in in deterministic order", () => {
+  it("contains card and BLIK components plus embedded drop-in in deterministic order", () => {
     expect(pe.PaymentMethod.card).toBe("card");
+    expect(pe.PaymentMethod.blik).toBe("blik");
     expect(pe.PaymentMethod.embedded).toBe("embedded");
-    expect(pe.SUPPORTED_PAYMENT_METHODS).toEqual(["card", "embedded"]);
-    expect(pe.PAYMENT_METHOD_REGISTRY.map((entry) => entry.key)).toEqual(["card", "embedded"]);
+    expect(pe.SUPPORTED_PAYMENT_METHODS).toEqual(["card", "blik", "embedded"]);
+    expect(pe.PAYMENT_METHOD_REGISTRY.map((entry) => entry.key)).toEqual([
+      "card",
+      "blik",
+      "embedded",
+    ]);
+    expect(pe.getComponentPaymentMethods().map((entry) => entry.key)).toEqual(["card", "blik"]);
+    expect(pe.getDropinPaymentMethods().map((entry) => entry.key)).toEqual(["embedded"]);
   });
 
-  it("keeps PSP metadata empty for the card and embedded entries", () => {
+  it("keeps PSP metadata empty for the card, BLIK, and embedded entries", () => {
     expect(pe.PAYMENT_METHOD_REGISTRY).toEqual([
       expect.objectContaining({
         key: "card",
         kind: "component",
         advertisedType: "card",
+        transitional: false,
+        pspMetadata: {},
+      }),
+      expect.objectContaining({
+        key: "blik",
+        kind: "component",
+        advertisedType: "blik",
+        displayName: "BLIK",
         transitional: false,
         pspMetadata: {},
       }),

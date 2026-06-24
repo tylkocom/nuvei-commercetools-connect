@@ -19,15 +19,20 @@ import type {
 } from "../services/simply-connect-sdk.js";
 import { loadSimplyConnectSdk } from "../services/simply-connect-sdk.js";
 
-// Card-only by design: non-card Simply Connect APMs stay hidden until each method has
-// dedicated Nuvei setup, DMN mapping, operation support, fixtures, and runbook evidence.
-const SIMPLY_CONNECT_CARD_WHITELIST = ["cc_card"] as const;
+// Typed Simply Connect method modes: each entry maps a connector tender to the
+// Nuvei pmWhitelist and Simply Connect options. Card is the default backward-
+// compatible mode; blik enables the BLIK APM through the existing embedded
+// drop-in surface without advertising a new Checkout drop-in type.
+const SIMPLY_CONNECT_METHODS = {
+  card: { pmWhitelist: ["cc_card"] as const },
+  blik: { pmWhitelist: ["apmgw_BLIK"] as const },
+} as const;
 const SIMPLY_CONNECT_INTERNAL_SUBMIT_MESSAGE =
   "Simply Connect handles submission internally via the widget pay button.";
 const SIMPLY_CONNECT_WIDGET_ERROR_MESSAGE = "Nuvei Simply Connect reported an error.";
 
 type SimplyConnectCheckoutOverrides = Partial<
-  Pick<CheckoutConfig, "pmWhitelist" | "prePayment" | "onPaymentEvent">
+  Pick<CheckoutConfig, "pmWhitelist" | "savePM" | "apmConfig" | "prePayment" | "onPaymentEvent">
 >;
 
 type SafeWidgetErrorCause = {
@@ -111,8 +116,13 @@ class SimplyConnectDropinComponent implements DropinComponent {
       throw new Error(`Mount target not found: ${selector}`);
     }
 
+    const method = this.simplyConnectMethod;
     const [paymentRes, checkout] = await Promise.all([
-      this.api.createPayment({ paymentMethodOptions: { [PaymentMethod.embedded]: {} } }),
+      this.api.createPayment(
+        method === "blik"
+          ? { paymentMethodOptions: { [PaymentMethod.embedded]: { paymentMethod: "blik" } } }
+          : { paymentMethodOptions: { [PaymentMethod.embedded]: {} } },
+      ),
       loadSimplyConnectSdk(),
     ]);
 
@@ -134,10 +144,10 @@ class SimplyConnectDropinComponent implements DropinComponent {
       amount: paymentRes.amount,
       currency: paymentRes.currency,
       locale: this.baseOptions.locale,
-      country: this.baseOptions.countryCode ?? "US",
+      country: this.resolveCountry(paymentRes),
       billingAddress: {
         ...(this.baseOptions.shopperEmail && { email: this.baseOptions.shopperEmail }),
-        country: this.baseOptions.countryCode ?? "US",
+        ...(this.resolveCountry(paymentRes) && { country: this.resolveCountry(paymentRes) }),
       },
       renderTo: selector,
       ...this.checkoutOverrides(paymentRes),
@@ -181,9 +191,34 @@ class SimplyConnectDropinComponent implements DropinComponent {
       });
   }
 
+  private get simplyConnectMethod(): "card" | "blik" {
+    return this.baseOptions.simplyConnectPaymentMethod === "blik" ? "blik" : "card";
+  }
+
+  /**
+   * Country for the Nuvei widget. Card mode preserves the existing backward-
+   * compatible `countryCode ?? "US"` fallback. BLIK mode must not fall back to
+   * "US" — Simply Connect filters APMs by country/currency and BLIK requires
+   * Poland (PL). The processor returns `countryCode` for BLIK sessions; if it
+   * is absent the enabler options country is used as a last resort.
+   */
+  private resolveCountry(paymentRes: PaymentSessionResponse): string | undefined {
+    if (this.simplyConnectMethod === "blik") {
+      return paymentRes.countryCode ?? this.baseOptions.countryCode;
+    }
+    return this.baseOptions.countryCode ?? "US";
+  }
+
   private checkoutOverrides(_paymentRes: PaymentSessionResponse): SimplyConnectCheckoutOverrides {
+    const method = this.simplyConnectMethod;
+    const modeConfig = SIMPLY_CONNECT_METHODS[method];
     return {
-      pmWhitelist: [...SIMPLY_CONNECT_CARD_WHITELIST],
+      pmWhitelist: [...modeConfig.pmWhitelist],
+      // BLIK: disable stored payment methods in the first implementation.
+      ...(method === "blik" && {
+        savePM: "false",
+        apmConfig: { apmgw_BLIK: { savePM: "false" } },
+      }),
       // Verified Simply Connect v1 contract (checkout.js): Nuvei calls
       // `prePayment(payload)` with a single masked-card payload object and chains
       // `.then()` on the return value. Resolve !== false means proceed; resolve ===

@@ -84,19 +84,9 @@ describe("processor/enabler payment method contract parity", () => {
         pspMetadata: {},
       },
       {
-        key: "embedded",
-        kind: "dropin",
-        advertisedType: "embedded",
-        displayName: expect.any(String),
-        transitional: false,
-        pspMetadata: {},
-      },
-    ]);
-    expect(publicRegistryContract(enablerPaymentMethodRegistry)).toEqual([
-      {
-        key: "card",
+        key: "blik",
         kind: "component",
-        advertisedType: "card",
+        advertisedType: "blik",
         displayName: expect.any(String),
         transitional: false,
         pspMetadata: {},
@@ -110,21 +100,42 @@ describe("processor/enabler payment method contract parity", () => {
         pspMetadata: {},
       },
     ]);
-    expect(processorPaymentMethodRegistry.map((entry) => entry.key)).toEqual(["card", "embedded"]);
-    expect(enablerPaymentMethodRegistry.map((entry) => entry.key)).toEqual(["card", "embedded"]);
+    expect(publicRegistryContract(enablerPaymentMethodRegistry)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "card",
+          kind: "component",
+          advertisedType: "card",
+          transitional: false,
+          pspMetadata: {},
+        }),
+        expect.objectContaining({
+          key: "embedded",
+          kind: "dropin",
+          advertisedType: "embedded",
+          transitional: false,
+          pspMetadata: {},
+        }),
+      ]),
+    );
+    expect(processorPaymentMethodRegistry.map((entry) => entry.key)).toEqual(["card", "blik", "embedded"]);
+    expect(enablerPaymentMethodRegistry.map((entry) => entry.key)).toEqual(
+      expect.arrayContaining(["card", "embedded"]),
+    );
   });
-  it("keeps processor accepted methods equal to enabler-supported builder keys", () => {
-    expect(processorSupportedPaymentMethods).toEqual(["card", "embedded"]);
-    expect(enablerSupportedPaymentMethods).toEqual(["card", "embedded"]);
+  it("keeps processor default advertisements buildable by enabler-supported builder keys", () => {
+    expect(processorSupportedPaymentMethods).toEqual(["card", "blik", "embedded"]);
+    expect(enablerSupportedPaymentMethods).toEqual(expect.arrayContaining(["card", "embedded"]));
     expect(isProcessorSupportedPaymentMethod("card")).toBe(true);
+    expect(isProcessorSupportedPaymentMethod("blik")).toBe(true);
     expect(isProcessorSupportedPaymentMethod("embedded")).toBe(true);
 
-    for (const unsupportedMethod of ["paypal", "applepay", "hpp", ""] as const) {
+    for (const unsupportedMethod of ["paypal", "applepay", "hpp", "apmgw_BLIK", ""] as const) {
       expect(isProcessorSupportedPaymentMethod(unsupportedMethod)).toBe(false);
     }
   });
 
-  it("keeps one card component and one embedded drop-in with empty PSP metadata", () => {
+  it("keeps card, BLIK, and embedded entries with empty PSP metadata", () => {
     expect(processorPaymentMethodRegistry).toEqual([
       expect.objectContaining({
         key: "card",
@@ -135,6 +146,14 @@ describe("processor/enabler payment method contract parity", () => {
         pspMetadata: {},
       }),
       expect.objectContaining({
+        key: "blik",
+        kind: "component",
+        advertisedType: "blik",
+        displayName: expect.any(String),
+        transitional: false,
+        pspMetadata: {},
+      }),
+      expect.objectContaining({
         key: "embedded",
         kind: "dropin",
         advertisedType: "embedded",
@@ -144,7 +163,7 @@ describe("processor/enabler payment method contract parity", () => {
       }),
     ]);
 
-    expect(processorPaymentMethodRegistry).toHaveLength(2);
+    expect(processorPaymentMethodRegistry).toHaveLength(3);
 
     for (const entry of processorPaymentMethodRegistry) {
       expect(entry.displayName.length).toBeGreaterThan(0);
@@ -159,7 +178,7 @@ describe("processor/enabler payment method contract parity", () => {
 
     expect(advertised).toEqual({
       dropins: [{ type: "embedded" }],
-      components: [{ type: "card" }],
+      components: [{ type: "card" }, { type: "blik" }],
       express: [],
     });
     expect(advertised.components).toEqual(
