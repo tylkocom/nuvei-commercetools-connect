@@ -178,6 +178,60 @@ describe("NuveiClient", () => {
       expect(capturedBody!.merchantId).toBe("test-merchant-id");
       expect(capturedBody!.merchantSiteId).toBe("test-site-id");
     });
+
+    it("redacts sensitive request fields from structured logs", async () => {
+      const stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+      vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+        return new Response(
+          JSON.stringify({
+            internalRequestId: 1,
+            status: "SUCCESS",
+            errCode: 0,
+            reason: "",
+            merchantId: "test-merchant-id",
+            merchantSiteId: "test-site-id",
+            version: "1.0",
+            clientRequestId: "req-1",
+            sessionToken: "session-abc",
+            clientUniqueId: "cart-1",
+            orderId: 100,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      });
+
+      await client.openOrder({
+        amount: "10.00",
+        currency: "PLN",
+        clientUniqueId: "cart-1",
+        billingAddress: {
+          email: "shopper@example.test",
+          country: "PL",
+          firstName: "Test",
+          lastName: "Shopper",
+        },
+        userDetails: {
+          email: "shopper@example.test",
+          country: "PL",
+          firstName: "Test",
+          lastName: "Shopper",
+        },
+      });
+
+      const requestLog = stdoutWrite.mock.calls
+        .map(([chunk]) => String(chunk))
+        .find((line) => line.includes('"message":"Nuvei API request"'));
+      expect(requestLog).toBeDefined();
+      expect(requestLog).not.toContain("shopper@example.test");
+      expect(requestLog).not.toContain("Test");
+      expect(requestLog).not.toContain("Shopper");
+      expect(requestLog).not.toContain(TEST_SECRET);
+      expect(requestLog).not.toContain("session-abc");
+      expect(requestLog).toContain('"email":"[REDACTED]"');
+      expect(requestLog).toContain('"firstName":"[REDACTED]"');
+      expect(requestLog).toContain('"lastName":"[REDACTED]"');
+      expect(requestLog).toContain('"checksum":"[REDACTED]"');
+    });
   });
 
   // ---------------------------------------------------------------------------

@@ -232,10 +232,19 @@ function createSession() {
 }
 
 function createCart() {
+  const blikAddress = {
+    country: "PL",
+    email: "blik-shopper@example.test",
+    firstName: "Blik",
+    lastName: "Shopper",
+  };
   return {
     id: CART_ID,
     version: 1,
     cartState: "Active",
+    customerEmail: blikAddress.email,
+    billingAddress: blikAddress,
+    shippingAddress: blikAddress,
     paymentInfo: {
       payments: [{ id: INITIAL_PAYMENT_ID, typeId: "payment" }],
     },
@@ -284,6 +293,9 @@ function sanitizeForLog(value) {
         normalizedKey.includes("checksum") ||
         normalizedKey.includes("secret") ||
         normalizedKey.includes("cardnumber") ||
+        normalizedKey.includes("email") ||
+        normalizedKey.includes("firstname") ||
+        normalizedKey.includes("lastname") ||
         normalizedKey === "cvv" ||
         normalizedKey === "blik_code" ||
         normalizedKey === "code"

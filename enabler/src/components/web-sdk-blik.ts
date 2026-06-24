@@ -228,18 +228,6 @@ class WebSdkBlikComponent implements PaymentComponent {
     const root = document.createElement("div");
     root.className = "nuvei-blik";
 
-    if (this.blikApm?.logoURL) {
-      const logo = document.createElement("img");
-      logo.alt = "BLIK";
-      logo.src = this.blikApm.logoURL;
-      root.appendChild(logo);
-    } else {
-      const logoText = document.createElement("span");
-      logoText.textContent = "BLIK";
-      logoText.setAttribute("aria-label", "BLIK");
-      root.appendChild(logoText);
-    }
-
     const label = document.createElement("label");
     label.htmlFor = "nuvei-blik-code";
     label.textContent = "BLIK code";

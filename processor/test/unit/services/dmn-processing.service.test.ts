@@ -716,6 +716,7 @@ describe("NuveiPaymentService – DMN processing", () => {
         { code: "ResourceNotFound", statusCode: 404 },
       );
       mockGetPayment.mockRejectedValue(notFound);
+      mockGetCart.mockRejectedValue(notFound);
       mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
@@ -735,6 +736,57 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       await service.processNuveiDmn(body);
 
+      expect(mockFindPaymentsByInterfaceId).toHaveBeenCalledWith({
+        interfaceId: "nuvei-session-token",
+      });
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "payment-from-session" }),
+      );
+    });
+
+    it("falls back to sessionToken when cart-id resolution only finds stale payment refs", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-session",
+        interfaceId: "nuvei-session-token",
+      });
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+        sessionToken: "nuvei-session-token",
+      };
+      const notFound = Object.assign(new Error("Resource not found"), {
+        code: "ResourceNotFound",
+        statusCode: 404,
+      });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockRejectedValue(notFound);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: [{ typeId: "payment", id: "stale-payment" }] },
+      });
+      mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "50001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Success",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(body);
+
+      expect(mockGetCart).toHaveBeenCalledWith({ id: "cart-123" });
       expect(mockFindPaymentsByInterfaceId).toHaveBeenCalledWith({
         interfaceId: "nuvei-session-token",
       });
@@ -884,6 +936,99 @@ describe("NuveiPaymentService – DMN processing", () => {
       );
       expect(mockUpdatePayment).toHaveBeenCalledWith(
         expect.objectContaining({ id: "payment-from-cart" }),
+      );
+    });
+
+    it("resolves BLIK cart-id DMNs before opaque sessionToken fallback", async () => {
+      const { service } = createService();
+      const payment = makeDmnMockPayment({
+        id: "payment-from-cart",
+        interfaceId: "nuvei-session-token",
+        amountPlanned: { centAmount: 213700, currencyCode: "PLN" },
+        paymentMethodInfo: { paymentInterface: "nuvei", method: "blik" },
+        transactions: [
+          {
+            type: PaymentTransactions.CHARGE,
+            state: "Initial",
+            interactionId: "nuvei-session-token",
+            amount: { centAmount: 213700, currencyCode: "PLN" },
+          },
+        ],
+      } as any);
+      const body = {
+        ...dmnAuthOk,
+        merchant_unique_id: "cart-123",
+        clientUniqueId: "cart-123",
+        sessionToken: "opaque-dmn-session-token",
+        TransactionID: "8110000000033309521",
+        PPP_TransactionID: "18773420111",
+        transactionType: "Sale",
+        ppp_status: "OK",
+        Status: "APPROVED",
+        totalAmount: "2137.00",
+        currency: "PLN",
+      };
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetCart.mockResolvedValue({
+        id: "cart-123",
+        version: 7,
+        paymentInfo: { payments: [{ typeId: "payment", id: "payment-from-cart" }] },
+      });
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "cart-123") {
+          throw Object.assign(new Error("Resource with ID 'cart-123' was not found"), {
+            code: "ResourceNotFound",
+            statusCode: 404,
+          });
+        }
+        if (id === "payment-from-cart") {
+          return payment;
+        }
+        throw new Error(`Unexpected payment lookup: ${id}`);
+      });
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "18773420111",
+          transactions: [
+            {
+              type: PaymentTransactions.CHARGE,
+              interactionId: "18773420111",
+              amount: { centAmount: 213700, currencyCode: "PLN" },
+              state: "Success",
+            },
+          ],
+          interfaceCode: "paid",
+          paymentMethod: "blik",
+          paymentMethodName: { en: "BLIK" },
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({
+          sessionToken: undefined,
+          transactionId: "8110000000033309521",
+          amount: "2137.00",
+          currency: "PLN",
+          clientUniqueId: "cart-123",
+          transactionType: "Sale",
+        }),
+      );
+
+      await expect(service.processNuveiDmn(body)).resolves.toBeUndefined();
+
+      expect(mockFindPaymentsByInterfaceId).not.toHaveBeenCalled();
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "payment-from-cart" }),
+        213700,
+      );
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "payment-from-cart",
+          transaction: expect.objectContaining({
+            type: PaymentTransactions.CHARGE,
+            state: "Success",
+          }),
+        }),
       );
     });
 

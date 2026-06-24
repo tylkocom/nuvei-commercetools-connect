@@ -415,13 +415,52 @@ export class NuveiClient {
   }
 
   private redactPayload(payload: NuveiRequestPayload): NuveiRequestPayload {
-    const redacted = { ...payload };
-    for (const field of ["checksum", "secretKey", "sessionToken", "userTokenId"]) {
-      if (redacted[field]) {
-        redacted[field] = "[REDACTED]";
-      }
+    return this.redactLogValue(payload) as NuveiRequestPayload;
+  }
+
+  private redactLogValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.redactLogValue(item));
     }
-    return redacted;
+
+    if (!value || typeof value !== "object") {
+      return value;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => {
+        const normalizedKey = key.toLowerCase();
+        if (this.isSensitiveLogField(normalizedKey)) {
+          return [key, "[REDACTED]"];
+        }
+        return [key, this.redactLogValue(entryValue)];
+      }),
+    );
+  }
+
+  private isSensitiveLogField(normalizedKey: string): boolean {
+    return (
+      normalizedKey.includes("token") ||
+      normalizedKey.includes("checksum") ||
+      normalizedKey.includes("secret") ||
+      normalizedKey.includes("authorization") ||
+      normalizedKey.includes("cardnumber") ||
+      normalizedKey.includes("email") ||
+      normalizedKey.includes("firstname") ||
+      normalizedKey.includes("lastname") ||
+      normalizedKey.includes("ipaddress") ||
+      normalizedKey === "cvv" ||
+      normalizedKey === "cvv2" ||
+      normalizedKey === "blik_code" ||
+      normalizedKey === "cardholdername" ||
+      normalizedKey === "expirationmonth" ||
+      normalizedKey === "expirationyear" ||
+      normalizedKey === "ccexpmonth" ||
+      normalizedKey === "ccexpyear" ||
+      normalizedKey === "bin" ||
+      normalizedKey === "last4digits" ||
+      normalizedKey === "userpaymentoptionid"
+    );
   }
 
   /**

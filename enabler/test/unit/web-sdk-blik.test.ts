@@ -199,7 +199,7 @@ describe("WebSdkBlikComponent", () => {
     );
 
     const input = mountTarget.findByTag("input");
-    const img = mountTarget.findByTag("img");
+    const label = mountTarget.findByTag("label");
     expect(input).toMatchObject({
       id: "nuvei-blik-code",
       inputMode: "numeric",
@@ -207,7 +207,7 @@ describe("WebSdkBlikComponent", () => {
       pattern: "[0-9]*",
       maxLength: 7,
     });
-    expect(img).toMatchObject({ alt: "BLIK", src: "https://cdn.example.test/blik.svg" });
+    expect(label).toMatchObject({ htmlFor: "nuvei-blik-code", textContent: "BLIK code" });
   });
 
   it("accepts missing getApms support but rejects getApms responses without BLIK", async () => {

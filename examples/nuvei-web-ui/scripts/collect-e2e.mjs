@@ -47,9 +47,21 @@ const MOCK_CT_URL = `http://127.0.0.1:${MOCK_CT_PORT}`;
 const PROCESSOR_URL = `http://127.0.0.1:${PROCESSOR_PORT}`;
 const SESSION_HEADERS = { 'content-type': 'application/json', 'x-session-id': 'session-local-001' };
 const OAUTH_HEADERS = { 'content-type': 'application/json', authorization: 'Bearer mock-ct-access-token' };
-const AMOUNT_CENT = 1000;
-const AMOUNT = '10.00';
-const CURRENCY = 'EUR';
+function centAmountFromSessionAmount(amount, currencyCode) {
+  const fractionDigits = new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency: currencyCode,
+  }).resolvedOptions().maximumFractionDigits;
+  const normalizedAmount = String(amount).trim();
+  if (!/^\d+(?:\.\d+)?$/.test(normalizedAmount)) throw new Error(`invalid session amount: ${amount}`);
+  const [whole, fraction = ''] = normalizedAmount.split('.');
+  if (fraction.length > fractionDigits) {
+    throw new Error(`session amount has too many fractional digits: ${amount} ${currencyCode}`);
+  }
+  const centAmount = Number(`${whole}${fraction.padEnd(fractionDigits, '0')}`);
+  if (!Number.isSafeInteger(centAmount)) throw new Error(`session amount is too large: ${amount}`);
+  return centAmount;
+}
 
 function spawnChild(label, command, args, env) {
   const child = spawn(command, args, {
@@ -120,11 +132,11 @@ async function createSessionAndPay(ctx, nuvei, flowId, { transactionType = 'Auth
   ctx.writeFixture(`${flowId}/processor-session-response.json`, session);
   if (session.status !== 200) throw new Error(`session creation failed with ${session.status}`);
 
-  const { sessionToken, paymentReference } = session.body;
+  const { sessionToken, paymentReference, amount, currency } = session.body;
   const payment = await nuvei.payment({
     sessionToken,
-    amount: AMOUNT,
-    currency: CURRENCY,
+    amount,
+    currency,
     transactionType,
     card: TEST_CARDS.approvedVisa,
     ...(urlDetails ? { urlDetails } : {}),
@@ -139,7 +151,11 @@ async function createSessionAndPay(ctx, nuvei, flowId, { transactionType = 'Auth
   ctx.writeFixture(`${flowId}/processor-confirm-response.json`, confirm);
   ctx.writeFixture(`${flowId}/ct-payment-after-confirm.json`, await ledgerPayment(paymentReference));
 
-  return { paymentReference, sessionToken };
+  return {
+    paymentReference,
+    sessionToken,
+    amountPlanned: { centAmount: centAmountFromSessionAmount(amount, currency), currencyCode: currency },
+  };
 }
 
 async function paymentIntent(ctx, flowId, paymentReference, action) {
@@ -225,11 +241,11 @@ async function main() {
     // --- E-02/E-03: capture then refund on the same payment ---------------
     await paymentIntent(ctx, 'E-02-capture-intent', e01.paymentReference, {
       action: 'capturePayment',
-      amount: { centAmount: AMOUNT_CENT, currencyCode: CURRENCY },
+      amount: e01.amountPlanned,
     });
     await paymentIntent(ctx, 'E-03-refund-intent', e01.paymentReference, {
       action: 'refundPayment',
-      amount: { centAmount: AMOUNT_CENT, currencyCode: CURRENCY },
+      amount: e01.amountPlanned,
     });
 
     // --- E-04: fresh auth, then cancel -------------------------------------

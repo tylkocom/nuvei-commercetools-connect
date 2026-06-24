@@ -1677,9 +1677,22 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     const dmnAmount = this.getDmnPlannedAmount(body);
-    const payments = await Promise.all(
+    const paymentResults = await Promise.allSettled(
       paymentIds.map((id) => this.ctPaymentService.getPayment({ id })),
     );
+    const payments: Payment[] = [];
+    for (const result of paymentResults) {
+      if (result.status === "fulfilled") {
+        payments.push(result.value);
+        continue;
+      }
+      if (!this.isResourceNotFoundError(result.reason)) {
+        throw result.reason;
+      }
+    }
+    if (payments.length === 0) {
+      return undefined;
+    }
     const amountMatches = payments.filter((payment) =>
       this.paymentMatchesDmnAmount(payment, dmnAmount),
     );
@@ -1749,18 +1762,20 @@ export class NuveiPaymentService extends AbstractPaymentService {
       "SessionId",
     ]);
 
+    let resolvedFromCartId = false;
+
     if (merchantUniqueId) {
       let payment: Payment | undefined;
       try {
         payment = await this.ctPaymentService.getPayment({ id: merchantUniqueId });
       } catch (error) {
         if (this.isResourceNotFoundError(error)) {
-          if (sessionToken) {
-            log.warn("DMN merchant_unique_id did not resolve to a Payment; falling back to session token.", {
+          payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
+          resolvedFromCartId = payment !== undefined;
+          if (!payment && sessionToken) {
+            log.warn("DMN merchant_unique_id did not resolve to a Payment or cart; falling back to session token.", {
               merchantUniqueId,
             });
-          } else {
-            payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
           }
         } else {
           throw error;
@@ -1768,8 +1783,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
       }
 
       if (payment) {
-        if (sessionToken && payment.interfaceId !== sessionToken) {
+        if (sessionToken && !resolvedFromCartId && payment.interfaceId !== sessionToken) {
           throw new Error("DMN session token does not match merchant_unique_id payment");
+        }
+        if (sessionToken && resolvedFromCartId && payment.interfaceId !== sessionToken) {
+          log.warn("DMN cart-id resolution ignored non-matching session token.", {
+            merchantUniqueId,
+            paymentId: payment.id,
+          });
         }
         return payment;
       }

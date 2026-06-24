@@ -11,11 +11,19 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../..');
 const EVIDENCE_ABS_ROOT = path.resolve(REPO_ROOT, EVIDENCE_ROOT);
 const RAW_ABS_ROOT = path.resolve(REPO_ROOT, RAW_WORKSPACE);
 
+function normalizedFieldSet(fields) {
+  return new Set(fields.map((field) => field.toLowerCase()));
+}
+
+function hasNormalizedField(fields, key) {
+  return fields.has(key.toLowerCase());
+}
+
 const REDACTED_VALUES = new Set(['[redacted-checksum]', '[redacted-secret]', '[redacted-card-data]', '[redacted-pii]', '[redacted-raw-body]', 'unobserved', 'not-captured']);
 const CHECKSUM_KEY_PATTERN = /checksum/i;
 const SECRET_KEY_PATTERN = /(?:NUVEI_SECRET_KEY|CTP_CLIENT_SECRET|CTP_CLIENT_ID|CTP_PROJECT_KEY|secret|password|private[_-]?key|client[_-]?secret)/i;
-const CARD_KEYS = new Set(['cardNumber', 'ccCardNumber', 'bin', 'last4', 'last4Digits', 'uniqueCC', 'Token', 'token', 'tokenId', 'userPaymentOptionId', 'userPaymentOption', 'PAR', 'nameOnCard', 'expMonth', 'expYear', 'expirationMonth', 'expirationYear', 'cvv', 'cvv2', 'cvc', 'avs']);
-const PII_KEYS = new Set(['email', 'billingEmail', 'phone', 'phoneNumber', 'ip', 'ipAddress', 'clientIp', 'firstName', 'lastName', 'address', 'billingAddress', 'shippingAddress', 'city', 'street', 'postalCode', 'zip']);
+const CARD_KEYS = normalizedFieldSet(['cardNumber', 'ccCardNumber', 'bin', 'last4', 'last4Digits', 'uniqueCC', 'Token', 'token', 'tokenId', 'userPaymentOptionId', 'userPaymentOption', 'PAR', 'nameOnCard', 'cardHolderName', 'expMonth', 'expYear', 'expirationMonth', 'expirationYear', 'ccExpMonth', 'ccExpYear', 'cvv', 'cvv2', 'cvc', 'avs']);
+const PII_KEYS = normalizedFieldSet(['email', 'billingEmail', 'phone', 'phoneNumber', 'ip', 'ipAddress', 'clientIp', 'firstName', 'lastName', 'address', 'billingAddress', 'shippingAddress', 'city', 'street', 'postalCode', 'zip']);
 const SESSION_KEYS = new Set(['sessionToken', 'paymentInterfaceId', 'interfaceId']);
 const PPP_KEYS = new Set(['PPP_TransactionID', 'PPP_TransactionId', 'ppp_TransactionID', 'pppTransactionId']);
 const TRANSACTION_KEYS = new Set(['TransactionID', 'TransactionId', 'transactionId']);
@@ -105,8 +113,8 @@ function scanParsedValue(value, filePath, errors, parents = []) {
       continue;
     }
     if (CHECKSUM_KEY_PATTERN.test(key) && !isAllowedPlaceholder(child)) addError(errors, filePath, 'checksum', `${location} contains an unredacted checksum`);
-    if (CARD_KEYS.has(key) && !isAllowedPlaceholder(child)) addError(errors, filePath, 'card-data', `${location} contains card-adjacent data`);
-    if (PII_KEYS.has(key) && !isAllowedPlaceholder(child)) addError(errors, filePath, 'pii', `${location} contains shopper PII`);
+    if (hasNormalizedField(CARD_KEYS, key) && !isAllowedPlaceholder(child)) addError(errors, filePath, 'card-data', `${location} contains card-adjacent data`);
+    if (hasNormalizedField(PII_KEYS, key) && !isAllowedPlaceholder(child)) addError(errors, filePath, 'pii', `${location} contains shopper PII`);
     if ((key === 'rawBody' || key === 'rawDmnBody' || key === 'unsanitizedBody') && !isAllowedPlaceholder(child)) addError(errors, filePath, 'raw-body', `${location} contains an unsanitized raw body`);
     if (SESSION_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'sessionToken')) addError(errors, filePath, 'session-token', `${location} contains a raw session token or interfaceId`);
     if (PPP_KEYS.has(key) && typeof child === 'string' && !isAllowedPlaceholder(child) && !isAlias(child, 'ppp')) addError(errors, filePath, 'ppp-transaction', `${location} contains a raw PPP transaction id`);
@@ -305,6 +313,11 @@ async function runSelfCheck() {
   assert.match(txResult.value.TransactionId, /^transaction-\d{3}$/);
   assert.match(txResult.value.transactionId, /^transaction-\d{3}$/);
 
+  const cardResult = sanitizeForEvidence({ CVV: '217', cardHolderName: 'Jane Shopper', ccExpMonth: '12' });
+  assert.equal(cardResult.value.CVV, '[redacted-card-data]');
+  assert.equal(cardResult.value.cardHolderName, '[redacted-card-data]');
+  assert.equal(cardResult.value.ccExpMonth, '[redacted-card-data]');
+
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'phase-02-evidence-check-'));
   fs.writeFileSync(path.join(tempRoot, 'bad.json'), JSON.stringify({
     checksum: 'abcdef1234567890abcdef1234567890',
@@ -317,6 +330,10 @@ async function runSelfCheck() {
     userPaymentOptionId: 'upo-raw',
     PAR: 'par-raw',
     nameOnCard: 'Jane Shopper',
+    cardHolderName: 'Jane Shopper',
+    CVV: '217',
+    ccExpMonth: '12',
+    ccExpYear: '30',
     expMonth: '12',
     email: 'shopper@example.com',
     address: 'Main Street 1',

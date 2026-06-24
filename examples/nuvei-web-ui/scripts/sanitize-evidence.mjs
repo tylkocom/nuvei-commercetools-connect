@@ -33,9 +33,17 @@ const ALIAS_PREFIX = {
 const ALIAS_CLASSES = Object.keys(ALIAS_PREFIX);
 const PPP_FIELDS = new Set(['PPP_TransactionID', 'PPP_TransactionId', 'ppp_TransactionID']);
 const TRANSACTION_FIELDS = new Set(['TransactionID', 'TransactionId', 'transactionId']);
-const CHECKSUM_FIELDS = new Set(['checksum', 'advanceResponseChecksum', 'responseChecksum', 'responsechecksum']);
-const CARD_FIELDS = new Set(['cardNumber', 'ccCardNumber', 'bin', 'last4', 'last4Digits', 'uniqueCC', 'Token', 'token', 'tokenId', 'userPaymentOptionId', 'userPaymentOption', 'PAR', 'nameOnCard', 'expMonth', 'expYear', 'expirationMonth', 'expirationYear', 'cvv', 'cvv2', 'cvc', 'avs']);
-const PII_FIELDS = new Set(['email', 'billingEmail', 'phone', 'phoneNumber', 'ip', 'ipAddress', 'clientIp', 'firstName', 'lastName', 'name', 'address', 'billingAddress', 'shippingAddress', 'city', 'street', 'postalCode', 'zip']);
+function normalizedFieldSet(fields) {
+  return new Set(fields.map((field) => field.toLowerCase()));
+}
+
+function hasNormalizedField(fields, key) {
+  return fields.has(key.toLowerCase());
+}
+
+const CHECKSUM_FIELDS = normalizedFieldSet(['checksum', 'advanceResponseChecksum', 'responseChecksum', 'responsechecksum']);
+const CARD_FIELDS = normalizedFieldSet(['cardNumber', 'ccCardNumber', 'bin', 'last4', 'last4Digits', 'uniqueCC', 'Token', 'token', 'tokenId', 'userPaymentOptionId', 'userPaymentOption', 'PAR', 'nameOnCard', 'cardHolderName', 'expMonth', 'expYear', 'expirationMonth', 'expirationYear', 'ccExpMonth', 'ccExpYear', 'cvv', 'cvv2', 'cvc', 'avs']);
+const PII_FIELDS = normalizedFieldSet(['email', 'billingEmail', 'phone', 'phoneNumber', 'ip', 'ipAddress', 'clientIp', 'firstName', 'lastName', 'name', 'address', 'billingAddress', 'shippingAddress', 'city', 'street', 'postalCode', 'zip']);
 const SECRET_FIELD_PATTERN = /(?:secret|password|private[_-]?key|client[_-]?secret|NUVEI_SECRET_KEY|CTP_CLIENT_SECRET|CTP_CLIENT_ID|CTP_PROJECT_KEY)/i;
 
 function isInside(child, parent) {
@@ -139,10 +147,10 @@ function semanticAliasClass(key, parents, value, aliasMap) {
 function redactOrAliasScalar(key, value, parents, aliasMap) {
   if (value === null || value === undefined || typeof value === 'boolean' || typeof value === 'number') return value;
   const stringValue = String(value);
-  if (CHECKSUM_FIELDS.has(key) || /checksum/i.test(key)) return REDACTIONS.checksum;
+  if (hasNormalizedField(CHECKSUM_FIELDS, key) || /checksum/i.test(key)) return REDACTIONS.checksum;
   if (SECRET_FIELD_PATTERN.test(key)) return REDACTIONS.secret;
-  if (CARD_FIELDS.has(key)) return REDACTIONS.cardData;
-  if (PII_FIELDS.has(key)) return REDACTIONS.pii;
+  if (hasNormalizedField(CARD_FIELDS, key)) return REDACTIONS.cardData;
+  if (hasNormalizedField(PII_FIELDS, key)) return REDACTIONS.pii;
   if (key === 'rawBody' || key === 'rawDmnBody' || key === 'unsanitizedBody') return REDACTIONS.rawBody;
   const aliasClass = semanticAliasClass(key, parents, stringValue, aliasMap);
   if (typeof aliasClass === 'object' && aliasClass.existing) return aliasClass.existing;
@@ -158,9 +166,9 @@ function sanitizeObject(value, aliasMap, parents = []) {
     if (child && typeof child === 'object') {
       if (SECRET_FIELD_PATTERN.test(key)) {
         output[key] = REDACTIONS.secret;
-      } else if (CARD_FIELDS.has(key)) {
+      } else if (hasNormalizedField(CARD_FIELDS, key)) {
         output[key] = REDACTIONS.cardData;
-      } else if (PII_FIELDS.has(key)) {
+      } else if (hasNormalizedField(PII_FIELDS, key)) {
         output[key] = REDACTIONS.pii;
       } else if (key === 'rawBody' || key === 'rawDmnBody' || key === 'unsanitizedBody') {
         output[key] = REDACTIONS.rawBody;
