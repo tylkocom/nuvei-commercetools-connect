@@ -225,20 +225,25 @@ class WebSdkBlikComponent implements PaymentComponent {
   }
 
   private renderForm(container: Element): void {
+    ensureBlikStyles();
+
     const root = document.createElement("div");
     root.className = "nuvei-blik";
 
     const label = document.createElement("label");
+    label.className = "nuvei-blik__label";
     label.htmlFor = "nuvei-blik-code";
     label.textContent = "BLIK code";
     root.appendChild(label);
 
     const input = document.createElement("input");
+    input.className = "nuvei-blik__input";
     input.id = "nuvei-blik-code";
     input.inputMode = "numeric";
     input.autocomplete = "one-time-code";
     input.pattern = "[0-9]*";
     input.maxLength = 7;
+    input.placeholder = "123 456";
     input.setAttribute("aria-describedby", "nuvei-blik-help nuvei-blik-error");
     input.addEventListener("input", () => {
       this.readCodeFromInput();
@@ -249,11 +254,13 @@ class WebSdkBlikComponent implements PaymentComponent {
     root.appendChild(input);
 
     const help = document.createElement("p");
+    help.className = "nuvei-blik__help";
     help.id = "nuvei-blik-help";
     help.textContent = "Enter the 6-digit BLIK code from your bank app.";
     root.appendChild(help);
 
     const error = document.createElement("p");
+    error.className = "nuvei-blik__error";
     error.id = "nuvei-blik-error";
     error.setAttribute("role", "alert");
     error.hidden = true;
@@ -261,6 +268,7 @@ class WebSdkBlikComponent implements PaymentComponent {
     root.appendChild(error);
 
     const status = document.createElement("p");
+    status.className = "nuvei-blik__status";
     status.setAttribute("role", "status");
     status.hidden = true;
     root.appendChild(status);
@@ -344,4 +352,99 @@ class WebSdkBlikComponent implements PaymentComponent {
 
 function formatBlikCode(digits: string): string {
   return digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
+}
+
+const BLIK_STYLE_ID = "nuvei-blik-styles";
+
+const BLIK_STYLES = `
+.nuvei-blik {
+  --nuvei-blik-ink: #111827;
+  --nuvei-blik-muted: #4b5563;
+  --nuvei-blik-border: #cbd5e1;
+  --nuvei-blik-focus: #475569;
+  --nuvei-blik-error: #111827;
+  --nuvei-blik-surface: #fff;
+  --nuvei-blik-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+  box-sizing: border-box;
+  font-family: inherit;
+  color: var(--nuvei-blik-ink);
+}
+.nuvei-blik * {
+  box-sizing: border-box;
+}
+.nuvei-blik__label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.nuvei-blik__input {
+  width: 100%;
+  margin: 0;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.22em;
+  color: inherit;
+  padding: 12px 14px;
+  border: 1px solid var(--nuvei-blik-border);
+  border-radius: var(--nuvei-blik-radius);
+  background: var(--nuvei-blik-surface);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.nuvei-blik__input::placeholder {
+  color: var(--nuvei-blik-muted);
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  opacity: 0.55;
+}
+.nuvei-blik__input:hover {
+  border-color: #94a3b8;
+}
+.nuvei-blik__input:focus,
+.nuvei-blik__input:focus-visible {
+  outline: none;
+  border-color: var(--nuvei-blik-focus);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.20);
+}
+.nuvei-blik__input[aria-invalid="true"] {
+  border-color: var(--nuvei-blik-error);
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.15);
+}
+.nuvei-blik__help,
+.nuvei-blik__error,
+.nuvei-blik__status {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.nuvei-blik__help {
+  color: var(--nuvei-blik-muted);
+}
+.nuvei-blik__error {
+  color: var(--nuvei-blik-error);
+  font-weight: 600;
+}
+.nuvei-blik__status {
+  color: var(--nuvei-blik-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nuvei-blik__input {
+    transition: none;
+  }
+}
+`;
+
+function ensureBlikStyles(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(BLIK_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = BLIK_STYLE_ID;
+  style.textContent = BLIK_STYLES;
+  document.head.appendChild(style);
 }

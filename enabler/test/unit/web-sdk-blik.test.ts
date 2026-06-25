@@ -110,15 +110,25 @@ function makeBlikSession(overrides: Partial<PaymentSessionResponse> = {}): Payme
   };
 }
 
-function stubDocument(): { mountTarget: FakeElement } {
+function stubDocument(): { mountTarget: FakeElement; head: FakeElement } {
   const mountTarget = new FakeElement("div");
+  const head = new FakeElement("head");
+  const byId = new Map<string, FakeElement>();
   vi.stubGlobal("document", {
     querySelector: vi.fn().mockImplementation((selector: string) =>
       selector === "#container" ? mountTarget : null,
     ),
+    getElementById: vi.fn().mockImplementation((id: string) => byId.get(id) ?? null),
     createElement: vi.fn().mockImplementation((tagName: string) => new FakeElement(tagName)),
+    head,
   });
-  return { mountTarget };
+  // Register style elements by id as they are appended, mirroring real getElementById.
+  const originalAppend = head.appendChild.bind(head);
+  head.appendChild = (child: FakeElement) => {
+    if (child.id) byId.set(child.id, child);
+    return originalAppend(child);
+  };
+  return { mountTarget, head };
 }
 
 function makeSfc(overrides: Record<string, unknown> = {}) {

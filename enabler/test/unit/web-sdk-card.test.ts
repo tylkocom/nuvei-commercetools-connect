@@ -32,10 +32,47 @@ function makeEnablerOptions(overrides: Partial<EnablerOptions> = {}): EnablerOpt
   };
 }
 
+class FakeElement {
+  public children: FakeElement[] = [];
+  public attributes = new Map<string, string>();
+  public classList = new Set<string>();
+  public textContent = "";
+  public className = "";
+  public id = "";
+  public hidden = false;
+
+  constructor(public readonly tagName: string) {}
+
+  appendChild(child: FakeElement): FakeElement {
+    this.children.push(child);
+    return child;
+  }
+
+  replaceChildren(...children: FakeElement[]): void {
+    this.children = children;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+}
+
 function stubDocument() {
+  const container = new FakeElement("div");
+  const head = new FakeElement("head");
+  const byId = new Map<string, FakeElement>();
   vi.stubGlobal("document", {
-    querySelector: vi.fn().mockReturnValue({ innerHTML: "" }),
+    querySelector: vi.fn().mockReturnValue(container),
+    getElementById: vi.fn().mockImplementation((id: string) => byId.get(id) ?? null),
+    createElement: vi.fn().mockImplementation((tagName: string) => new FakeElement(tagName)),
+    head,
   });
+  const originalAppend = head.appendChild.bind(head);
+  head.appendChild = (child: FakeElement) => {
+    if (child.id) byId.set(child.id, child);
+    return originalAppend(child);
+  };
+  return { container };
 }
 
 describe("WebSdkCardBuilder", () => {
@@ -109,7 +146,7 @@ describe("WebSdkCardComponent", () => {
     expect(mockCreatePayment).toHaveBeenCalledWith({
       paymentMethodOptions: { card: {} },
     });
-    expect(create).toHaveBeenCalledWith("card", {});
+    expect(create).toHaveBeenCalledWith("card", { style: expect.any(Object) });
     expect(attach).toHaveBeenCalledWith(expect.any(Object));
     const createPaymentParams = sfc.createPayment.mock.calls[0][0];
     expect(createPaymentParams).toMatchObject({

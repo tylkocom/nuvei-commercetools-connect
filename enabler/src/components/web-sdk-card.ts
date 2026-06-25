@@ -11,6 +11,7 @@ import { apiService, confirmPaymentResult } from "../services/api-service.js";
 import {
   loadWebSdk,
   type SafeChargeCardField,
+  type SafeChargeFieldStyle,
   type SafeChargeInstance,
   type SafeChargeResult,
 } from "../services/web-sdk.js";
@@ -29,6 +30,8 @@ class WebSdkCardComponent implements PaymentComponent {
   private readonly api: ApiService;
   private sfc: SafeChargeInstance | undefined;
   private scard: SafeChargeCardField | undefined;
+  private fieldShell: HTMLElement | undefined;
+  private errorElement: HTMLElement | undefined;
   private sessionToken = "";
   private paymentReference = "";
   private cartId = "";
@@ -130,9 +133,70 @@ class WebSdkCardComponent implements PaymentComponent {
       throw new Error(`Mount target not found: ${selector}`);
     }
 
+    this.renderShell(container);
+
     const scFields = sfc.fields({});
-    this.scard = scFields.create("card", {});
-    this.scard.attach(container);
+    this.scard = scFields.create("card", { style: CARD_FIELD_STYLE });
+    // Attach into the styled shell (already in the DOM) rather than the bare
+    // mount target, so the hosted iframe sits inside a real input box.
+    this.scard.attach(this.fieldShell as Element);
+    this.wireFieldEvents();
+  }
+
+  private renderShell(container: Element): void {
+    ensureCardStyles();
+
+    const root = document.createElement("div");
+    root.className = "nuvei-card";
+
+    const label = document.createElement("label");
+    label.className = "nuvei-card__label";
+    label.textContent = "Card details";
+    root.appendChild(label);
+
+    const fieldShell = document.createElement("div");
+    fieldShell.className = "nuvei-card__field";
+    root.appendChild(fieldShell);
+
+    const help = document.createElement("p");
+    help.className = "nuvei-card__help";
+    help.textContent = "Card number, expiry, and security code.";
+    root.appendChild(help);
+
+    const error = document.createElement("p");
+    error.className = "nuvei-card__error";
+    error.setAttribute("role", "alert");
+    error.hidden = true;
+    root.appendChild(error);
+
+    container.replaceChildren(root);
+    this.fieldShell = fieldShell;
+    this.errorElement = error;
+  }
+
+  // Progressive enhancement: if the SDK build exposes the hosted-field event
+  // channel, reflect focus and validation state on the shell. Feature-detected
+  // so it is a no-op when unavailable; payloads must be verified in the Nuvei
+  // sandbox before being treated as production-guaranteed.
+  private wireFieldEvents(): void {
+    if (!this.scard?.on || !this.fieldShell) return;
+    const shell = this.fieldShell;
+
+    this.scard.on("focus", () => shell.classList.add("is-focused"));
+    this.scard.on("blur", () => shell.classList.remove("is-focused"));
+    this.scard.on("change", (event) => {
+      const message = event?.error?.message;
+      if (message) {
+        shell.classList.add("is-invalid");
+        if (this.errorElement) {
+          this.errorElement.textContent = message;
+          this.errorElement.hidden = false;
+        }
+      } else {
+        shell.classList.remove("is-invalid");
+        if (this.errorElement) this.errorElement.hidden = true;
+      }
+    });
   }
 
   private handleWebSdkResult(res: SafeChargeResult): void {
@@ -158,4 +222,100 @@ class WebSdkCardComponent implements PaymentComponent {
       this.baseOptions.onPending,
     );
   }
+}
+
+// Styles the text *inside* the Nuvei-hosted iframe. The iframe is cross-origin,
+// so it cannot inherit the host font; values are sent to the SDK explicitly.
+const CARD_FIELD_STYLE: SafeChargeFieldStyle = {
+  base: {
+    fontSize: "16px",
+    fontFamily:
+      "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontWeight: "500",
+    color: "#111827",
+    "::placeholder": { color: "#9ca3af" },
+  },
+  invalid: {
+    color: "#111827",
+  },
+};
+
+const CARD_STYLE_ID = "nuvei-card-styles";
+
+const CARD_STYLES = `
+.nuvei-card {
+  --nuvei-card-ink: #111827;
+  --nuvei-card-muted: #4b5563;
+  --nuvei-card-border: #cbd5e1;
+  --nuvei-card-focus: #475569;
+  --nuvei-card-error: #111827;
+  --nuvei-card-surface: #fff;
+  --nuvei-card-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  box-sizing: border-box;
+  font-family: inherit;
+  color: var(--nuvei-card-ink);
+}
+.nuvei-card * {
+  box-sizing: border-box;
+}
+.nuvei-card__label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.nuvei-card__field {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--nuvei-card-border);
+  border-radius: var(--nuvei-card-radius);
+  background: var(--nuvei-card-surface);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.nuvei-card__field iframe {
+  display: block;
+  width: 100% !important;
+}
+.nuvei-card__field:hover {
+  border-color: #94a3b8;
+}
+.nuvei-card__field.is-focused {
+  border-color: var(--nuvei-card-focus);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.20);
+}
+.nuvei-card__field.is-invalid {
+  border-color: var(--nuvei-card-error);
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.15);
+}
+.nuvei-card__help,
+.nuvei-card__error {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.nuvei-card__help {
+  color: var(--nuvei-card-muted);
+}
+.nuvei-card__error {
+  color: var(--nuvei-card-error);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nuvei-card__field {
+    transition: none;
+  }
+}
+`;
+
+function ensureCardStyles(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(CARD_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = CARD_STYLE_ID;
+  style.textContent = CARD_STYLES;
+  document.head.appendChild(style);
 }
