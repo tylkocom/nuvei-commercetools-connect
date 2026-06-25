@@ -9,9 +9,30 @@ export type SafeChargeResult = {
   redirectUrl?: string;
 };
 
+export type SafeChargeFieldEventName = "focus" | "blur" | "change" | "ready";
+
+export type SafeChargeFieldEvent = {
+  error?: { message?: string };
+  complete?: boolean;
+};
+
 export interface SafeChargeCardField {
   attach(el: Element): void;
+  /**
+   * Optional Nuvei hosted-field event channel (focus/blur/change/ready).
+   * Declared optional and feature-detected at the call site: not every SDK
+   * build exposes it, and the exact payload must be verified against the
+   * Nuvei sandbox before relying on it for production behavior.
+   */
+  on?(event: SafeChargeFieldEventName, handler: (event: SafeChargeFieldEvent) => void): void;
 }
+
+/** Style passed to scFields.create("card", { style }) to theme the iframe's inner text. */
+export type SafeChargeFieldStyle = {
+  base?: Record<string, string | Record<string, string>>;
+  invalid?: Record<string, string>;
+  empty?: Record<string, string>;
+};
 
 export type SafeChargeAlternativePaymentMethod = {
   alternativePaymentMethod: {
