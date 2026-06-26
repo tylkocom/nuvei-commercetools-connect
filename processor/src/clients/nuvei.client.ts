@@ -325,7 +325,7 @@ export class NuveiClient {
   ): Promise<ResponseType> {
     const controller = signal ? undefined : new AbortController();
     const timeout = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : undefined;
-    log.info("Nuvei API request", { endpoint, payload: this.redactPayload(payload) });
+    log.info("Nuvei API request", { endpoint, payload: this.summarizeRequestForLog(payload) });
 
     try {
       const response = await fetch(`${this.baseUrl}/${endpoint}.do`, {
@@ -414,53 +414,43 @@ export class NuveiClient {
     return crypto.createHash("sha256").update(checkString).digest("hex");
   }
 
-  private redactPayload(payload: NuveiRequestPayload): NuveiRequestPayload {
-    return this.redactLogValue(payload) as NuveiRequestPayload;
-  }
+  /**
+   * Whitelist of non-sensitive Nuvei request fields for structured logs.
+   * Raw requests can include shopper PII, session tokens, checksums, and card data.
+   */
+  private summarizeRequestForLog(payload: NuveiRequestPayload): Record<string, unknown> {
+    const allowedFields = [
+      "amount",
+      "currency",
+      "clientUniqueId",
+      "relatedTransactionId",
+      "transactionId",
+      "merchantId",
+      "merchantSiteId",
+      "clientRequestId",
+      "timeStamp",
+    ] as const;
 
-  private redactLogValue(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.redactLogValue(item));
+    const summary: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (payload[field] !== undefined) {
+        summary[field] = payload[field];
+      }
     }
 
-    if (!value || typeof value !== "object") {
-      return value;
+    const urlDetails = payload.urlDetails as { notificationUrl?: string } | undefined;
+    if (urlDetails?.notificationUrl) {
+      summary.urlDetails = { notificationUrl: urlDetails.notificationUrl };
     }
 
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entryValue]) => {
-        const normalizedKey = key.toLowerCase();
-        if (this.isSensitiveLogField(normalizedKey)) {
-          return [key, "[REDACTED]"];
-        }
-        return [key, this.redactLogValue(entryValue)];
-      }),
-    );
-  }
+    if (payload.sessionToken !== undefined) {
+      summary.sessionToken = "[REDACTED]";
+    }
+    if (payload.checksum !== undefined) {
+      summary.checksum = "[REDACTED]";
+    }
 
-  private isSensitiveLogField(normalizedKey: string): boolean {
-    return (
-      normalizedKey.includes("token") ||
-      normalizedKey.includes("checksum") ||
-      normalizedKey.includes("secret") ||
-      normalizedKey.includes("authorization") ||
-      normalizedKey.includes("cardnumber") ||
-      normalizedKey.includes("email") ||
-      normalizedKey.includes("firstname") ||
-      normalizedKey.includes("lastname") ||
-      normalizedKey.includes("ipaddress") ||
-      normalizedKey === "cvv" ||
-      normalizedKey === "cvv2" ||
-      normalizedKey === "blik_code" ||
-      normalizedKey === "cardholdername" ||
-      normalizedKey === "expirationmonth" ||
-      normalizedKey === "expirationyear" ||
-      normalizedKey === "ccexpmonth" ||
-      normalizedKey === "ccexpyear" ||
-      normalizedKey === "bin" ||
-      normalizedKey === "last4digits" ||
-      normalizedKey === "userpaymentoptionid"
-    );
+    return summary;
   }
 
   /**

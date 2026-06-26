@@ -216,6 +216,7 @@ describe("NuveiClient", () => {
           firstName: "Test",
           lastName: "Shopper",
         },
+        urlDetails: { notificationUrl: "https://processor.example.test/webhooks/nuvei" },
       });
 
       const requestLog = stdoutWrite.mock.calls
@@ -227,10 +228,10 @@ describe("NuveiClient", () => {
       expect(requestLog).not.toContain("Shopper");
       expect(requestLog).not.toContain(TEST_SECRET);
       expect(requestLog).not.toContain("session-abc");
-      expect(requestLog).toContain('"email":"[REDACTED]"');
-      expect(requestLog).toContain('"firstName":"[REDACTED]"');
-      expect(requestLog).toContain('"lastName":"[REDACTED]"');
+      expect(requestLog).not.toContain('"billingAddress"');
+      expect(requestLog).not.toContain('"userDetails"');
       expect(requestLog).toContain('"checksum":"[REDACTED]"');
+      expect(requestLog).toContain("https://processor.example.test/webhooks/nuvei");
     });
   });
 
