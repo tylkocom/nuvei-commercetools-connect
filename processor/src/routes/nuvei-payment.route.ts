@@ -1,18 +1,21 @@
-import { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
+import type { SessionHeaderAuthenticationHook } from "@commercetools/connect-payments-sdk";
 import { Type } from "@sinclair/typebox";
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import type { FastifyInstance, FastifyPluginOptions } from "fastify";
 import {
   PaymentResponseSchema,
-  PaymentResponseSchemaDTO,
   PaymentMethodOptionsSchema,
-  PaymentMethodOptionsSchemaDTO,
   PaymentConfirmRequestSchema,
-  PaymentConfirmRequestSchemaDTO,
   PaymentConfirmResponseSchema,
+} from "../dtos/nuvei-payment.dto.js";
+import type {
+  PaymentResponseSchemaDTO,
+  PaymentMethodOptionsSchemaDTO,
+  PaymentConfirmRequestSchemaDTO,
   PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
-import { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
-import { DmnChecksumInvalidError, NuveiPaymentService } from "../services/nuvei-payment.service.js";
+import type { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
+import { DmnChecksumInvalidError } from "../services/nuvei-payment.service.js";
+import type { NuveiPaymentService } from "../services/nuvei-payment.service.js";
 import { PaymentSetupError } from "../dtos/operations/payment-errors.dto.js";
 import { log } from "../libs/logger/index.js";
 
@@ -25,6 +28,19 @@ type WebhookRoutesOptions = {
   paymentService: NuveiPaymentService;
   nuveiHeaderAuthHook: NuveiHeaderAuthHook;
 };
+
+function getSafeDmnDiagnosticFields(body: Record<string, unknown>): Record<string, string> {
+  return {
+    merchantUniqueId: String(body.merchant_unique_id ?? ""),
+    clientUniqueId: String(body.clientUniqueId ?? ""),
+    pppTransactionId: String(
+      body.PPP_TransactionID ?? body.PPP_TransactionId ?? body.ppp_TransactionID ?? "",
+    ),
+    transactionId: String(body.TransactionID ?? body.transactionId ?? ""),
+    transactionType: String(body.transactionType ?? ""),
+    pppStatus: String(body.ppp_status ?? ""),
+  };
+}
 
 /**
  * Payment routes for the Nuvei connector.
@@ -135,6 +151,7 @@ export const nuveiWebhookRoutes = async (
 
         log.error("Error processing Nuvei DMN", {
           error: error instanceof Error ? error.message : "Unknown error",
+          ...getSafeDmnDiagnosticFields(body),
         });
         return reply.status(500).send({ error: "Processing failed." });
       }
