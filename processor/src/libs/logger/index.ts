@@ -32,6 +32,7 @@ function write(level: (typeof levels)[number], message: string, meta?: unknown):
     projectKey: config.projectKey,
     version: process.env.npm_package_version,
     name: process.env.npm_package_name,
+    buildCommit: config.buildCommit,
     correlationId: context.correlationId,
     pathTemplate: context.pathTemplate,
     path: context.path,
