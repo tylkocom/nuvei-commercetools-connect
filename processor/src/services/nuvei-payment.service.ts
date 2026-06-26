@@ -1,12 +1,14 @@
 import {
-  CommercetoolsCartService,
-  CommercetoolsOrderService,
-  CommercetoolsPaymentService,
   ErrorInvalidOperation,
   healthCheckCommercetoolsPermissions,
   statusHandler,
 } from "@commercetools/connect-payments-sdk";
-import {
+import type {
+  CommercetoolsCartService,
+  CommercetoolsOrderService,
+  CommercetoolsPaymentService,
+} from "@commercetools/connect-payments-sdk";
+import type {
   CancelPaymentRequest,
   CapturePaymentRequest,
   ConfigResponse,
@@ -17,16 +19,18 @@ import {
 } from "./types/operation.type.js";
 import {
   PAYMENT_METHOD_REGISTRY,
-  type SupportedPaymentComponentsSchemaDTO,
-  type SupportedPaymentMethod,
   isSupportedPaymentMethod,
+} from "../dtos/operations/payment-components.dto.js";
+import type {
+  SupportedPaymentComponentsSchemaDTO,
+  SupportedPaymentMethod,
 } from "../dtos/operations/payment-components.dto.js";
 import {
   PaymentModificationStatus,
   PaymentTransactions,
 } from "../dtos/operations/payment-intents.dto.js";
-import { TransactionDraftDTO, TransactionResponseDTO } from "../dtos/operations/transaction.dto.js";
-import { HealthResponseSchemaDTO } from "../dtos/operations/health.dto.js";
+import type { TransactionDraftDTO, TransactionResponseDTO } from "../dtos/operations/transaction.dto.js";
+import type { HealthResponseSchemaDTO } from "../dtos/operations/health.dto.js";
 import { AbstractPaymentService } from "./abstract-payment.service.js";
 import { getConfig } from "../config/config.js";
 import { appLogger, paymentSDK } from "../payment-sdk.js";
@@ -35,16 +39,14 @@ import {
   getCartIdFromContext,
   getMerchantReturnUrlFromContext,
 } from "../libs/fastify/context/context.js";
-import {
-  nuveiClient,
-  type NuveiTransactionResponse,
-  type OpenOrderBillingAddress,
+import { nuveiClient } from "../clients/nuvei.client.js";
+import type {
+  NuveiTransactionResponse,
+  OpenOrderBillingAddress,
 } from "../clients/nuvei.client.js";
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
-import {
-  NuveiEventConverter,
-  type NuveiDmnUpdateData,
-} from "./converters/nuvei-event.converter.js";
+import { NuveiEventConverter } from "./converters/nuvei-event.converter.js";
+import type { NuveiDmnUpdateData } from "./converters/nuvei-event.converter.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
@@ -453,6 +455,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
     };
   }
 
+  private isPaymentTransaction(
+    tx: NuveiDmnUpdateData["transactions"][number],
+  ): boolean {
+    return tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE;
+  }
+
   private dmnTerminalTransactionAlreadyRecorded(
     updateData: NuveiDmnUpdateData,
     payment: Payment,
@@ -465,17 +473,34 @@ export class NuveiPaymentService extends AbstractPaymentService {
         return false;
       }
 
-      if (tx.type !== PaymentTransactions.AUTHORIZATION && tx.type !== PaymentTransactions.CHARGE) {
+      if (!this.isPaymentTransaction(tx)) {
         return false;
       }
 
+      // Match on PPP interactionId only — amount matching can produce false
+      // positives when two transactions share the same amount but different PPPs.
       return this.hasTerminalTransaction(payment, {
         type: tx.type,
         state: tx.state,
         interactionId: tx.interactionId,
-        amount: tx.amount,
       });
     });
+  }
+
+  private dmnTerminalPaymentOutcome(
+    updateData: NuveiDmnUpdateData,
+  ): "approved" | "rejected" | undefined {
+    const terminalPaymentTransaction = updateData.transactions.find(
+      (tx) => this.isPaymentTransaction(tx) && (tx.state === "Success" || tx.state === "Failure"),
+    );
+    if (!terminalPaymentTransaction) return undefined;
+    return terminalPaymentTransaction.state === "Success" ? "approved" : "rejected";
+  }
+
+  private dmnHasNonTerminalPaymentTransaction(updateData: NuveiDmnUpdateData): boolean {
+    return updateData.transactions.some(
+      (tx) => this.isPaymentTransaction(tx) && tx.state !== "Success" && tx.state !== "Failure",
+    );
   }
 
   private async assertSessionPaymentAccess(
@@ -579,13 +604,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
     payment: Payment,
     dmnBody: Record<string, unknown>,
   ): Promise<void> {
-    const successfulPaymentTransaction = updateData.transactions.find(
-      (tx) =>
-        tx.state === "Success" &&
-        (tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE),
+    const terminalPaymentTransaction = updateData.transactions.find(
+      (tx) => this.isPaymentTransaction(tx) && (tx.state === "Success" || tx.state === "Failure"),
     );
 
-    if (!successfulPaymentTransaction) {
+    if (!terminalPaymentTransaction) {
       return;
     }
 
@@ -594,9 +617,15 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     const statusBody = await nuveiClient().getPaymentStatus({ sessionToken: payment.interfaceId });
-
-    if (statusBody.status !== "SUCCESS" || statusBody.transactionStatus !== "APPROVED") {
-      throw new Error("Nuvei payment status does not confirm successful DMN");
+    if (terminalPaymentTransaction.state === "Success") {
+      if (statusBody.status !== "SUCCESS" || statusBody.transactionStatus !== "APPROVED") {
+        throw new Error("Nuvei payment status does not confirm successful DMN");
+      }
+    } else if (
+      statusBody.status !== "SUCCESS" ||
+      (statusBody.transactionStatus !== "DECLINED" && statusBody.transactionStatus !== "ERROR")
+    ) {
+      throw new Error("Nuvei payment status does not confirm failed DMN");
     }
 
     if (statusBody.sessionToken !== undefined && statusBody.sessionToken !== payment.interfaceId) {
@@ -1768,12 +1797,31 @@ export class NuveiPaymentService extends AbstractPaymentService {
       let payment: Payment | undefined;
       try {
         payment = await this.ctPaymentService.getPayment({ id: merchantUniqueId });
+        if (payment) {
+          log.info("Resolved DMN Payment by merchant_unique_id Payment id.", {
+            resolutionPath: "direct-payment-id",
+            merchantUniqueId,
+            paymentId: payment.id,
+          });
+        }
       } catch (error) {
         if (this.isResourceNotFoundError(error)) {
           payment = await this.resolveDmnPaymentFromCartId(merchantUniqueId, body);
           resolvedFromCartId = payment !== undefined;
-          if (!payment && sessionToken) {
+          if (payment) {
+            log.info("Resolved DMN Payment by cart payment link.", {
+              resolutionPath: "cart-payment-link",
+              merchantUniqueId,
+              paymentId: payment.id,
+            });
+          } else if (sessionToken) {
             log.warn("DMN merchant_unique_id did not resolve to a Payment or cart; falling back to session token.", {
+              resolutionPath: "session-token-fallback",
+              merchantUniqueId,
+            });
+          } else {
+            log.warn("DMN merchant_unique_id did not resolve to a Payment or cart and no session token fallback is available.", {
+              resolutionPath: "unresolved",
               merchantUniqueId,
             });
           }
@@ -1788,6 +1836,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         }
         if (sessionToken && resolvedFromCartId && payment.interfaceId !== sessionToken) {
           log.warn("DMN cart-id resolution ignored non-matching session token.", {
+            resolutionPath: "cart-payment-link",
             merchantUniqueId,
             paymentId: payment.id,
           });
@@ -1795,6 +1844,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
         return payment;
       }
     } else if (!sessionToken) {
+      log.warn("DMN is missing merchant_unique_id and session token.", {
+        resolutionPath: "unresolved",
+      });
       throw new Error("Missing merchant_unique_id in DMN body");
     }
 
@@ -1807,6 +1859,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
     });
 
     if (payments.length === 0) {
+      log.warn("DMN session token fallback did not resolve to a Payment.", {
+        resolutionPath: "unresolved",
+        merchantUniqueId,
+      });
       throw new Error("No Payment found for DMN session token");
     }
 
@@ -1814,16 +1870,34 @@ export class NuveiPaymentService extends AbstractPaymentService {
       throw new Error("Multiple Payments found for DMN session token");
     }
 
+    log.info("Resolved DMN Payment by session token fallback.", {
+      resolutionPath: "session-token-fallback",
+      merchantUniqueId,
+      paymentId: payments[0].id,
+    });
+
     return payments[0];
   }
 
   /**
-   * Process a Nuvei DMN (Direct Merchant Notification) webhook
+   * Process a Nuvei DMN (Direct Merchant Notification) webhook.
    *
-   * @remarks
-   * Validates the DMN checksum, resolves the exact CT Payment by
-   * merchant_unique_id or sessionToken fallback, checks idempotency, and updates
-   * the CT Payment with the appropriate transaction and payment status.
+   * The method runs an ordered gate pipeline before any CT Payment write.
+   * Each gate is positioned so that earlier (cheaper, more certain) checks
+   * short-circuit before later (more expensive, more specific) ones:
+   *
+   *   1. Non-transaction filter  — acknowledge pings that carry no transaction data.
+   *   2. Checksum validation     — reject unsigned/tempered payloads.
+   *   3. Merchant config match   — reject DMNs for other merchants.
+   *   4. Payment resolution      — resolve CT Payment by merchant_unique_id, cart-id, or session token.
+   *   5. PPP dedup               — skip if a terminal transaction with the same PPP already exists.
+   *   6. Non-terminal ack        — acknowledge PENDING Auth/Charge DMNs without a CT write so a
+   *                                later approved DMN is not blocked by a Pending transaction.
+   *   7. Terminal-already-recorded — skip if the exact terminal transaction (type + state + PPP) is on the Payment.
+   *   8. Conflicting-terminal guard — skip if the Payment already has a different terminal outcome.
+   *   9. Nuvei status cross-check — call getPaymentStatus to confirm the DMN outcome before writing.
+   *
+   * Only after all gates pass does the method write transactions to the CT Payment.
    *
    * @param body - The DMN request body
    */
@@ -1859,21 +1933,19 @@ export class NuveiPaymentService extends AbstractPaymentService {
       pppStatus: String(body.ppp_status),
     });
 
-    // Idempotency: deduplicate by canonical PPP identity (D-18).
-    // Do not deduplicate on optional fiscal TransactionID alone.
     const dmnPpp = extractCanonicalPpp(bodyForConversion);
-    if (dmnPpp) {
-      const existingInteractionIds = (ctPayment.transactions || [])
-        .map((tx) => tx.interactionId)
-        .filter((id): id is string => !!id);
-
-      if (existingInteractionIds.includes(dmnPpp)) {
-        log.info("DMN already processed (PPP duplicate), skipping.", {
-          paymentId,
-          ppp: dmnPpp,
-        });
-        return;
-      }
+    if (
+      dmnPpp &&
+      (ctPayment.transactions ?? []).some(
+        (tx) =>
+          tx.interactionId === dmnPpp && (tx.state === "Success" || tx.state === "Failure"),
+      )
+    ) {
+      log.info("DMN already processed (terminal PPP duplicate), skipping.", {
+        paymentId,
+        ppp: dmnPpp,
+      });
+      return;
     }
 
     const updateData = this.nuveiEventConverter.convertDmnToPaymentUpdate(
@@ -1881,11 +1953,39 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ctPayment.amountPlanned?.centAmount,
     );
     this.assertDmnUpdateMatchesPayment(updateData, ctPayment);
+
+    if (this.dmnHasNonTerminalPaymentTransaction(updateData)) {
+      log.info("Acknowledging non-terminal DMN without CT Payment update.", {
+        paymentId,
+        pspReference: updateData.pspReference,
+      });
+      return;
+    }
+
     if (this.dmnTerminalTransactionAlreadyRecorded(updateData, ctPayment)) {
       log.info("DMN terminal transaction already recorded, skipping.", {
         paymentId,
         pspReference: updateData.pspReference,
       });
+      return;
+    }
+    const existingTerminalOutcome = this.getExistingTerminalOutcome(ctPayment);
+    const incomingTerminalOutcome = this.dmnTerminalPaymentOutcome(updateData);
+    if (existingTerminalOutcome && incomingTerminalOutcome) {
+      if (existingTerminalOutcome !== incomingTerminalOutcome) {
+        log.warn("Ignoring conflicting terminal DMN for Payment with existing terminal outcome.", {
+          paymentId,
+          pspReference: updateData.pspReference,
+          existingOutcome: existingTerminalOutcome,
+          incomingOutcome: incomingTerminalOutcome,
+        });
+      } else {
+        log.info("DMN outcome matches existing terminal outcome, skipping.", {
+          paymentId,
+          pspReference: updateData.pspReference,
+          outcome: incomingTerminalOutcome,
+        });
+      }
       return;
     }
     await this.assertDmnMatchesNuveiStatus(updateData, ctPayment, bodyForConversion);
