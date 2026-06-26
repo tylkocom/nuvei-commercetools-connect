@@ -309,7 +309,7 @@ describe("WebSdkBlikComponent", () => {
     expect(mockCreatePayment).toHaveBeenCalledWith({ paymentMethodOptions: { blik: {} } });
   });
 
-  it("confirms pending BLIK results once without retry delays", async () => {
+  it("confirms BLIK results with the processor using default polling", async () => {
     const { mountTarget } = stubDocument();
     const sfc = makeSfc({
       createPayment: vi.fn((_params, callback) => callback({ result: "PENDING" })),
@@ -334,11 +334,10 @@ describe("WebSdkBlikComponent", () => {
       undefined,
       undefined,
       onPending,
-      { retryDelaysMs: [] },
     );
   });
 
-  it("handles cancellation and sanitized Web SDK errors without confirming", async () => {
+  it("handles cancellation but confirms non-cancelled BLIK Web SDK errors with the processor", async () => {
     const { mountTarget } = stubDocument();
     const onComplete = vi.fn();
     const onError = vi.fn();
@@ -368,8 +367,14 @@ describe("WebSdkBlikComponent", () => {
     );
     await component.submit();
 
-    expect(onError).toHaveBeenCalledWith(expect.any(Error), { paymentReference: "payment-ref-1" });
-    expect((onError.mock.calls[0][0] as Error).message).toBe("Nuvei Web SDK returned ERROR.");
-    expect(mockConfirmPaymentResult).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(mockConfirmPaymentResult).toHaveBeenCalledWith(
+      "payment-ref-1",
+      "session-token-1",
+      expect.any(Object),
+      onComplete,
+      onError,
+      undefined,
+    );
   });
 });

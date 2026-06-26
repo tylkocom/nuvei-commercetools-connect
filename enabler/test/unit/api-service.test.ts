@@ -400,7 +400,6 @@ describe("confirmPaymentResult", () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-
   it("does not leak session token when processor call throws (D-21 safe error path)", async () => {
     const onComplete = vi.fn();
     const onError = vi.fn();

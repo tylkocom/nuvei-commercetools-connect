@@ -61,7 +61,6 @@ export type ConfirmPaymentRequest = {
   paymentReference: string;
 };
 
-
 export type ConfirmPaymentPollingOptions = {
   retryDelaysMs?: readonly number[];
   wait?: (delayMs: number) => Promise<void>;
@@ -74,7 +73,15 @@ function waitForNextConfirmAttempt(delayMs: number): Promise<void> {
   });
 }
 
-const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_000] as const;
+const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [
+  2_000,
+  3_000,
+  5_000,
+  8_000,
+  8_000,
+  8_000,
+  8_000,
+] as const;
 
 /**
  * Confirms a payment via the processor and routes to the appropriate merchant
@@ -86,9 +93,9 @@ const DEFAULT_CONFIRM_PAYMENT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 8_0
  * Pending resolution:
  *   - If `onPending` is provided, fires it once and stops — the merchant owns
  *     the follow-up UX.
- *   - If `onPending` is not provided, retries up to the configured delays
- *     (default: 2 attempts over ~3s), then resolves through `onComplete`
- *     so the merchant always gets a definitive callback through one channel.
+ *   - If `onPending` is not provided, retries up to the configured delays,
+ *     then resolves through `onComplete` so the merchant always gets a
+ *     definitive callback through one channel.
  */
 export async function confirmPaymentResult(
   paymentReference: string,
@@ -132,15 +139,16 @@ export async function confirmPaymentResult(
           onPending({ paymentReference });
           return;
         }
+
         // No onPending → bounded retry, then resolve through onComplete.
         const retryDelayMs = retryDelaysMs[attempt];
         if (retryDelayMs !== undefined) {
           await wait(retryDelayMs);
           continue;
         }
+
         // Retries exhausted — report as unsuccessful so the merchant always
-        // receives a terminal callback through onComplete, never through
-        // onError for a business outcome.
+        // gets a definitive callback through one channel.
         onComplete?.({
           isSuccess: false,
           paymentReference,

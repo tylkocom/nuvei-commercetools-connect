@@ -324,13 +324,8 @@ class WebSdkBlikComponent implements PaymentComponent {
       return;
     }
 
-    if (res.result === "ERROR") {
-      this.baseOptions.onError?.(new Error("Nuvei Web SDK returned ERROR."), {
-        paymentReference: this.paymentReference,
-      });
-      return;
-    }
-
+    // BLIK browser SDK results are not authoritative. Confirm every non-cancelled,
+    // non-redirect result with the processor so DMN/session state remains source of truth.
     void confirmPaymentResult(
       this.paymentReference,
       this.sessionToken,
@@ -338,7 +333,6 @@ class WebSdkBlikComponent implements PaymentComponent {
       this.baseOptions.onComplete,
       this.baseOptions.onError,
       this.baseOptions.onPending,
-      { retryDelaysMs: [] },
     );
   }
 
