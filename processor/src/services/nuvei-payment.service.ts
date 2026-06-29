@@ -45,6 +45,8 @@ import type {
   OpenOrderBillingAddress,
 } from "../clients/nuvei.client.js";
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
+import { getTenderStrategy } from "./tenders/index.js";
+import type { NuveiTender, NuveiIntegrationSurface } from "./tenders/index.js";
 import { NuveiEventConverter } from "./converters/nuvei-event.converter.js";
 import type { NuveiDmnUpdateData } from "./converters/nuvei-event.converter.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
@@ -84,8 +86,6 @@ export class DmnChecksumInvalidError extends Error {
 }
 
 type CheckoutUiMethod = "card" | "blik" | "embedded";
-type NuveiTender = "card" | "blik";
-type NuveiIntegrationSurface = "web-sdk" | "simply-connect";
 
 type PaymentSelection =
   | { uiMethod: "card"; tender: "card"; surface: "web-sdk" }
@@ -442,8 +442,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
       : PaymentTransactions.AUTHORIZATION;
   }
 
-  private isBlikPayment(payment: Payment): boolean {
-    return payment.paymentMethodInfo?.method === "blik";
+  private tenderFromPayment(payment: Payment): NuveiTender {
+    // The CT Payment stores the browser uiMethod (card/blik/embedded), not the
+    // tender. "blik" is the only sale-based uiMethod today; everything else
+    // (including embedded-BLIK) resolves to the card tender for operations.
+    return payment.paymentMethodInfo?.method === "blik" ? "blik" : "card";
   }
 
   private rejectedModificationForUnsupportedOperation(
@@ -835,8 +838,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async capturePayment(
     request: CapturePaymentRequest,
   ): Promise<PaymentProviderModificationResponse> {
-    if (this.isBlikPayment(request.payment)) {
-      log.warn("Capture is not supported for BLIK payments.", {
+    if (
+      !getTenderStrategy(this.tenderFromPayment(request.payment)).supportedModifications.capture
+    ) {
+      log.warn("Capture is not supported for this tender.", {
         paymentId: request.payment.id,
       });
       return this.rejectedModificationForUnsupportedOperation(request.payment);
@@ -898,8 +903,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
   public async cancelPayment(
     request: CancelPaymentRequest,
   ): Promise<PaymentProviderModificationResponse> {
-    if (this.isBlikPayment(request.payment)) {
-      log.warn("Cancel is not supported for BLIK payments.", {
+    if (
+      !getTenderStrategy(this.tenderFromPayment(request.payment)).supportedModifications.cancel
+    ) {
+      log.warn("Cancel is not supported for this tender.", {
         paymentId: request.payment.id,
       });
       return this.rejectedModificationForUnsupportedOperation(request.payment);
@@ -965,8 +972,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
         request.payment,
         PaymentTransactions.CHARGE,
       );
-      if (this.isBlikPayment(request.payment) && !request.transactionId && !chargeInteractionId) {
-        log.warn("Refund is not supported for BLIK payments before a Charge transaction.", {
+      const tenderSupportsCapture = getTenderStrategy(
+        this.tenderFromPayment(request.payment),
+      ).supportedModifications.capture;
+      if (!tenderSupportsCapture && !request.transactionId && !chargeInteractionId) {
+        log.warn("Refund is not supported for this tender before a Charge transaction.", {
           paymentId: request.payment.id,
         });
         return this.rejectedModificationForUnsupportedOperation(request.payment);
@@ -1273,14 +1283,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
       const notificationUrl = this.getDmnNotificationUrl();
       const shopperDetails = this.cartShopperDetails(cart);
-      if (selection.tender === "blik") {
-        if (selection.surface === "simply-connect" && getConfig().simplyConnectPaymentMethod !== "blik") {
-          throw new PaymentSetupError(PublicPaymentErrorCode.METHOD_UNSUPPORTED, {
-            category: "blik_not_enabled",
-          });
-        }
-        this.validateBlikSessionPrerequisites(cart, amountPlanned, shopperDetails);
-      }
+      getTenderStrategy(selection.tender).validateSessionPrerequisites({
+        cart,
+        amountPlanned,
+        shopperDetails,
+        surface: selection.surface,
+      });
       const openOrderResponse = await nuveiClient().openOrder({
         amount: formattedAmount,
         currency: amountPlanned.currencyCode,
@@ -1475,38 +1483,6 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ...(address?.firstName && { firstName: address.firstName }),
       ...(address?.lastName && { lastName: address.lastName }),
     };
-  }
-
-  private validateBlikSessionPrerequisites(
-    cart: Cart,
-    amountPlanned: { currencyCode: string },
-    shopperDetails?: OpenOrderBillingAddress,
-  ): void {
-    if (amountPlanned.currencyCode !== "PLN") {
-      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
-        category: "blik_currency_invalid",
-      });
-    }
-
-    const countries = [cart.billingAddress?.country, cart.shippingAddress?.country].filter(
-      (country): country is string => typeof country === "string" && country.length > 0,
-    );
-    if (countries.length === 0 || countries.some((country) => country !== "PL")) {
-      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
-        category: "blik_country_invalid",
-      });
-    }
-
-    if (
-      shopperDetails?.country !== "PL" ||
-      !shopperDetails.email ||
-      !shopperDetails.firstName ||
-      !shopperDetails.lastName
-    ) {
-      throw new PaymentSetupError(PublicPaymentErrorCode.REQUEST_MALFORMED, {
-        category: "blik_shopper_identity_missing",
-      });
-    }
   }
 
   /**
