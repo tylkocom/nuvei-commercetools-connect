@@ -12,7 +12,6 @@ vi.mock("@commercetools/connect-payments-sdk", () => ({
 }));
 
 vi.mock("../../../src/services/nuvei-payment.service", () => ({
-  DmnChecksumInvalidError: class extends Error {},
   NuveiPaymentService: class {},
 }));
 

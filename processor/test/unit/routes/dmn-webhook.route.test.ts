@@ -27,11 +27,6 @@ vi.mock("../../../src/dtos/operations/payment-intents.dto", () => ({
 }));
 
 vi.mock("../../../src/services/nuvei-payment.service", () => ({
-  DmnChecksumInvalidError: class DmnChecksumInvalidError extends Error {
-    constructor() {
-      super("Invalid DMN checksum");
-    }
-  },
   NuveiPaymentService: class {},
 }));
 
@@ -40,7 +35,7 @@ vi.mock("../../../src/services/nuvei-payment.service", () => ({
 // ---------------------------------------------------------------------------
 
 import { nuveiWebhookRoutes } from "../../../src/routes/nuvei-payment.route";
-import { DmnChecksumInvalidError } from "../../../src/services/nuvei-payment.service";
+import { DmnChecksumInvalidError } from "../../../src/services/dmn-reconciler";
 import {
   dmnAuthOk,
   dmnAuthFail,

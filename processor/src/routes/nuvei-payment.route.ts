@@ -14,7 +14,7 @@ import type {
   PaymentConfirmResponseSchemaDTO,
 } from "../dtos/nuvei-payment.dto.js";
 import type { NuveiHeaderAuthHook } from "../libs/fastify/hooks/nuvei-header-auth.hook.js";
-import { DmnChecksumInvalidError } from "../services/nuvei-payment.service.js";
+import { DmnChecksumInvalidError } from "../services/dmn-reconciler.js";
 import type { NuveiPaymentService } from "../services/nuvei-payment.service.js";
 import { PaymentSetupError } from "../dtos/operations/payment-errors.dto.js";
 import { log } from "../libs/logger/index.js";
