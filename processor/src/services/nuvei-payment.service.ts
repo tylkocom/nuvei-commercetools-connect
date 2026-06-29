@@ -57,6 +57,15 @@ import {
   isPaymentTransaction,
   paymentHasInteraction,
 } from "./payment-state.js";
+import {
+  assertNuveiStatusMatchesPayment,
+  classifyNuveiStatus,
+  extractCanonicalPpp,
+  extractNuveiTransactionIdentities,
+  extractNuveiTerminalIdentity,
+  formatAmount,
+  parseAmountToCentAmount,
+} from "./nuvei-status.js";
 import { NuveiEventConverter } from "./converters/nuvei-event.converter.js";
 import type { NuveiDmnUpdateData } from "./converters/nuvei-event.converter.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
@@ -116,44 +125,8 @@ type PaymentSessionResponse = {
   countryCode?: string;
 };
 
-// ---------------------------------------------------------------------------
-// Nuvei terminal identity constants
-// Prefer PPP_TransactionID when Nuvei provides it, but getPaymentStatus can
-// return approved/rejected terminal status without PPP. In that case the lower
-// camel fiscal transactionId is the best terminal PSP identifier available.
-// If Nuvei omits every transaction identifier, fall back to the session token:
-// it is unique per openOrder and already bound to this CT Payment by interfaceId.
-// ---------------------------------------------------------------------------
-const PPP_TRANSACTION_ID_KEYS = [
-  "PPP_TransactionID",
-  "PPP_TransactionId",
-  "ppp_TransactionID",
-] as const;
-
-const FALLBACK_TRANSACTION_ID_KEYS = [
-  "transactionId",
-  "TransactionID",
-  "TransactionId",
-  "transactionID",
-] as const;
-
 const MAX_SESSION_BOUND_DMN_CANDIDATES = 3;
 const DMN_SESSION_VERIFICATION_TIMEOUT_MS = 3_000;
-
-type NuveiTerminalIdentitySource = "ppp" | "transactionId" | "sessionToken";
-
-type NuveiTerminalIdentity = {
-  interactionId: string;
-  pspReference: string;
-  source: NuveiTerminalIdentitySource;
-};
-
-function getNonEmptyString(body: Record<string, unknown>, key: string): string | undefined {
-  const value = body[key];
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
 
 function withAbortTimeout<T>(
   operation: (signal: AbortSignal) => Promise<T>,
@@ -174,66 +147,6 @@ function withAbortTimeout<T>(
   );
 }
 
-/** Extract the canonical Nuvei PPP transaction ID from a Nuvei status/DMN body. */
-function extractCanonicalPpp(body: Record<string, unknown>): string | undefined {
-  for (const key of PPP_TRANSACTION_ID_KEYS) {
-    const value = getNonEmptyString(body, key);
-    if (value) return value;
-  }
-  return undefined;
-}
-
-function extractNuveiTransactionIdentities(body: Record<string, unknown>): string[] {
-  const ids: string[] = [];
-  for (const key of [...PPP_TRANSACTION_ID_KEYS, ...FALLBACK_TRANSACTION_ID_KEYS]) {
-    const value = getNonEmptyString(body, key);
-    if (value && !ids.includes(value)) {
-      ids.push(value);
-    }
-  }
-  return ids;
-}
-
-function extractNuveiTerminalIdentity(
-  body: Record<string, unknown>,
-  sessionToken: string,
-): NuveiTerminalIdentity {
-  const ppp = extractCanonicalPpp(body);
-  if (ppp) {
-    return { interactionId: ppp, pspReference: ppp, source: "ppp" };
-  }
-
-  for (const key of FALLBACK_TRANSACTION_ID_KEYS) {
-    const transactionId = getNonEmptyString(body, key);
-    if (transactionId) {
-      return {
-        interactionId: transactionId,
-        pspReference: transactionId,
-        source: "transactionId",
-      };
-    }
-  }
-
-  return { interactionId: sessionToken, pspReference: sessionToken, source: "sessionToken" };
-}
-
-/**
- * Strict Nuvei status classifier (D-08):
- * - approved: status=SUCCESS AND transactionStatus=APPROVED
- * - rejected: status=SUCCESS AND transactionStatus in {DECLINED, ERROR}
- * - pending: everything else (unknown, missing, PENDING, UPDATE, cashier ERROR, etc.)
- */
-function classifyNuveiStatus(
-  status: unknown,
-  transactionStatus: unknown,
-): "approved" | "rejected" | "pending" {
-  if (status === "SUCCESS") {
-    if (transactionStatus === "APPROVED") return "approved";
-    if (transactionStatus === "DECLINED" || transactionStatus === "ERROR") return "rejected";
-  }
-  return "pending";
-}
-
 export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private nuveiEventConverter: NuveiEventConverter;
@@ -247,25 +160,6 @@ export class NuveiPaymentService extends AbstractPaymentService {
     });
     this.nuveiEventConverter = new NuveiEventConverter();
     this.ctCartClient = opts.ctCartClient;
-  }
-
-  private formatAmount(amount: {
-    centAmount: number;
-    currencyCode: string;
-    fractionDigits?: number;
-  }): string {
-    const fractionDigits =
-      amount.fractionDigits ?? this.getCurrencyFractionDigits(amount.currencyCode);
-    return (amount.centAmount / 10 ** fractionDigits).toFixed(fractionDigits);
-  }
-
-  private getCurrencyFractionDigits(currencyCode: string): number {
-    return (
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: currencyCode,
-      }).resolvedOptions().maximumFractionDigits ?? 2
-    );
   }
 
   private getTransactionInteractionId(
@@ -414,40 +308,6 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
   }
 
-  private assertNuveiStatusMatchesPayment(
-    statusBody: Record<string, unknown>,
-    payment: Payment,
-    cartId: string,
-    requireFinancialFields = false,
-  ): void {
-    const clientUniqueId = statusBody.clientUniqueId;
-    if (clientUniqueId !== undefined && String(clientUniqueId) !== cartId) {
-      throw new Error("Nuvei payment status does not match cart");
-    }
-
-    const currency = statusBody.currency;
-    if (requireFinancialFields && currency === undefined) {
-      throw new Error("Nuvei payment status is missing currency");
-    }
-    if (currency !== undefined && String(currency) !== payment.amountPlanned.currencyCode) {
-      throw new Error("Nuvei payment status currency does not match payment");
-    }
-
-    const amount = statusBody.amount;
-    if (requireFinancialFields && amount === undefined) {
-      throw new Error("Nuvei payment status is missing amount");
-    }
-    if (amount !== undefined) {
-      const statusCentAmount = this.parseAmountToCentAmount(
-        amount,
-        payment.amountPlanned.currencyCode,
-      );
-      if (statusCentAmount !== payment.amountPlanned.centAmount) {
-        throw new Error("Nuvei payment status amount does not match payment");
-      }
-    }
-  }
-
   private assertDmnMatchesConfig(body: Record<string, unknown>): void {
     const config = getConfig();
     const merchantId = body.merchant_id ?? body.merchantId;
@@ -540,21 +400,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     // confirmPayment validates against session context; DMNs validate against the signed DMN body.
-    this.assertNuveiStatusMatchesPayment(
-      statusBody as Record<string, unknown>,
-      payment,
-      String(dmnClientUniqueId),
-      true,
-    );
-  }
-
-  private parseAmountToCentAmount(amount: unknown, currencyCode: string): number {
-    const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount)) {
-      throw new Error("Invalid Nuvei amount");
-    }
-    const fractionDigits = this.getCurrencyFractionDigits(currencyCode);
-    return Math.round(parsedAmount * 10 ** fractionDigits);
+    assertNuveiStatusMatchesPayment(statusBody as Record<string, unknown>,
+    payment,
+    String(dmnClientUniqueId),
+    true,);
   }
 
   /**
@@ -741,7 +590,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         this.getTransactionInteractionId(request.payment, PaymentTransactions.AUTHORIZATION) ??
         (request.payment.interfaceId as string);
       const amount = request.amount;
-      const formattedAmount = this.formatAmount(amount);
+      const formattedAmount = formatAmount(amount);
       const currency = amount.currencyCode;
 
       log.info("Capturing payment via Nuvei settleTransaction.", {
@@ -806,7 +655,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         this.getTransactionInteractionId(request.payment, PaymentTransactions.AUTHORIZATION) ??
         (request.payment.interfaceId as string);
       const amount = request.payment.amountPlanned;
-      const formattedAmount = this.formatAmount(amount);
+      const formattedAmount = formatAmount(amount);
       const currency = amount.currencyCode;
 
       log.info("Canceling payment via Nuvei voidTransaction.", {
@@ -875,7 +724,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         chargeInteractionId ??
         (request.payment.interfaceId as string);
       const amount = request.amount;
-      const formattedAmount = this.formatAmount(amount);
+      const formattedAmount = formatAmount(amount);
       const currency = amount.currencyCode;
 
       log.info("Refunding payment via Nuvei refundTransaction.", {
@@ -1075,7 +924,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       const amountPlanned =
         transactionDraft.amount ?? (await this.ctCartService.getPaymentAmount({ cart }));
 
-      const formattedAmount = this.formatAmount(amountPlanned);
+      const formattedAmount = formatAmount(amountPlanned);
 
       log.info("Opening Nuvei order for transaction.", {
         cartId: cart.id,
@@ -1160,7 +1009,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
       lockedCartId = cart.id;
 
       const amountPlanned = await this.ctCartService.getPaymentAmount({ cart });
-      const formattedAmount = this.formatAmount(amountPlanned);
+      const formattedAmount = formatAmount(amountPlanned);
 
       log.info("Creating Nuvei payment session via openOrder.", {
         cartId: cart.id,
@@ -1279,7 +1128,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const outcome = classifyNuveiStatus(statusBody.status, statusBody.transactionStatus);
     const cartId = getCartIdFromContext();
     const requireFinancial = outcome === "approved";
-    this.assertNuveiStatusMatchesPayment(statusBody, ctPayment, cartId, requireFinancial);
+    assertNuveiStatusMatchesPayment(statusBody, ctPayment, cartId, requireFinancial);
 
     if (outcome === "pending") {
       log.info("Payment status is pending/inconclusive – no CT terminal write.", {
@@ -1444,7 +1293,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     }
 
     return {
-      centAmount: this.parseAmountToCentAmount(body.totalAmount, currencyCode),
+      centAmount: parseAmountToCentAmount(body.totalAmount, currencyCode),
       currencyCode,
     };
   }
@@ -1481,7 +1330,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         return false;
       }
 
-      this.assertNuveiStatusMatchesPayment(statusBody, payment, cartId, false);
+      assertNuveiStatusMatchesPayment(statusBody, payment, cartId, false);
       return true;
     } catch (error) {
       log.warn("Ignoring cart-linked Payment that did not verify as a Nuvei session.", {
