@@ -47,6 +47,16 @@ import type {
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
 import { getTenderStrategy } from "./tenders/index.js";
 import type { NuveiTender, NuveiIntegrationSurface } from "./tenders/index.js";
+import {
+  dmnHasNonTerminalPaymentTransaction,
+  dmnTerminalPaymentOutcome,
+  dmnTerminalTransactionAlreadyRecorded,
+  getConfirmTerminalTransactionType,
+  getExistingTerminalOutcome,
+  hasTerminalTransaction,
+  isPaymentTransaction,
+  paymentHasInteraction,
+} from "./payment-state.js";
 import { NuveiEventConverter } from "./converters/nuvei-event.converter.js";
 import type { NuveiDmnUpdateData } from "./converters/nuvei-event.converter.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
@@ -369,79 +379,6 @@ export class NuveiPaymentService extends AbstractPaymentService {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
-  private paymentHasInteraction(payment: Payment, interactionId: string): boolean {
-    return (
-      payment.interfaceId === interactionId ||
-      (payment.transactions ?? []).some((tx) => tx.interactionId === interactionId)
-    );
-  }
-
-  private transactionMatchesPlannedAmount(
-    payment: Payment,
-    transaction: Payment["transactions"][number],
-  ): boolean {
-    const amount = transaction.amount;
-    return (
-      amount !== undefined &&
-      amount.centAmount === payment.amountPlanned.centAmount &&
-      amount.currencyCode === payment.amountPlanned.currencyCode
-    );
-  }
-
-  private getExistingTerminalOutcome(
-    payment: Payment,
-  ): "approved" | "rejected" | undefined {
-    const transactions = payment.transactions ?? [];
-    const hasSuccessfulPayment = transactions.some(
-      (tx) =>
-        tx.state === "Success" &&
-        (tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE) &&
-        this.transactionMatchesPlannedAmount(payment, tx),
-    );
-
-    if (hasSuccessfulPayment) {
-      return "approved";
-    }
-
-    const hasFailedPayment = transactions.some(
-      (tx) =>
-        tx.state === "Failure" &&
-        (tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE) &&
-        this.transactionMatchesPlannedAmount(payment, tx),
-    );
-
-    return hasFailedPayment ? "rejected" : undefined;
-  }
-
-  private hasTerminalTransaction(
-    payment: Payment,
-    opts: {
-      type: string;
-      state: string;
-      interactionId?: string;
-      amount?: { centAmount: number; currencyCode: string };
-    },
-  ): boolean {
-    return (payment.transactions ?? []).some((tx) => {
-      if (tx.type !== opts.type || tx.state !== opts.state) return false;
-      if (opts.interactionId && tx.interactionId === opts.interactionId) return true;
-
-      const amount = opts.amount;
-      if (!amount || !tx.amount) return false;
-
-      return tx.amount.centAmount === amount.centAmount && tx.amount.currencyCode === amount.currencyCode;
-    });
-  }
-
-  private getConfirmTerminalTransactionType(
-    statusBody: Record<string, unknown>,
-  ): typeof PaymentTransactions.AUTHORIZATION | typeof PaymentTransactions.CHARGE {
-    const transactionType = statusBody.transactionType;
-    return transactionType === "Sale" || transactionType === "Settle"
-      ? PaymentTransactions.CHARGE
-      : PaymentTransactions.AUTHORIZATION;
-  }
-
   private tenderFromPayment(payment: Payment): NuveiTender {
     // The CT Payment stores the browser uiMethod (card/blik/embedded), not the
     // tender. "blik" is the only sale-based uiMethod today; everything else
@@ -458,60 +395,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
     };
   }
 
-  private isPaymentTransaction(
-    tx: NuveiDmnUpdateData["transactions"][number],
-  ): boolean {
-    return tx.type === PaymentTransactions.AUTHORIZATION || tx.type === PaymentTransactions.CHARGE;
-  }
-
-  private dmnTerminalTransactionAlreadyRecorded(
-    updateData: NuveiDmnUpdateData,
-    payment: Payment,
-  ): boolean {
-    return updateData.transactions.some((tx) => {
-      if (
-        tx.state !== "Success" &&
-        tx.state !== "Failure"
-      ) {
-        return false;
-      }
-
-      if (!this.isPaymentTransaction(tx)) {
-        return false;
-      }
-
-      // Match on PPP interactionId only — amount matching can produce false
-      // positives when two transactions share the same amount but different PPPs.
-      return this.hasTerminalTransaction(payment, {
-        type: tx.type,
-        state: tx.state,
-        interactionId: tx.interactionId,
-      });
-    });
-  }
-
-  private dmnTerminalPaymentOutcome(
-    updateData: NuveiDmnUpdateData,
-  ): "approved" | "rejected" | undefined {
-    const terminalPaymentTransaction = updateData.transactions.find(
-      (tx) => this.isPaymentTransaction(tx) && (tx.state === "Success" || tx.state === "Failure"),
-    );
-    if (!terminalPaymentTransaction) return undefined;
-    return terminalPaymentTransaction.state === "Success" ? "approved" : "rejected";
-  }
-
-  private dmnHasNonTerminalPaymentTransaction(updateData: NuveiDmnUpdateData): boolean {
-    return updateData.transactions.some(
-      (tx) => this.isPaymentTransaction(tx) && tx.state !== "Success" && tx.state !== "Failure",
-    );
-  }
-
   private async assertSessionPaymentAccess(
     paymentReference: string,
     sessionToken: string,
     payment: Payment,
   ): Promise<void> {
-    if (!this.paymentHasInteraction(payment, sessionToken)) {
+    if (!paymentHasInteraction(payment, sessionToken)) {
       throw new Error("Payment does not match Nuvei session token");
     }
 
@@ -608,7 +497,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     dmnBody: Record<string, unknown>,
   ): Promise<void> {
     const terminalPaymentTransaction = updateData.transactions.find(
-      (tx) => this.isPaymentTransaction(tx) && (tx.state === "Success" || tx.state === "Failure"),
+      (tx) => isPaymentTransaction(tx) && (tx.state === "Success" || tx.state === "Failure"),
     );
 
     if (!terminalPaymentTransaction) {
@@ -1373,7 +1262,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const ctPayment = await this.ctPaymentService.getPayment({ id: paymentReference });
     await this.assertSessionPaymentAccess(paymentReference, sessionToken, ctPayment);
 
-    const existingTerminalOutcome = this.getExistingTerminalOutcome(ctPayment);
+    const existingTerminalOutcome = getExistingTerminalOutcome(ctPayment);
     if (existingTerminalOutcome) {
       log.info(
         "CT terminal payment transaction already recorded – short-circuiting Nuvei status lookup.",
@@ -1404,8 +1293,8 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const terminalIdentity = extractNuveiTerminalIdentity(statusBody, sessionToken);
     const transactionState: "Success" | "Failure" = outcome === "approved" ? "Success" : "Failure";
 
-    const terminalTransactionType = this.getConfirmTerminalTransactionType(statusBody);
-    const alreadyRecorded = this.hasTerminalTransaction(ctPayment, {
+    const terminalTransactionType = getConfirmTerminalTransactionType(statusBody);
+    const alreadyRecorded = hasTerminalTransaction(ctPayment, {
       type: terminalTransactionType,
       state: transactionState,
       interactionId: terminalIdentity.interactionId,
@@ -1659,7 +1548,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   private getPaymentsWithExistingTerminalOutcome(payments: Payment[]): Payment[] {
-    return payments.filter((payment) => this.getExistingTerminalOutcome(payment) !== undefined);
+    return payments.filter((payment) => getExistingTerminalOutcome(payment) !== undefined);
   }
 
   private async resolveDmnPaymentFromCartId(
@@ -1930,7 +1819,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     );
     this.assertDmnUpdateMatchesPayment(updateData, ctPayment);
 
-    if (this.dmnHasNonTerminalPaymentTransaction(updateData)) {
+    if (dmnHasNonTerminalPaymentTransaction(updateData)) {
       log.info("Acknowledging non-terminal DMN without CT Payment update.", {
         paymentId,
         pspReference: updateData.pspReference,
@@ -1938,15 +1827,15 @@ export class NuveiPaymentService extends AbstractPaymentService {
       return;
     }
 
-    if (this.dmnTerminalTransactionAlreadyRecorded(updateData, ctPayment)) {
+    if (dmnTerminalTransactionAlreadyRecorded(updateData, ctPayment)) {
       log.info("DMN terminal transaction already recorded, skipping.", {
         paymentId,
         pspReference: updateData.pspReference,
       });
       return;
     }
-    const existingTerminalOutcome = this.getExistingTerminalOutcome(ctPayment);
-    const incomingTerminalOutcome = this.dmnTerminalPaymentOutcome(updateData);
+    const existingTerminalOutcome = getExistingTerminalOutcome(ctPayment);
+    const incomingTerminalOutcome = dmnTerminalPaymentOutcome(updateData);
     if (existingTerminalOutcome && incomingTerminalOutcome) {
       if (existingTerminalOutcome !== incomingTerminalOutcome) {
         log.warn("Ignoring conflicting terminal DMN for Payment with existing terminal outcome.", {
