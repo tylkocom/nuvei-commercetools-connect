@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Getting Started
 
 This guide gets the Nuvei commercetools Connector installed, validated, and running locally from a fresh checkout.

@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Nuvei commercetools Connector
 
 A private commercetools Connect payment Connector that integrates Nuvei payments with commercetools Checkout and custom storefronts.

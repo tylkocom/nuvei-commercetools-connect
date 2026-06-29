@@ -1,4 +1,3 @@
-<!-- generated-by: gsd-doc-writer -->
 # Testing Guide
 
 This repository has separate test suites for the browser enabler, the backend processor, and a local mocked commercetools harness for exercising connector flows without a real commercetools project.
