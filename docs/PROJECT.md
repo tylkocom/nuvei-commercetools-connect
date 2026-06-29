@@ -2,90 +2,70 @@
 
 ## What This Is
 
-A commercetools Connect payment connector that integrates Nuvei as a payment service provider for commercetools Checkout. The project contains a browser enabler that loads Nuvei Simply Connect/Web SDK components and a processor service that creates Nuvei sessions, updates commercetools Payments, handles Payment Intents operations, and reconciles final state through Nuvei DMN webhooks.
+A commercetools Connect payment connector that integrates Nuvei as a payment service provider for commercetools Checkout. The project contains a browser enabler that loads Nuvei Simply Connect / Web SDK components and a processor service that creates Nuvei sessions, confirms widget results, handles Payment Intents operations, and reconciles final state through Nuvei DMN webhooks.
 
-The current codebase is a working first-pass implementation, but the project is not production-ready until real sandbox E2E validation, DMN correlation, reconciliation correctness, security hardening, deployment repeatability, and CI quality gates are proven.
+The card payment baseline — Web SDK `card`, Web SDK `blik`, and Simply Connect `embedded` drop-in — is implemented, unit-tested, and verified through manual end-to-end testing against real Nuvei and commercetools sandboxes (Complete Checkout and Payment Only modes). Production rollout is the operator's manual deployment step and is out of scope for this repository's automation.
 
 ## Core Value
 
-Card-first Nuvei payments must reconcile correctly and safely between browser Checkout, Nuvei, and commercetools Payments without duplicate, missing, or misattributed transactions.
+Card-first Nuvei payments reconcile correctly and safely between browser Checkout, Nuvei, and commercetools Payments without duplicate, missing, or misattributed transactions.
 
 ## Requirements
 
 ### Validated
 
-- ✓ Processor and enabler packages exist with unit test suites and TypeScript builds — existing
-- ✓ Processor exposes payment, operation, and Nuvei webhook routes for the connector shape — existing
-- ✓ Enabler exposes card and embedded drop-in builders that call the processor and load Nuvei SDK — existing
-- ✓ Processor can call Nuvei openOrder/getPaymentStatus and map Nuvei DMN data to commercetools transaction concepts — existing
-- ✓ Capture, cancel authorization, and refund operations are implemented through Payment Intents route handlers — existing
+- ✓ Processor and enabler packages exist with unit test suites and TypeScript builds.
+- ✓ Processor exposes payment, operation, and Nuvei webhook routes for the connector shape.
+- ✓ Enabler exposes the Checkout-facing `card` and `blik` component builders plus the `embedded` drop-in, and fetches Nuvei config from the processor instead of requiring merchant config in the browser.
+- ✓ Processor calls Nuvei `openOrder`/`getPaymentStatus` and maps Nuvei DMN data to commercetools transaction concepts.
+- ✓ Capture, cancel authorization, refund, and reverse operations are implemented through Payment Intents route handlers.
+- ✓ Tri-state payment confirmation (`approved` / `rejected` / `pending`) with canonical Nuvei `PPP_TransactionID` identity for terminal Authorization records.
+- ✓ DMN processing is idempotent, rejects checksum-invalid / mismatched / duplicate / replayed events, and maps each valid event to exactly one commercetools Payment.
+- ✓ Session-authenticated payment creation is idempotent per cart/session via cart freezing before the Nuvei session is opened.
+- ✓ Card authorization, decline, 3DS (frictionless and step-up), capture, cancel, refund, duplicate-DMN, and mismatch-DMN flows verified against real Nuvei + commercetools sandboxes.
+- ✓ Checkout-facing enabler/processor contracts are explicit, validated, and aligned for all supported methods (parity-tested).
+- ✓ Package manager, build, and deployment documentation standardized on npm + `package-lock.json`.
+- ✓ DMN checksum policy is SHA-256 only (validated at startup; no MD5 path exists anywhere).
+- ✓ CI quality gates install, build, and test both packages and run `commercetools connect validate`.
+- ✓ Secret handling and log redaction use an allowlist; no secrets, checksums, session tokens, or PAN-adjacent values reach logs or browser callbacks.
 
 ### Active
 
-- [ ] Prove Nuvei sandbox DMN payload correlation for real authorization, decline, 3DS, capture, cancel, refund, duplicate, and mismatch events.
-- [ ] Harden DMN processing so events map to exactly one commercetools Payment, reject unsafe mismatches, and remain idempotent.
-- [ ] Add replay-safe DMN handling that treats checksum-valid unsigned fields as untrusted until revalidated against Nuvei/API/payment state.
-- [ ] Make session-authenticated payment creation idempotent per cart/session so retries cannot create unbounded Nuvei orders or CT Payments.
-- [ ] Make Checkout-facing enabler and processor contracts explicit, validated, and aligned for supported payment methods.
-- [ ] Replace hardcoded browser billing data with correct Checkout/session/cart/shopper-derived data or explicit validated enabler options.
-- [ ] Require allowlisted merchant return URLs and HTTPS processor URLs, with local HTTP allowed only in explicit development mode.
-- [ ] Improve frontend resilience for Nuvei SDK loading and delayed/inconclusive confirmation states.
-- [ ] Validate Complete Checkout and Payment Only flows end to end in a commercetools sandbox.
-- [ ] Standardize package manager/build/deployment documentation against the actual repository layout.
-- [ ] Resolve Nuvei DMN checksum algorithm policy to one public behavior and remove conflicting MD5/SHA-256 guidance.
-- [ ] Add CI quality gates for processor and enabler installs, builds, and tests.
-- [ ] Update public docs so readiness claims match observed sandbox and operational evidence.
+- _(none — card baseline is complete; see Out of Scope for deferred work)_
 
 ### Out of Scope
 
-- Nuvei wallet/APM expansion — defer until the card payment baseline is stable and reconciles correctly.
-- Production rollout — blocked until sandbox E2E, DMN correlation, and operational runbooks are complete.
-- Storing PAN or sensitive card data — the connector must rely on Nuvei and safe commercetools Payment metadata only.
-- Custom commercetools Types for payment metadata — current policy is to use native Payment fields exclusively.
+- Nuvei wallet/APM expansion — deferred until explicitly required; the shared registry allows adding methods without weakening card reconciliation.
+- Production rollout — operator-driven deployment; this repository never triggers commercetools Connect deployments.
+- Storing PAN or sensitive card data — the connector relies on Nuvei and safe native commercetools Payment metadata only.
+- Custom commercetools Types for payment metadata — native Payment fields are used exclusively.
 
 ## Context
 
-- The repository has two Connect applications: `enabler` as browser assets and `processor` as a backend service.
+- The repository has two Connect applications: `enabler` (browser assets) and `processor` (Fastify service), plus a local mock/evidence harness in `examples/nuvei-web-ui/`.
 - Nuvei is the source of truth for payment execution state. commercetools is the source of truth for carts, orders, and Payment records. DMN webhooks are the eventual-consistency mechanism for final state reconciliation.
-- Existing docs identify several production-critical gaps: real DMN correlation proof, webhook hardening, hardcoded billing data, SDK load retry behavior, overstated readiness docs, package manager documentation drift, missing CI, and overly binary browser confirmation handling.
-- A local testing harness now exists under `testing/` with an Express mock server and Postman collection to observe mock commercetools state and endpoint behavior while isolating Nuvei/processor interactions.
-- Current package layout uses separate `processor/package-lock.json` and `enabler/package-lock.json`; there is no root package manifest or pnpm lockfile in the current working tree.
+- The Checkout-facing `Enabler` adapter is the only Merchant Center entry point; it is template-compatible (one-argument constructor, Nuvei config fetched from `GET /operations/config`, promise-based lifecycle, template-shaped `onComplete`/`onError` callbacks).
+- Package layout: separate `processor/package-lock.json` and `enabler/package-lock.json`; no root workspace manifest. The project is npm-only (no pnpm/bun).
+- CI (`.github/workflows/connect-validate.yml`) gates both packages on install/build/test plus Connect descriptor validation.
 
 ## Constraints
 
-- **Reliability**: Payment state transitions must be idempotent and correctly correlated — duplicate or wrong-payment financial transactions are unacceptable.
-- **Security**: No secrets, checksums, session tokens, PANs, or raw sensitive payment data may be exposed to shoppers or stored/logged unsafely.
-- **Platform**: The connector must follow commercetools Connect payment integration expectations for enabler assets, processor routes, session auth, JWT/OAuth operation routes, and Payment Intents behavior.
-- **Nuvei**: Nuvei sandbox payloads and Web SDK behavior must be observed directly before production claims or reconciliation assumptions are accepted.
-- **Documentation**: Deployment and testing instructions must match the actual npm/package-lock repository layout unless the package strategy is intentionally changed.
-- **Scope**: Card-first Checkout correctness takes precedence over adding wallets, APMs, express payments, or stored payment methods.
+- **Reliability**: Payment state transitions are idempotent and correctly correlated — duplicate or wrong-payment financial transactions are unacceptable.
+- **Security**: No secrets, checksums, session tokens, PANs, or raw sensitive payment data are exposed to shoppers or stored/logged unsafely.
+- **Platform**: The connector follows commercetools Connect payment integration expectations for enabler assets, processor routes, session auth, JWT/OAuth operation routes, and Payment Intents behavior.
+- **Documentation**: Deployment and testing instructions match the actual npm/`package-lock.json` repository layout.
+- **Deployment**: All deployments are performed manually by the operator; this repository never triggers Connect deployments.
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Treat card-first reconciliation as the core project priority | Financial correctness matters more than breadth of payment methods | — Pending |
-| Use native commercetools Payment fields instead of Custom Types | Keeps the connector simpler and aligned with current architecture docs | — Pending |
-| Defer wallet/APM expansion until card baseline is proven | Method expansion would multiply unproven reconciliation and security paths | — Pending |
-| Use local mock commercetools testing before full Checkout E2E | Isolates Nuvei/processor behavior and gives full request/response visibility | — Pending |
-| Keep planning docs committed to git | User selected git tracking for planning artifacts | — Pending |
-
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+| Treat card-first reconciliation as the core priority | Financial correctness matters more than breadth of payment methods | Adopted |
+| Use native commercetools Payment fields instead of Custom Types | Keeps the connector simpler and aligned with the architecture | Adopted |
+| Defer wallet/APM expansion | Card baseline is proven; methods can be added via the shared registry when required | Adopted |
+| Use a local mock commercetools harness for development | Isolates Nuvei/processor behavior with full request/response visibility (`examples/nuvei-web-ui/`) | Adopted |
+| SHA-256 only for DMN checksums | Single, startup-validated policy; no MD5 path | Adopted |
+| `Enabler` is the only Checkout-facing adapter | Template-compatible entry point; provider specifics fetched from the processor | Adopted |
 
 ---
-*Last updated: 2026-06-02 after initialization*
+*Last updated: 2026-06-29*
