@@ -55,22 +55,11 @@ export function getExistingTerminalOutcome(
 
 export function hasTerminalTransaction(
   payment: Payment,
-  opts: {
-    type: string;
-    state: string;
-    interactionId?: string;
-    amount?: { centAmount: number; currencyCode: string };
-  },
+  opts: { type: string; state: string; interactionId: string },
 ): boolean {
-  return (payment.transactions ?? []).some((tx) => {
-    if (tx.type !== opts.type || tx.state !== opts.state) return false;
-    if (opts.interactionId && tx.interactionId === opts.interactionId) return true;
-
-    const amount = opts.amount;
-    if (!amount || !tx.amount) return false;
-
-    return tx.amount.centAmount === amount.centAmount && tx.amount.currencyCode === amount.currencyCode;
-  });
+  return (payment.transactions ?? []).some(
+    (tx) => tx.type === opts.type && tx.state === opts.state && tx.interactionId === opts.interactionId,
+  );
 }
 
 export function getConfirmTerminalTransactionType(
@@ -101,8 +90,11 @@ export function dmnTerminalTransactionAlreadyRecorded(
       return false;
     }
 
-    // Match on PPP interactionId only — amount matching can produce false
-    // positives when two transactions share the same amount but different PPPs.
+    if (!tx.interactionId) {
+      // No PSP identity to compare → cannot match a recorded terminal transaction.
+      return false;
+    }
+
     return hasTerminalTransaction(payment, {
       type: tx.type,
       state: tx.state,

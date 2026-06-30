@@ -208,20 +208,12 @@ function expectDmnUpdatePayloads(args: {
   transaction: Record<string, unknown>;
   interfaceCode: string;
 }) {
+  // Terminal transaction and paymentMethodInfo are applied in one atomic updatePayment call.
   expect(mockUpdatePayment).toHaveBeenNthCalledWith(1, {
     id: "payment-1",
     pspReference: args.pspReference,
     transaction: args.transaction,
-  });
-  expect(mockUpdatePayment).toHaveBeenNthCalledWith(2, {
-    id: "payment-1",
-    pspReference: args.pspReference,
-    paymentMethodInfo: { method: "Visa" },
-  });
-  expect(mockUpdatePayment).toHaveBeenNthCalledWith(3, {
-    id: "payment-1",
-    pspReference: args.pspReference,
-    paymentMethodInfo: { name: { en: "Credit Card" } },
+    paymentMethodInfo: { method: "Visa", name: { en: "Credit Card" } },
   });
   expect(mockConvertDmnToPaymentUpdate.mock.results[0]?.value).toEqual(
     expect.objectContaining({ interfaceCode: args.interfaceCode }),
@@ -1887,17 +1879,13 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       await service.processNuveiDmn(dmnAuthOk);
 
-      // Should call updatePayment for: transaction + paymentMethod + paymentMethodName
-      const calls = mockUpdatePayment.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-
-      const methodCall = calls.find((c: any[]) => c[0]?.paymentMethodInfo?.method === "Visa");
-      expect(methodCall).toBeDefined();
-
-      const nameCall = calls.find(
-        (c: any[]) => c[0]?.paymentMethodInfo?.name?.en === "Credit Card",
+      // Terminal transaction and paymentMethodInfo are applied in one atomic call.
+      expect(mockUpdatePayment).toHaveBeenCalledTimes(1);
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentMethodInfo: { method: "Visa", name: { en: "Credit Card" } },
+        }),
       );
-      expect(nameCall).toBeDefined();
     });
 
     it("does not update paymentMethod when absent from converter output", async () => {
@@ -1917,11 +1905,27 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       await service.processNuveiDmn(dmnAuthOk);
 
-      // Only the transaction update should be called, no paymentMethodInfo calls
-      const methodCall = mockUpdatePayment.mock.calls.find(
-        (c: any[]) => c[0]?.paymentMethodInfo?.method !== undefined,
+      // Single updatePayment carries only the transaction; no paymentMethodInfo key.
+      expect(mockUpdatePayment).toHaveBeenCalledTimes(1);
+      expect(mockUpdatePayment.mock.calls[0][0].paymentMethodInfo).toBeUndefined();
+    });
+  });
+
+  describe("transaction write", () => {
+    it("throws when the converter yields no transaction to write", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
       );
-      expect(methodCall).toBeUndefined();
+      mockConvertDmnToPaymentUpdate.mockReturnValue(defaultConverterReturn({ transactions: [] }));
+
+      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow(
+        "DMN update produced no transaction to write",
+      );
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
   });
 });

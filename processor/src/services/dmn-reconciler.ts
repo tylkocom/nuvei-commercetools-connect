@@ -180,11 +180,26 @@ export class NuveiDmnReconciler {
     }
     await this.assertDmnMatchesNuveiStatus(updateData, ctPayment, bodyForConversion);
 
-    for (const tx of updateData.transactions) {
+    const paymentMethodInfo: { method?: string; name?: { en: string } } = {
+      ...(updateData.paymentMethod && { method: updateData.paymentMethod }),
+      ...(updateData.paymentMethodName && { name: updateData.paymentMethodName }),
+    };
+    const hasPaymentMethodInfo = Object.keys(paymentMethodInfo).length > 0;
+
+    if (updateData.transactions.length === 0) {
+      throw new Error("DMN update produced no transaction to write");
+    }
+
+    // Apply the terminal transaction(s) and paymentMethodInfo in one atomic
+    // updatePayment so a retried DMN either records everything (caught by the
+    // already-recorded gate above) or nothing — no window where the terminal
+    // transaction exists but method/name is left unset.
+    for (const [index, transaction] of updateData.transactions.entries()) {
       await this.ctPaymentService.updatePayment({
         id: paymentId,
         pspReference: updateData.pspReference,
-        transaction: tx,
+        transaction,
+        ...(index === 0 && hasPaymentMethodInfo && { paymentMethodInfo }),
       });
     }
 
@@ -192,26 +207,6 @@ export class NuveiDmnReconciler {
       log.info("DMN interfaceCode determined.", {
         paymentId,
         interfaceCode: updateData.interfaceCode,
-      });
-    }
-
-    if (updateData.paymentMethod) {
-      await this.ctPaymentService.updatePayment({
-        id: paymentId,
-        pspReference: updateData.pspReference,
-        paymentMethodInfo: {
-          method: updateData.paymentMethod,
-        },
-      });
-    }
-
-    if (updateData.paymentMethodName) {
-      await this.ctPaymentService.updatePayment({
-        id: paymentId,
-        pspReference: updateData.pspReference,
-        paymentMethodInfo: {
-          name: updateData.paymentMethodName,
-        },
       });
     }
 
@@ -427,6 +422,16 @@ export class NuveiDmnReconciler {
     if (merchantSiteId !== undefined && String(merchantSiteId) !== config.nuveiMerchantSiteId) {
       throw new Error("DMN merchant_site_id does not match configured merchant site");
     }
+    if (merchantId === undefined && merchantSiteId === undefined) {
+      // The checksum is the real integrity gate (HMAC'd with the merchant
+      // secret), so a DMN omitting both merchant fields is not trusted on that
+      // basis alone. Surface it for monitoring: a DMN identifying no merchant
+      // is unusual and worth flagging even though it is not rejected here.
+      log.warn(
+        "DMN carries no merchant_id or merchant_site_id; merchant match skipped.",
+        this.getDmnLogFields(body),
+      );
+    }
   }
 
   private assertDmnUpdateMatchesPayment(
@@ -510,7 +515,7 @@ export class NuveiDmnReconciler {
 
     // confirmPayment validates against session context; DMNs validate against the signed DMN body.
     assertNuveiStatusMatchesPayment(
-      statusBody as unknown as Record<string, unknown>,
+      statusBody,
       payment,
       String(dmnClientUniqueId),
       true,
@@ -622,11 +627,11 @@ export class NuveiDmnReconciler {
 
     const sessionToken = payment.interfaceId as string;
     try {
-      const statusBody = (await withAbortTimeout(
+      const statusBody = await withAbortTimeout(
         (signal) => nuveiClient().getPaymentStatus({ sessionToken, signal }),
         DMN_SESSION_VERIFICATION_TIMEOUT_MS,
         "Nuvei session verification timed out",
-      )) as Record<string, unknown>;
+      );
 
       if (statusBody.sessionToken !== undefined && statusBody.sessionToken !== sessionToken) {
         return false;
