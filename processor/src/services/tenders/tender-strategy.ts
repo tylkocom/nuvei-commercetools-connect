@@ -31,8 +31,17 @@ export type TenderSessionContext = {
  * directly as a Charge and support neither.
  */
 export type TenderCapabilities = {
+  /** Supports capture against an existing Authorization. */
   capture: boolean;
+  /** Supports cancel/void against an existing Authorization. */
   cancel: boolean;
+  /**
+   * Whether a refund requires an existing terminal Charge transaction on the
+   * Payment before it is allowed. Auth-based tenders (card) refund against the
+   * session/interface id; sale-based tenders (blik) settle directly as a Charge
+   * and can only be refunded once that Charge exists.
+   */
+  refundRequiresExistingCharge: boolean;
 };
 
 /**

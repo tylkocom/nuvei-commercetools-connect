@@ -14,7 +14,11 @@ import type { NuveiTenderStrategy, TenderSessionContext } from "./tender-strateg
  */
 export class BlikTenderStrategy implements NuveiTenderStrategy {
   public readonly tender = "blik" as const;
-  public readonly supportedModifications = { capture: false, cancel: false };
+  public readonly supportedModifications = {
+    capture: false,
+    cancel: false,
+    refundRequiresExistingCharge: true,
+  };
 
   public validateSessionPrerequisites(ctx: TenderSessionContext): void {
     // BLIK rendered through the Simply Connect drop-in requires the processor

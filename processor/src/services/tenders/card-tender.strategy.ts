@@ -6,7 +6,11 @@ import type { NuveiTenderStrategy } from "./tender-strategy.js";
  */
 export class CardTenderStrategy implements NuveiTenderStrategy {
   public readonly tender = "card" as const;
-  public readonly supportedModifications = { capture: true, cancel: true };
+  public readonly supportedModifications = {
+    capture: true,
+    cancel: true,
+    refundRequiresExistingCharge: false,
+  };
 
   public validateSessionPrerequisites(): void {
     // Card has no tender-specific prerequisites.

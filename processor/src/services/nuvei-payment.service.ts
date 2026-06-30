@@ -244,9 +244,12 @@ export class NuveiPaymentService extends AbstractPaymentService {
   }
 
   private tenderFromPayment(payment: Payment): NuveiTender {
-    // The CT Payment stores the browser uiMethod (card/blik/embedded), not the
-    // tender. "blik" is the only sale-based uiMethod today; everything else
-    // (including embedded-BLIK) resolves to the card tender for operations.
+    // Resolve the processing tender from the stored payment method. Pre-DMN the
+    // method holds the browser uiMethod (card/blik/embedded); after the DMN
+    // reconciler runs it holds Nuvei's reported paymentMethod (e.g. "Visa",
+    // "blik"). Either way, only an explicit "blik" method is the sale-based
+    // tender — everything else (card, embedded, unknown) resolves to the
+    // auth-based card tender for modification operations.
     return payment.paymentMethodInfo?.method === "blik" ? "blik" : "card";
   }
 
@@ -582,11 +585,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
         request.payment,
         PaymentTransactions.CHARGE,
       );
-      const tenderSupportsCapture = getTenderStrategy(
-        this.tenderFromPayment(request.payment),
-      ).supportedModifications.capture;
-      if (!tenderSupportsCapture && !request.transactionId && !chargeInteractionId) {
-        log.warn("Refund is not supported for this tender before a Charge transaction.", {
+      const tenderStrategy = getTenderStrategy(this.tenderFromPayment(request.payment));
+      if (
+        tenderStrategy.supportedModifications.refundRequiresExistingCharge &&
+        !request.transactionId &&
+        !chargeInteractionId
+      ) {
+        log.warn("Refund requires an existing Charge transaction for this tender.", {
           paymentId: request.payment.id,
         });
         return this.rejectedModificationForUnsupportedOperation(request.payment);
