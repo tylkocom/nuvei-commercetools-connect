@@ -4,8 +4,7 @@ import {
   mapNuveiDmnTransactionState,
   getStatusInterfaceCode,
 } from "../payment-converter.js";
-
-const currencyFractionDigitsCache = new Map<string, number>();
+import { scaleToCentAmount } from "../money.js";
 
 export interface NuveiDmnUpdateData {
   id: string;
@@ -49,38 +48,12 @@ function getOptionalString(body: Record<string, unknown>, key: string): string |
   return undefined;
 }
 
-function getCurrencyFractionDigits(currencyCode: string): number {
-  const cached = currencyFractionDigitsCache.get(currencyCode);
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  try {
-    const fractionDigits = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode,
-    }).resolvedOptions().maximumFractionDigits;
-
-    if (fractionDigits === undefined) {
-      throw new Error(`Unsupported currency in DMN: ${currencyCode}`);
-    }
-
-    currencyFractionDigitsCache.set(currencyCode, fractionDigits);
-    return fractionDigits;
-  } catch (error) {
-    if (error instanceof RangeError) {
-      throw new Error(`Unsupported currency in DMN: ${currencyCode}`);
-    }
-    throw error;
-  }
-}
-
 function parseCentAmount(amount: unknown, currencyCode: string): number {
   const parsedAmount = Number(amount);
   if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
     throw new Error("Invalid totalAmount in DMN");
   }
-  return Math.round(parsedAmount * 10 ** getCurrencyFractionDigits(currencyCode));
+  return scaleToCentAmount(parsedAmount, currencyCode);
 }
 
 function isBlikPaymentMethod(paymentMethod: string | undefined): boolean {

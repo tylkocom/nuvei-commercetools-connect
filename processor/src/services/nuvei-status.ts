@@ -1,4 +1,5 @@
 import type { Payment } from "@commercetools/platform-sdk";
+import { getCurrencyFractionDigits, scaleToCentAmount } from "./money.js";
 
 /**
  * Pure Nuvei response/status parsing and validation helpers shared by payment
@@ -107,15 +108,6 @@ export function classifyNuveiStatus(
 // Amount parsing/formatting
 // ---------------------------------------------------------------------------
 
-export function getCurrencyFractionDigits(currencyCode: string): number {
-  return (
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode,
-    }).resolvedOptions().maximumFractionDigits ?? 2
-  );
-}
-
 export function formatAmount(amount: {
   centAmount: number;
   currencyCode: string;
@@ -130,16 +122,23 @@ export function parseAmountToCentAmount(amount: unknown, currencyCode: string): 
   if (!Number.isFinite(parsedAmount)) {
     throw new Error("Invalid Nuvei amount");
   }
-  const fractionDigits = getCurrencyFractionDigits(currencyCode);
-  return Math.round(parsedAmount * 10 ** fractionDigits);
+  return scaleToCentAmount(parsedAmount, currencyCode);
 }
 
 // ---------------------------------------------------------------------------
 // Status/payment assertion
 // ---------------------------------------------------------------------------
 
+/** Minimal structural slice of a Nuvei status body that the assertion reads.
+ * Accepts a typed PaymentStatusResponse or any looser record with these fields. */
+type NuveiStatusAmountBody = {
+  clientUniqueId?: unknown;
+  currency?: unknown;
+  amount?: unknown;
+};
+
 export function assertNuveiStatusMatchesPayment(
-  statusBody: Record<string, unknown>,
+  statusBody: NuveiStatusAmountBody,
   payment: Payment,
   cartId: string,
   requireFinancialFields = false,

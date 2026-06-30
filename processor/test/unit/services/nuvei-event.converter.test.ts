@@ -158,7 +158,7 @@ describe("NuveiEventConverter", () => {
         ...baseDmn,
         currency: "UNKNOWN",
       }),
-    ).toThrow("Unsupported currency in DMN: UNKNOWN");
+    ).toThrow("Unsupported currency: UNKNOWN");
   });
 
   it("rejects non-numeric totalAmount values", () => {
