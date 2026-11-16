@@ -40,6 +40,10 @@ class FakeElement {
   public className = "";
   public id = "";
   public hidden = false;
+  public value = "";
+  public type = "";
+  public required = false;
+  public maxLength = -1;
 
   constructor(public readonly tagName: string) {}
 
@@ -73,6 +77,13 @@ function stubDocument() {
     return originalAppend(child);
   };
   return { container };
+}
+
+function fillCardHolderName(container: FakeElement, value: string): void {
+  const root = container.children[0];
+  const input = root.children.find((child) => child.tagName === "input");
+  if (!input) throw new Error("cardholder name input not rendered");
+  input.value = value;
 }
 
 describe("WebSdkCardBuilder", () => {
@@ -110,7 +121,7 @@ describe("WebSdkCardComponent", () => {
   });
 
   it("mount() creates a card field and submit() confirms using res.result", async () => {
-    stubDocument();
+    const { container } = stubDocument();
     const attach = vi.fn();
     const cardField = { attach };
     const create = vi.fn().mockReturnValue(cardField);
@@ -137,6 +148,8 @@ describe("WebSdkCardComponent", () => {
 
     expect(mockLoadWebSdk).toHaveBeenCalled();
     expect(attach).toHaveBeenCalled();
+    await expect(component.isValid()).resolves.toBe(false);
+    fillCardHolderName(container, "  Jane Shopper  ");
     await expect(component.isValid()).resolves.toBe(true);
 
     await component.submit();
@@ -156,6 +169,7 @@ describe("WebSdkCardComponent", () => {
       merchantUniqueId: "payment-ref-1",
       merchantUniqueID: "payment-ref-1",
       paymentOption: cardField,
+      cardHolderName: "Jane Shopper",
     });
     // Without a shopper email the payload must NOT carry a billingAddress: an
     // explicit one replaces the processor's openOrder pre-fill at the gateway
@@ -172,8 +186,38 @@ describe("WebSdkCardComponent", () => {
     );
   });
 
+  it("blocks submission and shows an error when the cardholder name is empty", async () => {
+    const { container } = stubDocument();
+    const onPayButtonClick = vi.fn();
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
+      createPayment: vi.fn(),
+    };
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "USD",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const component = new WebSdkCardBuilder(makeEnablerOptions()).build({
+      showPayButton: true,
+      onPayButtonClick,
+    });
+    await component.mount("#container");
+    fillCardHolderName(container, "   ");
+
+    await expect(component.submit()).rejects.toThrow("Enter the name shown on the card.");
+    expect(sfc.createPayment).not.toHaveBeenCalled();
+    expect(onPayButtonClick).not.toHaveBeenCalled();
+    const error = container.children[0].children.find((c) => c.className === "nuvei-card__error");
+    expect(error?.hidden).toBe(false);
+  });
+
   it("attaches billingAddress when a shopper email is provided", async () => {
-    stubDocument();
+    const { container } = stubDocument();
     const attach = vi.fn();
     const create = vi.fn().mockReturnValue({ attach });
     const sfc = {
@@ -197,6 +241,7 @@ describe("WebSdkCardComponent", () => {
     );
     const component = builder.build({ showPayButton: true });
     await component.mount("#container");
+    fillCardHolderName(container, "Jane Shopper");
     await component.submit();
 
     expect(sfc.createPayment).toHaveBeenCalledWith(
@@ -208,7 +253,7 @@ describe("WebSdkCardComponent", () => {
   });
 
   it("calls onError for Web SDK ERROR without confirmation polling", async () => {
-    stubDocument();
+    const { container } = stubDocument();
     const onError = vi.fn();
     const sfc = {
       fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
@@ -228,6 +273,7 @@ describe("WebSdkCardComponent", () => {
     const builder = new WebSdkCardBuilder(makeEnablerOptions({ onError }));
     const component = builder.build({ showPayButton: true });
     await component.mount("#container");
+    fillCardHolderName(container, "Jane Shopper");
     await component.submit();
 
     expect(onError).toHaveBeenCalledWith(expect.any(Error), { paymentReference: "payment-ref-1" });
@@ -236,7 +282,7 @@ describe("WebSdkCardComponent", () => {
   });
 
   it("calls failed onComplete for Web SDK cancellation without confirmation polling", async () => {
-    stubDocument();
+    const { container } = stubDocument();
     const onComplete = vi.fn();
     const sfc = {
       fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
@@ -256,6 +302,7 @@ describe("WebSdkCardComponent", () => {
     const builder = new WebSdkCardBuilder(makeEnablerOptions({ onComplete }));
     const component = builder.build({ showPayButton: true });
     await component.mount("#container");
+    fillCardHolderName(container, "Jane Shopper");
     await component.submit();
 
     expect(onComplete).toHaveBeenCalledWith({ isSuccess: false, paymentReference: "payment-ref-1" });
@@ -263,7 +310,7 @@ describe("WebSdkCardComponent", () => {
   });
 
   it("routes declined Web SDK results through confirmation failure callback", async () => {
-    stubDocument();
+    const { container } = stubDocument();
     const onComplete = vi.fn();
     mockConfirmPaymentResult.mockImplementation((paymentReference, _sessionToken, _api, callback) => {
       callback?.({ isSuccess: false, paymentReference });
@@ -286,6 +333,7 @@ describe("WebSdkCardComponent", () => {
     const builder = new WebSdkCardBuilder(makeEnablerOptions({ onComplete }));
     const component = builder.build({ showPayButton: true });
     await component.mount("#container");
+    fillCardHolderName(container, "Jane Shopper");
     await component.submit();
 
     expect(mockConfirmPaymentResult).toHaveBeenCalledWith(

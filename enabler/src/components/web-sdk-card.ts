@@ -31,6 +31,7 @@ class WebSdkCardComponent implements PaymentComponent {
   private sfc: SafeChargeInstance | undefined;
   private scard: SafeChargeCardField | undefined;
   private fieldShell: HTMLElement | undefined;
+  private nameInput: HTMLInputElement | undefined;
   private errorElement: HTMLElement | undefined;
   private sessionToken = "";
   private paymentReference = "";
@@ -67,6 +68,14 @@ class WebSdkCardComponent implements PaymentComponent {
       throw new Error("WebSdkCardComponent: not mounted yet");
     }
 
+    // Hosted Nuvei Fields collect only number/expiry/CVV; the cardholder name
+    // must be sent explicitly so the managed 3DS flow carries it. Never log it.
+    const cardHolderName = this.cardHolderName();
+    if (!cardHolderName) {
+      this.showError(CARDHOLDER_NAME_REQUIRED_MESSAGE);
+      throw new Error(CARDHOLDER_NAME_REQUIRED_MESSAGE);
+    }
+
     const clickOptions = await this.componentOptions.onPayButtonClick?.();
     const storePaymentDetails = clickOptions?.storePaymentDetails ?? options.storePaymentDetails;
 
@@ -77,12 +86,13 @@ class WebSdkCardComponent implements PaymentComponent {
         merchant_unique_id: this.paymentReference,
         merchantUniqueId: this.paymentReference,
         merchantUniqueID: this.paymentReference,
+        cardHolderName,
         paymentOption: this.scard,
-        // Only attach billingAddress when we actually hold shopper data: an
-        // explicit billingAddress REPLACES the openOrder pre-fill wholesale
-        // at the gateway, and one without an email trips the mandatory-field
-        // rules (gateway error 1136). The processor pre-fills shopper details
-        // on the order from the cart, so omitting it here is the safe default.
+        // Only attach billingAddress when we actually hold shopper data: one
+        // without an email trips the mandatory-field rules (gateway error 1136).
+        // When the cart already supplies email + country, the processor sends
+        // openOrder `preventOverride`, so this block cannot wipe the cart's
+        // first/last name; otherwise it fills the missing email.
         ...(this.baseOptions.shopperEmail && {
           billingAddress: {
             email: this.baseOptions.shopperEmail,
@@ -98,7 +108,17 @@ class WebSdkCardComponent implements PaymentComponent {
   }
 
   async isValid(): Promise<boolean> {
-    return !!this.scard;
+    return !!this.scard && !!this.cardHolderName();
+  }
+
+  private cardHolderName(): string {
+    return (this.nameInput?.value ?? "").trim().slice(0, CARDHOLDER_NAME_MAX_LENGTH);
+  }
+
+  private showError(message: string): void {
+    if (!this.errorElement) return;
+    this.errorElement.textContent = message;
+    this.errorElement.hidden = false;
   }
 
   async getState(): Promise<PaymentComponentState> {
@@ -149,11 +169,26 @@ class WebSdkCardComponent implements PaymentComponent {
     const root = document.createElement("div");
     root.className = "nuvei-card";
 
+    const nameLabel = document.createElement("label");
+    nameLabel.className = "nuvei-card__label";
+    nameLabel.setAttribute("for", CARDHOLDER_NAME_INPUT_ID);
+    nameLabel.textContent = "Name on card";
+    root.appendChild(nameLabel);
+
+    const nameInput = document.createElement("input");
+    nameInput.id = CARDHOLDER_NAME_INPUT_ID;
+    nameInput.className = "nuvei-card__input";
+    nameInput.type = "text";
+    nameInput.required = true;
+    nameInput.maxLength = CARDHOLDER_NAME_MAX_LENGTH;
+    nameInput.setAttribute("autocomplete", "cc-name");
+    nameInput.setAttribute("spellcheck", "false");
+    root.appendChild(nameInput);
+
     const label = document.createElement("label");
     label.className = "nuvei-card__label";
     label.textContent = "Card details";
     root.appendChild(label);
-
     const fieldShell = document.createElement("div");
     fieldShell.className = "nuvei-card__field";
     root.appendChild(fieldShell);
@@ -171,6 +206,7 @@ class WebSdkCardComponent implements PaymentComponent {
 
     container.replaceChildren(root);
     this.fieldShell = fieldShell;
+    this.nameInput = nameInput;
     this.errorElement = error;
   }
 
@@ -241,6 +277,10 @@ const CARD_FIELD_STYLE: SafeChargeFieldStyle = {
 };
 
 const CARD_STYLE_ID = "nuvei-card-styles";
+const CARDHOLDER_NAME_INPUT_ID = "nuvei-card-holder-name";
+// Nuvei cardHolderName limit.
+const CARDHOLDER_NAME_MAX_LENGTH = 70;
+const CARDHOLDER_NAME_REQUIRED_MESSAGE = "Enter the name shown on the card.";
 
 const CARD_STYLES = `
 .nuvei-card {
@@ -275,6 +315,20 @@ const CARD_STYLES = `
   border-radius: var(--nuvei-card-radius);
   background: var(--nuvei-card-surface);
   transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.nuvei-card__input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--nuvei-card-border);
+  border-radius: var(--nuvei-card-radius);
+  background: var(--nuvei-card-surface);
+  color: inherit;
+  font: inherit;
+}
+.nuvei-card__input:focus {
+  outline: none;
+  border-color: var(--nuvei-card-focus);
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.20);
 }
 .nuvei-card__field iframe {
   display: block;
