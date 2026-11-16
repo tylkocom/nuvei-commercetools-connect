@@ -841,6 +841,7 @@ describe("NuveiPaymentService", () => {
         expect.objectContaining({
           billingAddress: expectedDetails,
           userDetails: expectedDetails,
+          preventOverride: "1",
         }),
       );
     });
@@ -856,6 +857,10 @@ describe("NuveiPaymentService", () => {
         expect.objectContaining({
           billingAddress: { email: "shopper@example.com" },
         }),
+      );
+      // Incomplete cart data (no country) must stay overridable by the browser.
+      expect(mockNuveiClientInstance.openOrder.mock.calls[0][0]).not.toHaveProperty(
+        "preventOverride",
       );
     });
 

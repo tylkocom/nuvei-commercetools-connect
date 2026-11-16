@@ -43,6 +43,7 @@ import { nuveiClient } from "../clients/nuvei.client.js";
 import type {
   NuveiTransactionResponse,
   OpenOrderBillingAddress,
+  OpenOrderParams,
 } from "../clients/nuvei.client.js";
 import { CtPaymentCreationService } from "./ct-payment-creation.service.js";
 import { getTenderStrategy } from "./tenders/index.js";
@@ -816,7 +817,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
         ...(notificationUrl && { urlDetails: { notificationUrl } }),
-        ...(shopperDetails && { billingAddress: shopperDetails, userDetails: shopperDetails }),
+        ...this.openOrderShopperFields(shopperDetails),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -909,7 +910,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         currency: amountPlanned.currencyCode,
         clientUniqueId: cart.id,
         ...(notificationUrl && { urlDetails: { notificationUrl } }),
-        ...(shopperDetails && { billingAddress: shopperDetails, userDetails: shopperDetails }),
+        ...this.openOrderShopperFields(shopperDetails),
       });
 
       const sessionToken = openOrderResponse.sessionToken;
@@ -1067,6 +1068,24 @@ export class NuveiPaymentService extends AbstractPaymentService {
     const serviceUrl = getConfig().serviceUrl;
     if (!serviceUrl) return undefined;
     return `${serviceUrl.replace(/\/+$/, "")}/webhooks/nuvei`;
+  }
+
+  /**
+   * openOrder shopper blocks. When the cart supplies both mandatory fields
+   * (email + country), `preventOverride` locks them so a browser-side
+   * billingAddress (Web SDK / Simply Connect) cannot replace the block and drop
+   * the cart's first/last name. Incomplete cart data stays overridable so the
+   * browser can still supply the missing email (gateway error 1136).
+   */
+  private openOrderShopperFields(
+    shopperDetails: OpenOrderBillingAddress | undefined,
+  ): Pick<OpenOrderParams, "billingAddress" | "userDetails" | "preventOverride"> {
+    if (!shopperDetails) return {};
+    return {
+      billingAddress: shopperDetails,
+      userDetails: shopperDetails,
+      ...(shopperDetails.email && shopperDetails.country && { preventOverride: "1" as const }),
+    };
   }
 
   /**

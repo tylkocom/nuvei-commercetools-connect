@@ -29,6 +29,11 @@ export interface OpenOrderParams {
    */
   billingAddress?: OpenOrderBillingAddress;
   userDetails?: OpenOrderBillingAddress;
+  /**
+   * "1" stops later createPayment/checkout requests from overwriting the
+   * userDetails/billingAddress blocks set here.
+   */
+  preventOverride?: "1";
 }
 
 export interface OpenOrderResult {
