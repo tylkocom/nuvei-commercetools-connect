@@ -72,8 +72,9 @@ class WebSdkCardComponent implements PaymentComponent {
     // must be sent explicitly so the managed 3DS flow carries it. Never log it.
     const cardHolderName = this.cardHolderName();
     if (!cardHolderName) {
-      this.showError(CARDHOLDER_NAME_REQUIRED_MESSAGE);
-      throw new Error(CARDHOLDER_NAME_REQUIRED_MESSAGE);
+      const message = cardCopyFor(this.baseOptions.locale).nameRequired;
+      this.showError(message);
+      throw new Error(message);
     }
 
     const clickOptions = await this.componentOptions.onPayButtonClick?.();
@@ -165,6 +166,7 @@ class WebSdkCardComponent implements PaymentComponent {
 
   private renderShell(container: Element): void {
     ensureCardStyles();
+    const copy = cardCopyFor(this.baseOptions.locale);
 
     const root = document.createElement("div");
     root.className = "nuvei-card";
@@ -172,7 +174,7 @@ class WebSdkCardComponent implements PaymentComponent {
     const nameLabel = document.createElement("label");
     nameLabel.className = "nuvei-card__label";
     nameLabel.setAttribute("for", CARDHOLDER_NAME_INPUT_ID);
-    nameLabel.textContent = "Name on card";
+    nameLabel.textContent = copy.nameLabel;
     root.appendChild(nameLabel);
 
     const nameInput = document.createElement("input");
@@ -187,7 +189,7 @@ class WebSdkCardComponent implements PaymentComponent {
 
     const label = document.createElement("label");
     label.className = "nuvei-card__label";
-    label.textContent = "Card details";
+    label.textContent = copy.cardLabel;
     root.appendChild(label);
     const fieldShell = document.createElement("div");
     fieldShell.className = "nuvei-card__field";
@@ -195,7 +197,7 @@ class WebSdkCardComponent implements PaymentComponent {
 
     const help = document.createElement("p");
     help.className = "nuvei-card__help";
-    help.textContent = "Card number, expiry, and security code.";
+    help.textContent = copy.cardHelp;
     root.appendChild(help);
 
     const error = document.createElement("p");
@@ -280,7 +282,33 @@ const CARD_STYLE_ID = "nuvei-card-styles";
 const CARDHOLDER_NAME_INPUT_ID = "nuvei-card-holder-name";
 // Nuvei cardHolderName limit.
 const CARDHOLDER_NAME_MAX_LENGTH = 70;
-const CARDHOLDER_NAME_REQUIRED_MESSAGE = "Enter the name shown on the card.";
+
+type CardCopy = {
+  nameLabel: string;
+  nameRequired: string;
+  cardLabel: string;
+  cardHelp: string;
+};
+
+const CARD_COPY: Record<"en" | "pl", CardCopy> = {
+  en: {
+    nameLabel: "Name on card",
+    nameRequired: "Enter the name shown on the card.",
+    cardLabel: "Card details",
+    cardHelp: "Card number, expiry, and security code.",
+  },
+  pl: {
+    nameLabel: "Imię i nazwisko na karcie",
+    nameRequired: "Podaj imię i nazwisko widoczne na karcie.",
+    cardLabel: "Dane karty",
+    cardHelp: "Numer karty, data ważności i kod bezpieczeństwa.",
+  },
+};
+
+/** Picks UI copy from the Checkout locale (`pl`, `pl-PL`, ...); defaults to English. */
+function cardCopyFor(locale: string | undefined): CardCopy {
+  return locale?.toLowerCase().startsWith("pl") ? CARD_COPY.pl : CARD_COPY.en;
+}
 
 const CARD_STYLES = `
 .nuvei-card {
