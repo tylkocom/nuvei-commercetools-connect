@@ -41,7 +41,11 @@ export const getCtSessionIdFromContext = (): string => {
 
 export const getCartIdFromContext = (): string => {
   const authentication = getRequestContext().authentication as SessionAuthentication;
-  return authentication?.getPrincipal().cartId;
+  const cartId = authentication?.getPrincipal().cartId;
+  if (!cartId) {
+    throw new Error("Session is not bound to a cart");
+  }
+  return cartId;
 };
 
 export const getAllowedPaymentMethodsFromContext = (): string[] => {
