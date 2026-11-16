@@ -216,6 +216,35 @@ describe("WebSdkCardComponent", () => {
     expect(error?.hidden).toBe(false);
   });
 
+  it("renders Polish copy and error when the locale is pl-PL", async () => {
+    const { container } = stubDocument();
+    const sfc = {
+      fields: vi.fn().mockReturnValue({ create: vi.fn().mockReturnValue({ attach: vi.fn() }) }),
+      createPayment: vi.fn(),
+    };
+    mockCreatePayment.mockResolvedValue({
+      cartId: "cart-1",
+      sessionToken: "session-token-1",
+      paymentReference: "payment-ref-1",
+      amount: "10.00",
+      currency: "PLN",
+    });
+    mockLoadWebSdk.mockResolvedValue(sfc);
+
+    const component = new WebSdkCardBuilder(makeEnablerOptions({ locale: "pl-PL" })).build({
+      showPayButton: true,
+    });
+    await component.mount("#container");
+
+    const root = container.children[0];
+    const labels = root.children.filter((c) => c.tagName === "label").map((c) => c.textContent);
+    expect(labels).toEqual(["Imię i nazwisko na karcie", "Dane karty"]);
+
+    fillCardHolderName(container, "  ");
+    await expect(component.submit()).rejects.toThrow("Podaj imię i nazwisko widoczne na karcie.");
+    expect(sfc.createPayment).not.toHaveBeenCalled();
+  });
+
   it("attaches billingAddress when a shopper email is provided", async () => {
     const { container } = stubDocument();
     const attach = vi.fn();
