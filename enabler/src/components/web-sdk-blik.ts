@@ -20,6 +20,33 @@ const BLIK_PAYMENT_METHOD = "apmgw_BLIK" as const;
 const BLIK_CURRENCY = "PLN";
 const BLIK_COUNTRY = "PL";
 
+type BlikCopy = {
+  codeLabel: string;
+  codeHelp: string;
+  codeInvalid: string;
+  confirmInBankApp: string;
+};
+
+const BLIK_COPY: Record<"en" | "pl", BlikCopy> = {
+  en: {
+    codeLabel: "BLIK code",
+    codeHelp: "Enter the 6-digit BLIK code from your bank app.",
+    codeInvalid: "Enter a 6-digit BLIK code.",
+    confirmInBankApp: "Confirm the payment in your bank’s app.",
+  },
+  pl: {
+    codeLabel: "Kod BLIK",
+    codeHelp: "Wpisz 6-cyfrowy kod BLIK z aplikacji bankowej.",
+    codeInvalid: "Wpisz 6-cyfrowy kod BLIK.",
+    confirmInBankApp: "Potwierdź płatność w aplikacji swojego banku.",
+  },
+};
+
+/** Picks UI copy from the Checkout locale (`pl`, `pl-PL`, ...); defaults to English. */
+function blikCopyFor(locale: string | undefined): BlikCopy {
+  return locale?.toLowerCase().startsWith("pl") ? BLIK_COPY.pl : BLIK_COPY.en;
+}
+
 type BlikAvailability = {
   available: boolean;
   apm?: SafeChargeApm;
@@ -83,11 +110,11 @@ class WebSdkBlikComponent implements PaymentComponent {
     const blikCode = this.readCodeFromInput();
     if (blikCode.length !== 6) {
       await this.showValidation();
-      throw new Error("Enter a 6-digit BLIK code.");
+      throw new Error(this.copy().codeInvalid);
     }
 
     this.hideValidation();
-    this.setStatus("Confirm the payment in your bank’s app.");
+    this.setStatus(this.copy().confirmInBankApp);
 
     try {
       this.sfc.createPayment(
@@ -233,7 +260,7 @@ class WebSdkBlikComponent implements PaymentComponent {
     const label = document.createElement("label");
     label.className = "nuvei-blik__label";
     label.htmlFor = "nuvei-blik-code";
-    label.textContent = "BLIK code";
+    label.textContent = this.copy().codeLabel;
     root.appendChild(label);
 
     const input = document.createElement("input");
@@ -256,7 +283,7 @@ class WebSdkBlikComponent implements PaymentComponent {
     const help = document.createElement("p");
     help.className = "nuvei-blik__help";
     help.id = "nuvei-blik-help";
-    help.textContent = "Enter the 6-digit BLIK code from your bank app.";
+    help.textContent = this.copy().codeHelp;
     root.appendChild(help);
 
     const error = document.createElement("p");
@@ -264,7 +291,7 @@ class WebSdkBlikComponent implements PaymentComponent {
     error.id = "nuvei-blik-error";
     error.setAttribute("role", "alert");
     error.hidden = true;
-    error.textContent = "Enter a 6-digit BLIK code.";
+    error.textContent = this.copy().codeInvalid;
     root.appendChild(error);
 
     const status = document.createElement("p");
@@ -334,6 +361,10 @@ class WebSdkBlikComponent implements PaymentComponent {
       this.baseOptions.onError,
       this.baseOptions.onPending,
     );
+  }
+
+  private copy(): BlikCopy {
+    return blikCopyFor(this.baseOptions.locale);
   }
 
   private languageCode(): string | undefined {
