@@ -73,6 +73,11 @@ class FakeElement {
     return undefined;
   }
 
+  findAllByTag(tagName: string): FakeElement[] {
+    const own = this.tagName === tagName ? [this] : [];
+    return own.concat(...this.children.map((child) => child.findAllByTag(tagName)));
+  }
+
   findByRole(role: string): FakeElement | undefined {
     if (this.attributes.get("role") === role) return this;
     for (const child of this.children) {
@@ -217,7 +222,34 @@ describe("WebSdkBlikComponent", () => {
       pattern: "[0-9]*",
       maxLength: 7,
     });
-    expect(label).toMatchObject({ htmlFor: "nuvei-blik-code", textContent: "BLIK code" });
+    expect(label).toMatchObject({ htmlFor: "nuvei-blik-code", textContent: "Kod BLIK" });
+  });
+
+  it("renders English BLIK copy for non-Polish locales", async () => {
+    const { mountTarget } = stubDocument();
+    mockCreatePayment.mockResolvedValue(makeBlikSession());
+    mockLoadWebSdk.mockResolvedValue(makeSfc());
+    const component = new WebSdkBlikBuilder(makeEnablerOptions({ locale: "en" })).build({});
+    await component.mount("#container");
+
+    expect(mountTarget.findByTag("label")).toMatchObject({ textContent: "BLIK code" });
+    const input = mountTarget.findByTag("input");
+    if (!input) throw new Error("input missing");
+    input.value = "12";
+    input.dispatchInput();
+    await expect(component.submit()).rejects.toThrow("Enter a 6-digit BLIK code.");
+  });
+
+  it("renders Polish hint and error text for Polish locales", async () => {
+    const { mountTarget } = stubDocument();
+    mockCreatePayment.mockResolvedValue(makeBlikSession());
+    mockLoadWebSdk.mockResolvedValue(makeSfc());
+    const component = new WebSdkBlikBuilder(makeEnablerOptions({ locale: "pl" })).build({});
+    await component.mount("#container");
+
+    const texts = mountTarget.findAllByTag("p").map((p) => p.textContent);
+    expect(texts).toContain("Wpisz 6-cyfrowy kod BLIK z aplikacji bankowej.");
+    expect(texts).toContain("Wpisz 6-cyfrowy kod BLIK.");
   });
 
   it("accepts missing getApms support but rejects getApms responses without BLIK", async () => {
@@ -264,7 +296,7 @@ describe("WebSdkBlikComponent", () => {
     input.value = "12";
     input.dispatchInput();
     await expect(component.isValid()).resolves.toBe(false);
-    await expect(component.submit()).rejects.toThrow("Enter a 6-digit BLIK code.");
+    await expect(component.submit()).rejects.toThrow("Wpisz 6-cyfrowy kod BLIK.");
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.focus).toHaveBeenCalledOnce();
     expect(sfc.createPayment).not.toHaveBeenCalled();
