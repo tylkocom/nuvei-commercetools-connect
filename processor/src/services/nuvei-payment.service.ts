@@ -64,6 +64,7 @@ import {
   formatAmount,
 } from "./nuvei-status.js";
 import { NuveiDmnReconciler } from "./dmn-reconciler.js";
+import { withPaymentWriteLock } from "./payment-write-lock.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
@@ -1037,26 +1038,44 @@ export class NuveiPaymentService extends AbstractPaymentService {
       return { outcome };
     }
 
-    log.info("Writing CT terminal payment transaction.", {
-      paymentReference,
-      transactionType: terminalTransactionType,
-      interactionId: terminalIdentity.interactionId,
-      identitySource: terminalIdentity.source,
-      state: transactionState,
-    });
+    return withPaymentWriteLock(ctPayment.id, async () => {
+      // The Payment read above predates the Nuvei status call, and a DMN may have
+      // recorded the same outcome under a different id (PPP vs fiscal
+      // transactionId) in the meantime. Re-read inside the lock and decide on
+      // the outcome, not on the interactionId, so only one writer records it.
+      const currentPayment = await this.ctPaymentService.getPayment({ id: ctPayment.id });
+      const recordedOutcome = getExistingTerminalOutcome(currentPayment);
+      if (recordedOutcome) {
+        log.info("Terminal outcome recorded concurrently – skipping duplicate write.", {
+          paymentReference,
+          interactionId: terminalIdentity.interactionId,
+          identitySource: terminalIdentity.source,
+          outcome: recordedOutcome,
+        });
+        return { outcome: recordedOutcome };
+      }
 
-    await this.ctPaymentService.updatePayment({
-      id: ctPayment.id,
-      pspReference: terminalIdentity.pspReference,
-      transaction: {
-        type: terminalTransactionType,
-        amount: ctPayment.amountPlanned,
-        state: transactionState,
+      log.info("Writing CT terminal payment transaction.", {
+        paymentReference,
+        transactionType: terminalTransactionType,
         interactionId: terminalIdentity.interactionId,
-      },
-    });
+        identitySource: terminalIdentity.source,
+        state: transactionState,
+      });
 
-    return { outcome };
+      await this.ctPaymentService.updatePayment({
+        id: ctPayment.id,
+        pspReference: terminalIdentity.pspReference,
+        transaction: {
+          type: terminalTransactionType,
+          amount: ctPayment.amountPlanned,
+          state: transactionState,
+          interactionId: terminalIdentity.interactionId,
+        },
+      });
+
+      return { outcome };
+    });
   }
 
   /**

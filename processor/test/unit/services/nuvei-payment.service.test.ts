@@ -1860,6 +1860,86 @@ describe("NuveiPaymentService", () => {
   // -------------------------------------------------------------------------
   // processNuveiDmn()
   // -------------------------------------------------------------------------
+  describe("concurrent confirmPayment() and processNuveiDmn()", () => {
+    // Production regression: a card payment ended up with two Charge/Success
+    // transactions ~140ms apart. The browser confirm identified the Charge by
+    // Nuvei's fiscal transactionId while the DMN identified it by the PPP id, so
+    // the interactionId-based "already recorded" gates could never match, and
+    // both paths pass their pre-write outcome checks before either has written.
+    function terminalTransactions(payment: Payment) {
+      return (payment.transactions ?? []).filter(
+        (tx) =>
+          tx.state === "Success" && (tx.type === "Charge" || tx.type === "Authorization"),
+      );
+    }
+
+    function arrangeStatefulPayment() {
+      const payment = makeMockPayment({ interfaceId: "session-token-1", transactions: [] });
+      const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockImplementation(async () => structuredClone(payment));
+      mockUpdatePayment.mockImplementation(
+        async ({ transaction }: { transaction: Record<string, unknown> }) => {
+          await delay(5);
+          (payment.transactions as unknown as Record<string, unknown>[]).push({ ...transaction });
+          return payment;
+        },
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockImplementation(async () => {
+        await delay(5);
+        return {
+          status: "SUCCESS",
+          transactionStatus: "APPROVED",
+          transactionType: "Sale",
+          transactionId: "fiscal-tx-1",
+          sessionToken: "session-token-1",
+          amount: "10.00",
+          currency: "USD",
+          clientUniqueId: "cart-123",
+        };
+      });
+
+      const dmnBody: Record<string, unknown> = {
+        merchant_unique_id: "payment-1",
+        clientUniqueId: "cart-123",
+        PPP_TransactionID: "dmn-tx-1",
+        TransactionID: "fiscal-tx-1",
+        totalAmount: "10.00",
+        currency: "USD",
+        transactionType: "Sale",
+        ppp_status: "OK",
+        Status: "APPROVED",
+      };
+
+      return { payment, dmnBody };
+    }
+
+    it("records exactly one terminal transaction when the browser confirm and the DMN race", async () => {
+      const { service } = createService();
+      const { payment, dmnBody } = arrangeStatefulPayment();
+
+      await Promise.all([
+        service.confirmPayment("payment-1", "session-token-1"),
+        service.processNuveiDmn(dmnBody),
+      ]);
+
+      expect(terminalTransactions(payment)).toHaveLength(1);
+    });
+
+    it("records exactly one terminal transaction when the DMN races the browser confirm", async () => {
+      const { service } = createService();
+      const { payment, dmnBody } = arrangeStatefulPayment();
+
+      await Promise.all([
+        service.processNuveiDmn(dmnBody),
+        service.confirmPayment("payment-1", "session-token-1"),
+      ]);
+
+      expect(terminalTransactions(payment)).toHaveLength(1);
+    });
+  });
+
   describe("processNuveiDmn()", () => {
     it("with valid checksum adds transaction to CT payment", async () => {
       const { service } = createService();
