@@ -875,6 +875,9 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
       mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
+      // Resolution goes through the session token; the only getPayment call is the
+      // fresh re-read of the resolved Payment inside the terminal-write lock.
+      mockGetPayment.mockResolvedValue(payment);
       mockConvertDmnToPaymentUpdate.mockReturnValue(
         defaultConverterReturn({
           transactions: [
@@ -893,7 +896,9 @@ describe("NuveiPaymentService – DMN processing", () => {
 
       await service.processNuveiDmn(body);
 
-      expect(mockGetPayment).not.toHaveBeenCalled();
+      expect(mockGetPayment.mock.calls.every(([arg]) => arg.id === "payment-from-session")).toBe(
+        true,
+      );
       expect(mockFindPaymentsByInterfaceId).toHaveBeenCalledWith({
         interfaceId: "nuvei-session-token",
       });
@@ -923,7 +928,12 @@ describe("NuveiPaymentService – DMN processing", () => {
         new Error("Resource with ID 'nuvei-non-payment-reference' was not found"),
         { code: "ResourceNotFound", statusCode: 404 },
       );
-      mockGetPayment.mockRejectedValue(notFound);
+      // The unresolvable reference is not found; the resolved Payment is readable
+      // for the fresh re-read inside the terminal-write lock.
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "payment-from-session") return payment;
+        throw notFound;
+      });
       mockGetCart.mockRejectedValue(notFound);
       mockFindPaymentsByInterfaceId.mockResolvedValue([payment]);
       mockConvertDmnToPaymentUpdate.mockReturnValue(
@@ -969,7 +979,12 @@ describe("NuveiPaymentService – DMN processing", () => {
       });
 
       mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
-      mockGetPayment.mockRejectedValue(notFound);
+      // The cart reference and its stale payment are not found; the resolved
+      // Payment is readable for the fresh re-read inside the terminal-write lock.
+      mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+        if (id === "payment-from-session") return payment;
+        throw notFound;
+      });
       mockGetCart.mockResolvedValue({
         id: "cart-123",
         version: 7,

@@ -16,6 +16,7 @@ import {
   dmnTerminalTransactionAlreadyRecorded,
   getExistingTerminalOutcome,
 } from "./payment-state.js";
+import { withPaymentWriteLock } from "./payment-write-lock.js";
 import {
   assertNuveiStatusMatchesPayment,
   extractCanonicalPpp,
@@ -194,13 +195,39 @@ export class NuveiDmnReconciler {
     // updatePayment so a retried DMN either records everything (caught by the
     // already-recorded gate above) or nothing — no window where the terminal
     // transaction exists but method/name is left unset.
-    for (const [index, transaction] of updateData.transactions.entries()) {
-      await this.ctPaymentService.updatePayment({
-        id: paymentId,
-        pspReference: updateData.pspReference,
-        transaction,
-        ...(index === 0 && hasPaymentMethodInfo && { paymentMethodInfo }),
-      });
+    const written = await withPaymentWriteLock(paymentId, async () => {
+      // The Payment above predates the Nuvei status verification, and the
+      // shopper's browser confirm may have recorded the same outcome under a
+      // different id (fiscal transactionId vs PPP) meanwhile. Re-read inside the
+      // lock and compare outcomes so only one channel records the terminal
+      // transaction.
+      if (incomingTerminalOutcome) {
+        const currentPayment = await this.ctPaymentService.getPayment({ id: paymentId });
+        const recordedOutcome = getExistingTerminalOutcome(currentPayment);
+        if (recordedOutcome) {
+          log.info("Terminal outcome recorded concurrently, skipping duplicate DMN write.", {
+            paymentId,
+            pspReference: updateData.pspReference,
+            existingOutcome: recordedOutcome,
+            incomingOutcome: incomingTerminalOutcome,
+          });
+          return false;
+        }
+      }
+
+      for (const [index, transaction] of updateData.transactions.entries()) {
+        await this.ctPaymentService.updatePayment({
+          id: paymentId,
+          pspReference: updateData.pspReference,
+          transaction,
+          ...(index === 0 && hasPaymentMethodInfo && { paymentMethodInfo }),
+        });
+      }
+      return true;
+    });
+
+    if (!written) {
+      return;
     }
 
     if (updateData.interfaceCode) {
