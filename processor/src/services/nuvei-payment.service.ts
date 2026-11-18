@@ -64,6 +64,10 @@ import {
   formatAmount,
 } from "./nuvei-status.js";
 import { NuveiDmnReconciler } from "./dmn-reconciler.js";
+import {
+  triggerOrderPaymentStateSync,
+  type OrderPaymentStateSyncer,
+} from "./order-payment-state.service.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
@@ -92,6 +96,8 @@ export type NuveiPaymentServiceOptions = {
   ctPaymentService: CommercetoolsPaymentService;
   ctOrderService: CommercetoolsOrderService;
   ctCartClient: CommercetoolsCartClient;
+  /** Sets Order.paymentState = Paid after a successful charge. Optional: omit to disable. */
+  orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
 
 type CheckoutUiMethod = "card" | "blik" | "embedded";
@@ -119,6 +125,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private ctCartClient: CommercetoolsCartClient;
   private dmnReconciler: NuveiDmnReconciler;
+  private orderPaymentStateSync?: OrderPaymentStateSyncer;
 
   constructor(opts: NuveiPaymentServiceOptions) {
     super(opts.ctCartService, opts.ctPaymentService, opts.ctOrderService);
@@ -127,9 +134,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ctPaymentService: opts.ctPaymentService,
     });
     this.ctCartClient = opts.ctCartClient;
+    this.orderPaymentStateSync = opts.orderPaymentStateSync;
     this.dmnReconciler = new NuveiDmnReconciler({
       ctCartService: opts.ctCartService,
       ctPaymentService: opts.ctPaymentService,
+      orderPaymentStateSync: opts.orderPaymentStateSync,
     });
   }
 
@@ -998,6 +1007,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
           outcome: existingTerminalOutcome,
         },
       );
+      if (existingTerminalOutcome === "approved") {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentReference);
+      }
       return { outcome: existingTerminalOutcome };
     }
 
@@ -1034,6 +1046,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
         identitySource: terminalIdentity.source,
         outcome,
       });
+      if (outcome === "approved") {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, ctPayment.id);
+      }
       return { outcome };
     }
 
@@ -1055,6 +1070,10 @@ export class NuveiPaymentService extends AbstractPaymentService {
         interactionId: terminalIdentity.interactionId,
       },
     });
+
+    if (outcome === "approved") {
+      triggerOrderPaymentStateSync(this.orderPaymentStateSync, ctPayment.id);
+    }
 
     return { outcome };
   }
