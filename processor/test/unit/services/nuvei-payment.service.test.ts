@@ -208,7 +208,10 @@ function makeCtCartClientMock(cartAfterFreeze: Record<string, unknown> = {}) {
   return { client, post, get };
 }
 
-function createService(ctCartClient?: ReturnType<typeof makeCtCartClientMock>) {
+function createService(
+  ctCartClient?: ReturnType<typeof makeCtCartClientMock>,
+  orderPaymentStateSync?: { syncWithRetry: ReturnType<typeof vi.fn> },
+) {
   const ctCartService = { getCart: mockGetCart, getPaymentAmount: mockGetPaymentAmount };
   const ctPaymentService = {
     getPayment: mockGetPayment,
@@ -235,6 +238,7 @@ function createService(ctCartClient?: ReturnType<typeof makeCtCartClientMock>) {
     ctPaymentService: ctPaymentService as unknown as CommercetoolsPaymentService,
     ctOrderService: ctOrderService as unknown as CommercetoolsOrderService,
     ctCartClient: cartClient.client as never,
+    ...(orderPaymentStateSync && { orderPaymentStateSync: orderPaymentStateSync as never }),
   });
 
   return { service, cartClient };
@@ -1251,6 +1255,78 @@ describe("NuveiPaymentService", () => {
           }),
         }),
       );
+    });
+  });
+  describe("confirmPayment() – order paymentState sync", () => {
+    const approvedStatus = {
+      status: "SUCCESS",
+      transactionStatus: "APPROVED",
+      transactionId: "auth-tx-1",
+      amount: "10.00",
+      currency: "USD",
+    };
+
+    it("syncs the Order after writing an approved terminal transaction", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockResolvedValue("updated") };
+      const { service } = createService(undefined, orderPaymentStateSync);
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(approvedStatus);
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+
+      await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(mockUpdatePayment).toHaveBeenCalledTimes(1);
+      expect(orderPaymentStateSync.syncWithRetry).toHaveBeenCalledWith("payment-1");
+    });
+
+    it("re-syncs the Order when approval was already recorded (repair on repeated confirm)", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockResolvedValue("updated") };
+      const { service } = createService(undefined, orderPaymentStateSync);
+      mockGetPayment.mockResolvedValue(
+        makeMockPayment({
+          interfaceId: "session-token-1",
+          transactions: [
+            {
+              type: "Charge",
+              state: "Success",
+              interactionId: "dmn-charge-success-1",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+
+      const result = await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(result).toEqual({ outcome: "approved" });
+      expect(orderPaymentStateSync.syncWithRetry).toHaveBeenCalledWith("payment-1");
+    });
+
+    it("does not sync the Order when the payment is rejected or pending", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn() };
+      const { service } = createService(undefined, orderPaymentStateSync);
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue({
+        status: "SUCCESS",
+        transactionStatus: "DECLINED",
+        transactionId: "auth-tx-2",
+        amount: "10.00",
+        currency: "USD",
+      });
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+
+      await service.confirmPayment("payment-1", "session-token-1");
+
+      expect(orderPaymentStateSync.syncWithRetry).not.toHaveBeenCalled();
+    });
+
+    it("does not let a rejected Order sync fail the confirmation", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockRejectedValue(new Error("boom")) };
+      const { service } = createService(undefined, orderPaymentStateSync);
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(approvedStatus);
+      mockGetPayment.mockResolvedValue(makeMockPayment({ interfaceId: "session-token-1" }));
+
+      await expect(service.confirmPayment("payment-1", "session-token-1")).resolves.toEqual({
+        outcome: "approved",
+      });
     });
   });
   // -------------------------------------------------------------------------
