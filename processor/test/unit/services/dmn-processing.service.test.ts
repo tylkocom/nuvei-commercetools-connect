@@ -135,7 +135,7 @@ function makeMockPayment(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-function createService() {
+function createService(opts: { orderPaymentStateSync?: { syncWithRetry: ReturnType<typeof vi.fn> } } = {}) {
   const ctCartService = { getCart: mockGetCart, getPaymentAmount: mockGetPaymentAmount };
   const ctPaymentService = {
     getPayment: mockGetPayment,
@@ -173,6 +173,7 @@ function createService() {
     ctPaymentService: ctPaymentService as any,
     ctOrderService: ctOrderService as any,
     ctCartClient: ctCartClient as any,
+    ...(opts.orderPaymentStateSync && { orderPaymentStateSync: opts.orderPaymentStateSync as any }),
   });
 
   return { service };
@@ -1941,6 +1942,105 @@ describe("NuveiPaymentService – DMN processing", () => {
         "DMN update produced no transaction to write",
       );
       expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+  // -------------------------------------------------------------------------
+  // Order paymentState sync
+  // -------------------------------------------------------------------------
+  describe("order paymentState sync", () => {
+    const chargeSuccess = () =>
+      defaultConverterReturn({
+        pspReference: "tx-settle-001",
+        transactions: [
+          {
+            type: PaymentTransactions.CHARGE,
+            interactionId: "tx-settle-001",
+            amount: { centAmount: 1000, currencyCode: "USD" },
+            state: "Success",
+          },
+        ],
+        interfaceCode: "paid",
+      });
+
+    it("syncs the Order after an approved terminal transaction is written", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockResolvedValue("updated") };
+      const { service } = createService({ orderPaymentStateSync });
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(chargeSuccess());
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ transactionId: "tx-settle-001", sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnSettleOk);
+
+      expect(mockUpdatePayment).toHaveBeenCalledTimes(1);
+      expect(orderPaymentStateSync.syncWithRetry).toHaveBeenCalledWith("payment-1");
+    });
+
+    it("does not sync the Order for a failed payment DMN", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockResolvedValue("not-paid") };
+      const { service } = createService({ orderPaymentStateSync });
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({
+          pspReference: "tx-auth-fail",
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              interactionId: "tx-auth-fail",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+              state: "Failure",
+            },
+          ],
+        }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ transactionStatus: "DECLINED", sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthFail);
+
+      expect(orderPaymentStateSync.syncWithRetry).not.toHaveBeenCalled();
+    });
+
+    it("re-syncs the Order when the approved terminal transaction was already recorded (repair)", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockResolvedValue("updated") };
+      const { service } = createService({ orderPaymentStateSync });
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(
+        makeDmnMockPayment({
+          interfaceId: "nuvei-session-token",
+          transactions: [
+            {
+              type: "Charge",
+              state: "Success",
+              interactionId: "tx-settle-001",
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+          ],
+        }),
+      );
+      mockConvertDmnToPaymentUpdate.mockReturnValue(chargeSuccess());
+
+      await service.processNuveiDmn(dmnSettleOk);
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+      expect(orderPaymentStateSync.syncWithRetry).toHaveBeenCalledWith("payment-1");
+    });
+
+    it("still acknowledges the DMN when the Order sync rejects", async () => {
+      const orderPaymentStateSync = { syncWithRetry: vi.fn().mockRejectedValue(new Error("boom")) };
+      const { service } = createService({ orderPaymentStateSync });
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(chargeSuccess());
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ transactionId: "tx-settle-001", sessionToken: "nuvei-session-token" }),
+      );
+
+      await expect(service.processNuveiDmn(dmnSettleOk)).resolves.toBeUndefined();
     });
   });
 });

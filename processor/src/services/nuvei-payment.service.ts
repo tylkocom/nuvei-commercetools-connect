@@ -65,6 +65,10 @@ import {
 } from "./nuvei-status.js";
 import { NuveiDmnReconciler } from "./dmn-reconciler.js";
 import { withPaymentWriteLock } from "./payment-write-lock.js";
+import {
+  triggerOrderPaymentStateSync,
+  type OrderPaymentStateSyncer,
+} from "./order-payment-state.service.js";
 import type { Cart, CartUpdateAction, Payment } from "@commercetools/platform-sdk";
 import {
   PaymentSetupError,
@@ -93,6 +97,8 @@ export type NuveiPaymentServiceOptions = {
   ctPaymentService: CommercetoolsPaymentService;
   ctOrderService: CommercetoolsOrderService;
   ctCartClient: CommercetoolsCartClient;
+  /** Sets Order.paymentState = Paid after a successful charge. Optional: omit to disable. */
+  orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
 
 type CheckoutUiMethod = "card" | "blik" | "embedded";
@@ -120,6 +126,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private ctCartClient: CommercetoolsCartClient;
   private dmnReconciler: NuveiDmnReconciler;
+  private orderPaymentStateSync?: OrderPaymentStateSyncer;
 
   constructor(opts: NuveiPaymentServiceOptions) {
     super(opts.ctCartService, opts.ctPaymentService, opts.ctOrderService);
@@ -128,9 +135,11 @@ export class NuveiPaymentService extends AbstractPaymentService {
       ctPaymentService: opts.ctPaymentService,
     });
     this.ctCartClient = opts.ctCartClient;
+    this.orderPaymentStateSync = opts.orderPaymentStateSync;
     this.dmnReconciler = new NuveiDmnReconciler({
       ctCartService: opts.ctCartService,
       ctPaymentService: opts.ctPaymentService,
+      orderPaymentStateSync: opts.orderPaymentStateSync,
     });
   }
 
@@ -999,6 +1008,9 @@ export class NuveiPaymentService extends AbstractPaymentService {
           outcome: existingTerminalOutcome,
         },
       );
+      if (existingTerminalOutcome === "approved") {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentReference);
+      }
       return { outcome: existingTerminalOutcome };
     }
 
@@ -1035,10 +1047,13 @@ export class NuveiPaymentService extends AbstractPaymentService {
         identitySource: terminalIdentity.source,
         outcome,
       });
+      if (outcome === "approved") {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, ctPayment.id);
+      }
       return { outcome };
     }
 
-    return withPaymentWriteLock(ctPayment.id, async () => {
+    const locked = await withPaymentWriteLock(ctPayment.id, async () => {
       // The Payment read above predates the Nuvei status call, and a DMN may have
       // recorded the same outcome under a different id (PPP vs fiscal
       // transactionId) in the meantime. Re-read inside the lock and decide on
@@ -1076,6 +1091,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
 
       return { outcome };
     });
+
+    // Sync the Order's paymentState once the lock is released. Also covers the
+    // "recorded concurrently" early exit, like the other already-recorded paths.
+    if (locked.outcome === "approved") {
+      triggerOrderPaymentStateSync(this.orderPaymentStateSync, ctPayment.id);
+    }
+
+    return locked;
   }
 
   /**

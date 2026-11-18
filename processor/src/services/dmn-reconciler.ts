@@ -18,6 +18,10 @@ import {
 } from "./payment-state.js";
 import { withPaymentWriteLock } from "./payment-write-lock.js";
 import {
+  triggerOrderPaymentStateSync,
+  type OrderPaymentStateSyncer,
+} from "./order-payment-state.service.js";
+import {
   assertNuveiStatusMatchesPayment,
   extractCanonicalPpp,
   extractNuveiTransactionIdentities,
@@ -55,6 +59,7 @@ function withAbortTimeout<T>(
 type NuveiDmnReconcilerOptions = {
   ctCartService: CommercetoolsCartService;
   ctPaymentService: CommercetoolsPaymentService;
+  orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
 
 /**
@@ -70,11 +75,13 @@ type NuveiDmnReconcilerOptions = {
 export class NuveiDmnReconciler {
   private readonly ctCartService: CommercetoolsCartService;
   private readonly ctPaymentService: CommercetoolsPaymentService;
+  private readonly orderPaymentStateSync?: OrderPaymentStateSyncer;
   private readonly nuveiEventConverter = new NuveiEventConverter();
 
   public constructor(opts: NuveiDmnReconcilerOptions) {
     this.ctCartService = opts.ctCartService;
     this.ctPaymentService = opts.ctPaymentService;
+    this.orderPaymentStateSync = opts.orderPaymentStateSync;
   }
 
   /**
@@ -126,16 +133,24 @@ export class NuveiDmnReconciler {
     });
 
     const dmnPpp = extractCanonicalPpp(bodyForConversion);
-    if (
-      dmnPpp &&
-      (ctPayment.transactions ?? []).some(
-        (tx) => tx.interactionId === dmnPpp && (tx.state === "Success" || tx.state === "Failure"),
-      )
-    ) {
+    const duplicateTerminalTx = dmnPpp
+      ? (ctPayment.transactions ?? []).find(
+          (tx) => tx.interactionId === dmnPpp && (tx.state === "Success" || tx.state === "Failure"),
+        )
+      : undefined;
+    if (duplicateTerminalTx) {
       log.info("DMN already processed (terminal PPP duplicate), skipping.", {
         paymentId,
         ppp: dmnPpp,
       });
+      // Repair: an earlier attempt may have recorded the charge before the Order existed.
+      if (
+        duplicateTerminalTx.state === "Success" &&
+        (duplicateTerminalTx.type === PaymentTransactions.AUTHORIZATION ||
+          duplicateTerminalTx.type === PaymentTransactions.CHARGE)
+      ) {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentId);
+      }
       return;
     }
 
@@ -158,6 +173,9 @@ export class NuveiDmnReconciler {
         paymentId,
         pspReference: updateData.pspReference,
       });
+      if (dmnTerminalPaymentOutcome(updateData) === "approved") {
+        triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentId);
+      }
       return;
     }
     const existingTerminalOutcome = getExistingTerminalOutcome(ctPayment);
@@ -176,6 +194,9 @@ export class NuveiDmnReconciler {
           pspReference: updateData.pspReference,
           outcome: incomingTerminalOutcome,
         });
+        if (incomingTerminalOutcome === "approved") {
+          triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentId);
+        }
       }
       return;
     }
@@ -228,6 +249,10 @@ export class NuveiDmnReconciler {
 
     if (!written) {
       return;
+    }
+
+    if (incomingTerminalOutcome === "approved") {
+      triggerOrderPaymentStateSync(this.orderPaymentStateSync, paymentId);
     }
 
     if (updateData.interfaceCode) {
