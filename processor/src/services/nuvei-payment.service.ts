@@ -74,6 +74,9 @@ import {
   PublicPaymentErrorCode,
 } from "../dtos/operations/payment-errors.dto.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
+import { nuveiPaymentKeyFromOrder } from "./nuvei-payment-key.js";
+import { StalePaymentCleaner } from "./stale-payment-cleanup.js";
+import type { CommercetoolsPaymentClient } from "./dmn-reconciler.js";
 
 /**
  * Minimal structural slice of the platform SDK ByProjectKeyRequestBuilder used
@@ -96,6 +99,11 @@ export type NuveiPaymentServiceOptions = {
   ctPaymentService: CommercetoolsPaymentService;
   ctOrderService: CommercetoolsOrderService;
   ctCartClient: CommercetoolsCartClient;
+  /**
+   * Enables DMN resolution by Payment key (`nuvei-<orderId>`). Optional: when
+   * omitted, DMNs resolve through the cart-link / session-token paths only.
+   */
+  ctPaymentClient?: CommercetoolsPaymentClient;
   /** Sets Order.paymentState = Paid after a successful charge. Optional: omit to disable. */
   orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
@@ -125,6 +133,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
   private paymentCreationService: CtPaymentCreationService;
   private ctCartClient: CommercetoolsCartClient;
   private dmnReconciler: NuveiDmnReconciler;
+  private stalePaymentCleaner: StalePaymentCleaner;
   private orderPaymentStateSync?: OrderPaymentStateSyncer;
 
   constructor(opts: NuveiPaymentServiceOptions) {
@@ -135,10 +144,33 @@ export class NuveiPaymentService extends AbstractPaymentService {
     });
     this.ctCartClient = opts.ctCartClient;
     this.orderPaymentStateSync = opts.orderPaymentStateSync;
+    this.stalePaymentCleaner = new StalePaymentCleaner({
+      ctPaymentService: opts.ctPaymentService,
+      ctCartClient: opts.ctCartClient,
+    });
     this.dmnReconciler = new NuveiDmnReconciler({
       ctCartService: opts.ctCartService,
       ctPaymentService: opts.ctPaymentService,
+      ctPaymentClient: opts.ctPaymentClient,
       orderPaymentStateSync: opts.orderPaymentStateSync,
+    });
+  }
+
+  /**
+   * Unlinks unused same-method sessions from the cart without delaying the
+   * response: the shopper's widget must not wait on housekeeping. Best-effort —
+   * a failure only leaves orphans that DMN key resolution tolerates.
+   */
+  private scheduleStalePaymentCleanup(opts: {
+    cartId: string;
+    keepPaymentId: string;
+    method: string;
+  }): void {
+    this.stalePaymentCleaner.removeStaleSessionPayments(opts).catch((error: unknown) => {
+      log.warn("Stale Nuvei session Payment cleanup failed.", {
+        cartId: opts.cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     });
   }
 
@@ -835,6 +867,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         interactionId: sessionToken,
         amountPlanned,
         cart,
+        paymentKey: nuveiPaymentKeyFromOrder(openOrderResponse.orderId),
       });
 
       log.info("Transaction created successfully.", {
@@ -930,6 +963,14 @@ export class NuveiPaymentService extends AbstractPaymentService {
         cart,
         paymentMethod: selection.uiMethod,
         tender: selection.tender,
+        paymentKey: nuveiPaymentKeyFromOrder(openOrderResponse.orderId),
+      });
+
+      // The new Payment supersedes unused earlier sessions of the same method.
+      this.scheduleStalePaymentCleanup({
+        cartId: cart.id,
+        keepPaymentId: paymentReference,
+        method: selection.tender,
       });
 
       const config = getConfig();

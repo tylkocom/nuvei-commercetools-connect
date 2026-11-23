@@ -43,6 +43,8 @@ export class CtPaymentCreationService {
     cart: Cart;
     paymentMethod?: "card" | "blik" | "embedded" | string;
     tender?: "card" | "blik";
+    /** Deterministic CT Payment key (see nuvei-payment-key.ts) used for DMN resolution. */
+    paymentKey?: string;
   }): Promise<string> {
     const requestedPaymentMethod = opts.tender === "blik" ? "blik" : (opts.paymentMethod ?? "nuvei");
     const paymentMethodInfoMethod = isSupportedPaymentMethod(requestedPaymentMethod)
@@ -61,6 +63,7 @@ export class CtPaymentCreationService {
     const response = await this.ctPaymentService.createPayment({
       amountPlanned: opts.amountPlanned,
       interfaceId: opts.interactionId,
+      ...(opts.paymentKey && { key: opts.paymentKey }),
       paymentMethodInfo: {
         paymentInterface,
         method: paymentMethodInfoMethod,

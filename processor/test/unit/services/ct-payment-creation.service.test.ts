@@ -89,6 +89,43 @@ describe("CtPaymentCreationService", () => {
       }),
     );
   });
+
+  it("sets the Payment key when a paymentKey is provided", async () => {
+    const createPayment = vi.fn().mockResolvedValue({ id: "payment-1" });
+    const service = new CtPaymentCreationService({
+      ctCartService: { addPayment: vi.fn().mockResolvedValue(undefined) } as any,
+      ctPaymentService: { createPayment } as any,
+    });
+
+    await service.handleCtPaymentCreation({
+      interactionId: "session-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "PLN" },
+      cart: { id: "cart-1", version: 1 } as any,
+      paymentMethod: "card",
+      paymentKey: "nuvei-4402057979221",
+    });
+
+    expect(createPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "nuvei-4402057979221" }),
+    );
+  });
+
+  it("omits the Payment key entirely when none is provided", async () => {
+    const createPayment = vi.fn().mockResolvedValue({ id: "payment-1" });
+    const service = new CtPaymentCreationService({
+      ctCartService: { addPayment: vi.fn().mockResolvedValue(undefined) } as any,
+      ctPaymentService: { createPayment } as any,
+    });
+
+    await service.handleCtPaymentCreation({
+      interactionId: "session-1",
+      amountPlanned: { centAmount: 1000, currencyCode: "PLN" },
+      cart: { id: "cart-1", version: 1 } as any,
+      paymentMethod: "card",
+    });
+
+    expect(createPayment.mock.calls[0][0]).not.toHaveProperty("key");
+  });
 });
 
 describe("CtPaymentCreationService payment interface", () => {
