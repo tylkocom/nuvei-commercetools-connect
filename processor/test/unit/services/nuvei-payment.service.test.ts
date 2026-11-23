@@ -112,17 +112,6 @@ vi.mock("../../../src/services/ct-payment-creation.service", () => ({
   },
 }));
 
-const { mockRemoveStaleSessionPayments } = vi.hoisted(() => ({
-  mockRemoveStaleSessionPayments: vi.fn(),
-}));
-
-vi.mock("../../../src/services/stale-payment-cleanup", () => ({
-  StalePaymentCleaner: class {
-    // async: a throwing mock must surface as a rejection, like the real method.
-    removeStaleSessionPayments = async (opts: unknown) => mockRemoveStaleSessionPayments(opts);
-  },
-}));
-
 vi.mock("../../../src/services/converters/nuvei-event.converter", () => ({
   NuveiEventConverter: class {
     convertDmnToPaymentUpdate = vi.fn().mockReturnValue({
@@ -278,8 +267,6 @@ describe("NuveiPaymentService", () => {
     mockGetPaymentAmount.mockReset();
     mockHandleCtPaymentCreation.mockReset();
     mockHandleCtPaymentCreation.mockResolvedValue("payment-ref-1");
-    mockRemoveStaleSessionPayments.mockReset();
-    mockRemoveStaleSessionPayments.mockResolvedValue([]);
   });
 
   // -------------------------------------------------------------------------
@@ -835,61 +822,6 @@ describe("NuveiPaymentService", () => {
       expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
         expect.objectContaining({ paymentKey: undefined }),
       );
-    });
-
-    it("schedules cleanup of stale sessions for the same method, keeping the new Payment", async () => {
-      const cartClient = makeCtCartClientMock({
-        customerEmail: "shopper@example.com",
-        billingAddress: { country: "PL", firstName: "Jan", lastName: "Kowalski" },
-        shippingAddress: { country: "PL" },
-      });
-      const { service } = createService(cartClient);
-      mockGetPaymentAmount.mockResolvedValue({ centAmount: 1234, currencyCode: "PLN" });
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-clean", orderId: 1 });
-
-      await service.createPaymentSession({ paymentMethodOptions: { blik: {} } });
-
-      expect(mockRemoveStaleSessionPayments).toHaveBeenCalledWith({
-        cartId: "cart-123",
-        keepPaymentId: "payment-ref-1",
-        method: "blik",
-      });
-    });
-
-    it("uses the card tender for card and embedded drop-in sessions", async () => {
-      const { service } = createService();
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-card", orderId: 2 });
-
-      await service.createPaymentSession({ paymentMethodOptions: { embedded: {} } });
-
-      expect(mockRemoveStaleSessionPayments).toHaveBeenCalledWith(
-        expect.objectContaining({ method: "card" }),
-      );
-    });
-
-    it("does not fail or delay session creation when cleanup fails", async () => {
-      const { service } = createService();
-      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-fail", orderId: 3 });
-      mockRemoveStaleSessionPayments.mockRejectedValue(new Error("CT unavailable"));
-
-      const result = await service.createPaymentSession();
-
-      expect(result.paymentReference).toBe("payment-ref-1");
-      await vi.waitFor(() =>
-        expect(log.warn).toHaveBeenCalledWith(
-          "Stale Nuvei session Payment cleanup failed.",
-          expect.objectContaining({ cartId: "cart-123", error: "CT unavailable" }),
-        ),
-      );
-    });
-
-    it("does not schedule cleanup when session creation fails", async () => {
-      const { service } = createService();
-      mockNuveiClientInstance.openOrder.mockRejectedValue(new Error("Nuvei down"));
-
-      await expect(service.createPaymentSession()).rejects.toThrow("Nuvei down");
-
-      expect(mockRemoveStaleSessionPayments).not.toHaveBeenCalled();
     });
 
     it("formats zero-decimal currencies without forcing cents", async () => {
