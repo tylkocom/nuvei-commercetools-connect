@@ -451,7 +451,11 @@ export class NuveiDmnReconciler {
     // cart-linked session candidates block an already identifiable Nuvei Payment.
     const verifiedSessionBoundCandidates =
       staticNuveiCandidates.length === 0
-        ? await this.getNuveiVerifiedSessionBoundPayments(sessionBoundCandidates, cartId)
+        ? await this.verifySessionBoundCandidatesPreferringIdentity(
+            sessionBoundCandidates,
+            cartId,
+            body,
+          )
         : [];
     const candidates = [...staticNuveiCandidates, ...verifiedSessionBoundCandidates];
 
@@ -738,6 +742,35 @@ export class NuveiDmnReconciler {
       });
       return false;
     }
+  }
+
+  /**
+   * Verifies session-bound candidates through Nuvei, trying first the ones that
+   * already hold the DMN's transaction identity (e.g. a settle/refund DMN for a
+   * Payment that already recorded its Auth). Abandoned sibling sessions never
+   * hold that identity, so they no longer count toward the candidate cap when
+   * the real Payment can be told apart locally.
+   *
+   * Identity alone never decides: every narrowed candidate is still verified, and
+   * if none verifies the remaining candidates are verified as before.
+   */
+  private async verifySessionBoundCandidatesPreferringIdentity(
+    candidates: Payment[],
+    cartId: string,
+    body: Record<string, unknown>,
+  ): Promise<Payment[]> {
+    const holdingDmnTransaction = this.getPaymentsMatchingDmnTransactionIdentity(candidates, body);
+    if (holdingDmnTransaction.length === 0 || holdingDmnTransaction.length === candidates.length) {
+      return this.getNuveiVerifiedSessionBoundPayments(candidates, cartId);
+    }
+
+    const verified = await this.getNuveiVerifiedSessionBoundPayments(holdingDmnTransaction, cartId);
+    if (verified.length > 0) {
+      return verified;
+    }
+
+    const remaining = candidates.filter((payment) => !holdingDmnTransaction.includes(payment));
+    return this.getNuveiVerifiedSessionBoundPayments(remaining, cartId);
   }
 
   private async getNuveiVerifiedSessionBoundPayments(
