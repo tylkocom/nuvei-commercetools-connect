@@ -799,6 +799,31 @@ describe("NuveiPaymentService", () => {
   // createPaymentSession()
   // -------------------------------------------------------------------------
   describe("createPaymentSession()", () => {
+    it("creates the CT Payment with a key derived from the Nuvei orderId", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.openOrder.mockResolvedValue({
+        sessionToken: "st-key",
+        orderId: 4402057979221,
+      });
+
+      await service.createPaymentSession();
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({ interactionId: "st-key", paymentKey: "nuvei-4402057979221" }),
+      );
+    });
+
+    it("omits the key when Nuvei returns no usable orderId", async () => {
+      const { service } = createService();
+      mockNuveiClientInstance.openOrder.mockResolvedValue({ sessionToken: "st-nokey" });
+
+      await service.createPaymentSession();
+
+      expect(mockHandleCtPaymentCreation).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentKey: undefined }),
+      );
+    });
+
     it("formats zero-decimal currencies without forcing cents", async () => {
       const { service } = createService();
 

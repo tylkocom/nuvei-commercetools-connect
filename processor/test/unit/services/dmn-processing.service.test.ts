@@ -135,7 +135,12 @@ function makeMockPayment(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
-function createService(opts: { orderPaymentStateSync?: { syncWithRetry: ReturnType<typeof vi.fn> } } = {}) {
+function createService(
+  opts: {
+    orderPaymentStateSync?: { syncWithRetry: ReturnType<typeof vi.fn> };
+    ctPaymentClient?: unknown;
+  } = {},
+) {
   const ctCartService = { getCart: mockGetCart, getPaymentAmount: mockGetPaymentAmount };
   const ctPaymentService = {
     getPayment: mockGetPayment,
@@ -173,10 +178,17 @@ function createService(opts: { orderPaymentStateSync?: { syncWithRetry: ReturnTy
     ctPaymentService: ctPaymentService as any,
     ctOrderService: ctOrderService as any,
     ctCartClient: ctCartClient as any,
+    ...(opts.ctPaymentClient ? { ctPaymentClient: opts.ctPaymentClient as any } : {}),
     ...(opts.orderPaymentStateSync && { orderPaymentStateSync: opts.orderPaymentStateSync as any }),
   });
 
   return { service };
+}
+
+/** Builds a ctPaymentClient mock whose `payments().withKey({key}).get().execute()` is controllable. */
+function makePaymentKeyClient(execute: ReturnType<typeof vi.fn>) {
+  const withKey = vi.fn().mockReturnValue({ get: () => ({ execute }) });
+  return { client: { payments: () => ({ withKey }) }, withKey, execute };
 }
 
 /**
@@ -1419,6 +1431,120 @@ describe("NuveiPaymentService – DMN processing", () => {
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
 
+    describe("cart fallback with abandoned sibling sessions", () => {
+      const sessionPayment = (id: string, extraTransactions: unknown[] = []) =>
+        makeDmnMockPayment({
+          id,
+          interfaceId: `session-${id}`,
+          paymentMethodInfo: { paymentInterface: "checkout-session-interface", method: "Visa" },
+          transactions: [
+            {
+              type: PaymentTransactions.AUTHORIZATION,
+              state: "Initial",
+              interactionId: `session-${id}`,
+              amount: { centAmount: 1000, currencyCode: "USD" },
+            },
+            ...extraTransactions,
+          ],
+        } as any);
+
+      const pendingAuth = {
+        type: PaymentTransactions.AUTHORIZATION,
+        state: "Pending",
+        interactionId: "50001", // dmnAuthOk PPP_TransactionID
+        amount: { centAmount: 1000, currencyCode: "USD" },
+      };
+
+      function arrangeCart(payments: any[]) {
+        mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+        mockGetCart.mockResolvedValue({
+          id: "cart-123",
+          version: 7,
+          paymentInfo: {
+            payments: payments.map((payment) => ({ typeId: "payment", id: payment.id })),
+          },
+        });
+        mockGetPayment.mockImplementation(async ({ id }: { id: string }) => {
+          if (id === "cart-123") {
+            throw new Error("The Resource with ID 'cart-123' was not found.");
+          }
+          const payment = payments.find((candidate) => candidate.id === id);
+          if (payment) return payment;
+          throw new Error(`Unexpected payment lookup: ${id}`);
+        });
+        mockConvertDmnToPaymentUpdate.mockReturnValue(
+          defaultConverterReturn({ id: "real-payment", pspReference: "50001" }),
+        );
+      }
+
+      it("does not count abandoned sessions toward the cap when one Payment already holds the DMN transaction", async () => {
+        const { service } = createService();
+        const abandoned = ["a", "b", "c", "d"].map((id) => sessionPayment(`abandoned-${id}`));
+        const real = sessionPayment("real-payment", [pendingAuth]);
+        arrangeCart([...abandoned, real]);
+        mockNuveiClientInstance.getPaymentStatus.mockImplementation(
+          async ({ sessionToken }: { sessionToken: string }) =>
+            defaultPaymentStatus({ sessionToken, clientUniqueId: "cart-123" }),
+        );
+
+        await service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" });
+
+        const verifiedTokens = mockNuveiClientInstance.getPaymentStatus.mock.calls.map(
+          ([arg]: [{ sessionToken: string }]) => arg.sessionToken,
+        );
+        expect(verifiedTokens.every((token: string) => token === "session-real-payment")).toBe(true);
+        expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ merchant_unique_id: "real-payment" }),
+          1000,
+        );
+        expect(mockUpdatePayment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "real-payment" }),
+        );
+      });
+
+      it("still verifies the remaining candidates when the identity-holding Payment does not verify", async () => {
+        const { service } = createService();
+        const holdsIdentityButForeign = sessionPayment("foreign-holder", [pendingAuth]);
+        const real = sessionPayment("real-payment");
+        arrangeCart([holdsIdentityButForeign, real]);
+        mockNuveiClientInstance.getPaymentStatus.mockImplementation(
+          async ({ sessionToken }: { sessionToken: string }) =>
+            defaultPaymentStatus({
+              sessionToken,
+              clientUniqueId: sessionToken === "session-foreign-holder" ? "other-cart" : "cart-123",
+            }),
+        );
+
+        await service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" });
+
+        const verifiedTokens = mockNuveiClientInstance.getPaymentStatus.mock.calls.map(
+          ([arg]: [{ sessionToken: string }]) => arg.sessionToken,
+        );
+        expect(verifiedTokens).toEqual(
+          expect.arrayContaining(["session-foreign-holder", "session-real-payment"]),
+        );
+        expect(mockUpdatePayment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: "real-payment" }),
+        );
+      });
+
+      it("never selects a Payment on transaction identity alone", async () => {
+        const { service } = createService();
+        const holdsIdentityButForeign = sessionPayment("foreign-holder", [pendingAuth]);
+        arrangeCart([holdsIdentityButForeign]);
+        mockNuveiClientInstance.getPaymentStatus.mockImplementation(
+          async ({ sessionToken }: { sessionToken: string }) =>
+            defaultPaymentStatus({ sessionToken, clientUniqueId: "other-cart" }),
+        );
+
+        await expect(
+          service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" }),
+        ).rejects.toThrow("Missing DMN session token for Payment fallback");
+
+        expect(mockUpdatePayment).not.toHaveBeenCalled();
+      });
+    });
+
     it("does not let session-bound overflow block a static Nuvei cart candidate", async () => {
       const { service } = createService();
       const staticPayment = makeDmnMockPayment({
@@ -1680,6 +1806,122 @@ describe("NuveiPaymentService – DMN processing", () => {
       ).rejects.toThrow("DMN session token does not match merchant_unique_id payment");
 
       expect(mockFindPaymentsByInterfaceId).not.toHaveBeenCalled();
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // processNuveiDmn – resolution by Nuvei order key (nuvei-<PPP_TransactionID>)
+  // -------------------------------------------------------------------------
+  describe("resolution by Nuvei order key", () => {
+    it("resolves a cart-id DMN by key without scanning the cart or verifying siblings", async () => {
+      const keyed = makeDmnMockPayment({
+        id: "keyed-payment",
+        key: "nuvei-50001",
+        interfaceId: "nuvei-session-token",
+      } as any);
+      const keyClient = makePaymentKeyClient(vi.fn().mockResolvedValue({ body: keyed }));
+      const { service } = createService({ ctPaymentClient: keyClient.client });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockConvertDmnToPaymentUpdate.mockReturnValue(
+        defaultConverterReturn({ id: "keyed-payment", pspReference: "50001" }),
+      );
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn({ ...dmnAuthOk, merchant_unique_id: "cart-123" });
+
+      // dmnAuthOk carries PPP_TransactionID 50001.
+      expect(keyClient.withKey).toHaveBeenCalledWith({ key: "nuvei-50001" });
+      expect(mockGetCart).not.toHaveBeenCalled();
+      expect(mockGetPayment).not.toHaveBeenCalledWith({ id: "cart-123" });
+      expect(mockConvertDmnToPaymentUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ merchant_unique_id: "keyed-payment" }),
+        1000,
+      );
+      expect(mockUpdatePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "keyed-payment" }),
+      );
+    });
+
+    it("falls back to the legacy resolution when no Payment has the key", async () => {
+      const notFound = Object.assign(new Error("not found"), { statusCode: 404 });
+      const keyClient = makePaymentKeyClient(vi.fn().mockRejectedValue(notFound));
+      const { service } = createService({ ctPaymentClient: keyClient.client });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(defaultConverterReturn());
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthOk);
+
+      expect(keyClient.withKey).toHaveBeenCalledWith({ key: "nuvei-50001" });
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+      expect(mockUpdatePayment).toHaveBeenCalled();
+    });
+
+    it("does not look up by key when the client is not wired", async () => {
+      const { service } = createService();
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(defaultConverterReturn());
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(dmnAuthOk);
+
+      expect(mockGetPayment).toHaveBeenCalledWith({ id: "payment-1" });
+    });
+
+    it("skips the key lookup when the DMN carries no PPP transaction id", async () => {
+      const keyClient = makePaymentKeyClient(vi.fn());
+      const { service } = createService({ ctPaymentClient: keyClient.client });
+      const { PPP_TransactionID: _ppp, ...bodyWithoutPpp } = dmnAuthOk;
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+      mockGetPayment.mockResolvedValue(makeDmnMockPayment({ interfaceId: "nuvei-session-token" }));
+      mockConvertDmnToPaymentUpdate.mockReturnValue(defaultConverterReturn());
+      mockNuveiClientInstance.getPaymentStatus.mockResolvedValue(
+        defaultPaymentStatus({ sessionToken: "nuvei-session-token" }),
+      );
+
+      await service.processNuveiDmn(bodyWithoutPpp);
+
+      expect(keyClient.withKey).not.toHaveBeenCalled();
+    });
+
+    it("rejects when the DMN sessionToken conflicts with the key-resolved Payment", async () => {
+      const keyed = makeDmnMockPayment({ id: "keyed-payment", interfaceId: "other-session" } as any);
+      const keyClient = makePaymentKeyClient(vi.fn().mockResolvedValue({ body: keyed }));
+      const { service } = createService({ ctPaymentClient: keyClient.client });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+
+      await expect(
+        service.processNuveiDmn({ ...dmnAuthOk, sessionToken: "nuvei-session-token" }),
+      ).rejects.toThrow("DMN session token does not match Nuvei order key payment");
+
+      expect(mockUpdatePayment).not.toHaveBeenCalled();
+    });
+
+    it("propagates non-404 key lookup failures instead of guessing another Payment", async () => {
+      const keyClient = makePaymentKeyClient(
+        vi.fn().mockRejectedValue(Object.assign(new Error("boom"), { statusCode: 503 })),
+      );
+      const { service } = createService({ ctPaymentClient: keyClient.client });
+
+      mockNuveiClientInstance.validateDmnChecksum.mockReturnValue(true);
+
+      await expect(service.processNuveiDmn(dmnAuthOk)).rejects.toThrow("boom");
+
+      expect(mockGetPayment).not.toHaveBeenCalled();
       expect(mockUpdatePayment).not.toHaveBeenCalled();
     });
   });

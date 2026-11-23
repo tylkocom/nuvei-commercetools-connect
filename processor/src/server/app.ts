@@ -7,6 +7,7 @@ const paymentService = new NuveiPaymentService({
   ctPaymentService: paymentSDK.ctPaymentService,
   ctOrderService: paymentSDK.ctOrderService,
   ctCartClient: paymentSDK.ctAPI.client,
+  ctPaymentClient: paymentSDK.ctAPI.client,
   orderPaymentStateSync: new OrderPaymentStateSync({ client: paymentSDK.ctAPI.client }),
 });
 

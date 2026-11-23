@@ -74,6 +74,8 @@ import {
   PublicPaymentErrorCode,
 } from "../dtos/operations/payment-errors.dto.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
+import { nuveiPaymentKeyFromOrder } from "./nuvei-payment-key.js";
+import type { CommercetoolsPaymentClient } from "./dmn-reconciler.js";
 
 /**
  * Minimal structural slice of the platform SDK ByProjectKeyRequestBuilder used
@@ -96,6 +98,11 @@ export type NuveiPaymentServiceOptions = {
   ctPaymentService: CommercetoolsPaymentService;
   ctOrderService: CommercetoolsOrderService;
   ctCartClient: CommercetoolsCartClient;
+  /**
+   * Enables DMN resolution by Payment key (`nuvei-<orderId>`). Optional: when
+   * omitted, DMNs resolve through the cart-link / session-token paths only.
+   */
+  ctPaymentClient?: CommercetoolsPaymentClient;
   /** Sets Order.paymentState = Paid after a successful charge. Optional: omit to disable. */
   orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
@@ -138,6 +145,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
     this.dmnReconciler = new NuveiDmnReconciler({
       ctCartService: opts.ctCartService,
       ctPaymentService: opts.ctPaymentService,
+      ctPaymentClient: opts.ctPaymentClient,
       orderPaymentStateSync: opts.orderPaymentStateSync,
     });
   }
@@ -835,6 +843,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         interactionId: sessionToken,
         amountPlanned,
         cart,
+        paymentKey: nuveiPaymentKeyFromOrder(openOrderResponse.orderId),
       });
 
       log.info("Transaction created successfully.", {
@@ -930,6 +939,7 @@ export class NuveiPaymentService extends AbstractPaymentService {
         cart,
         paymentMethod: selection.uiMethod,
         tender: selection.tender,
+        paymentKey: nuveiPaymentKeyFromOrder(openOrderResponse.orderId),
       });
 
       const config = getConfig();

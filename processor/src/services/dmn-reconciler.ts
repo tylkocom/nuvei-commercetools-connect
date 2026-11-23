@@ -8,6 +8,7 @@ import { nuveiClient } from "../clients/nuvei.client.js";
 import { log } from "../libs/logger/index.js";
 import { PaymentTransactions } from "../dtos/operations/payment-intents.dto.js";
 import { NUVEI_PAYMENT_INTERFACE } from "../constants.js";
+import { nuveiPaymentKeyFromOrder } from "./nuvei-payment-key.js";
 import { NuveiEventConverter } from "./converters/nuvei-event.converter.js";
 import type { NuveiDmnUpdateData } from "./converters/nuvei-event.converter.js";
 import {
@@ -55,9 +56,23 @@ function withAbortTimeout<T>(
   );
 }
 
+/**
+ * Minimal structural slice of the platform SDK ByProjectKeyRequestBuilder used to
+ * fetch a Payment by key. Structurally satisfied by paymentSDK.ctAPI.client and
+ * trivially mockable in tests.
+ */
+export type CommercetoolsPaymentClient = {
+  payments: () => {
+    withKey: (arg: { key: string }) => {
+      get: () => { execute: () => Promise<{ body: Payment }> };
+    };
+  };
+};
+
 type NuveiDmnReconcilerOptions = {
   ctCartService: CommercetoolsCartService;
   ctPaymentService: CommercetoolsPaymentService;
+  ctPaymentClient?: CommercetoolsPaymentClient;
   orderPaymentStateSync?: OrderPaymentStateSyncer;
 };
 
@@ -74,12 +89,14 @@ type NuveiDmnReconcilerOptions = {
 export class NuveiDmnReconciler {
   private readonly ctCartService: CommercetoolsCartService;
   private readonly ctPaymentService: CommercetoolsPaymentService;
+  private readonly ctPaymentClient?: CommercetoolsPaymentClient;
   private readonly orderPaymentStateSync?: OrderPaymentStateSyncer;
   private readonly nuveiEventConverter = new NuveiEventConverter();
 
   public constructor(opts: NuveiDmnReconcilerOptions) {
     this.ctCartService = opts.ctCartService;
     this.ctPaymentService = opts.ctPaymentService;
+    this.ctPaymentClient = opts.ctPaymentClient;
     this.orderPaymentStateSync = opts.orderPaymentStateSync;
   }
 
@@ -253,6 +270,14 @@ export class NuveiDmnReconciler {
       "SessionId",
     ]);
 
+    // Preferred path: the DMN's PPP_TransactionID is the openOrder orderId, and the
+    // Payment was created with key `nuvei-<orderId>`. One lookup, independent of how
+    // many sibling Payments (card/BLIK mounts, retries) are linked to the cart.
+    const keyedPayment = await this.resolveDmnPaymentByNuveiKey(body, sessionToken);
+    if (keyedPayment) {
+      return keyedPayment;
+    }
+
     let resolvedFromCartId = false;
 
     if (merchantUniqueId) {
@@ -341,6 +366,51 @@ export class NuveiDmnReconciler {
     return payments[0];
   }
 
+  /**
+   * Resolves the Payment created for this Nuvei order via its deterministic key.
+   * Returns undefined (so the legacy paths run) when the client is not wired, the
+   * DMN carries no PPP id, or no Payment has that key — e.g. Payments created
+   * before keys were introduced, or settle/refund DMNs whose PPP id is not an
+   * openOrder id.
+   */
+  private async resolveDmnPaymentByNuveiKey(
+    body: Record<string, unknown>,
+    sessionToken: string | undefined,
+  ): Promise<Payment | undefined> {
+    if (!this.ctPaymentClient) return undefined;
+
+    const pppTransactionId = extractCanonicalPpp(body);
+    const key = nuveiPaymentKeyFromOrder(pppTransactionId);
+    if (!pppTransactionId || !key) return undefined;
+
+    let payment: Payment;
+    try {
+      payment = (await this.ctPaymentClient.payments().withKey({ key }).get().execute()).body;
+    } catch (error) {
+      if (this.isResourceNotFoundError(error)) {
+        // Visible in logs so a staging/production run shows whether Nuvei's
+        // PPP_TransactionID really correlates with the key set at session creation.
+        log.info("No Payment found for Nuvei order key; using legacy DMN resolution.", {
+          resolutionPath: "nuvei-order-key-miss",
+          pppTransactionId,
+        });
+        return undefined;
+      }
+      throw error;
+    }
+
+    if (sessionToken && payment.interfaceId !== sessionToken) {
+      throw new Error("DMN session token does not match Nuvei order key payment");
+    }
+
+    log.info("Resolved DMN Payment by Nuvei order key.", {
+      resolutionPath: "nuvei-order-key",
+      pppTransactionId,
+      paymentId: payment.id,
+    });
+    return payment;
+  }
+
   private async resolveDmnPaymentFromCartId(
     cartId: string,
     body: Record<string, unknown>,
@@ -389,7 +459,11 @@ export class NuveiDmnReconciler {
     // cart-linked session candidates block an already identifiable Nuvei Payment.
     const verifiedSessionBoundCandidates =
       staticNuveiCandidates.length === 0
-        ? await this.getNuveiVerifiedSessionBoundPayments(sessionBoundCandidates, cartId)
+        ? await this.verifySessionBoundCandidatesPreferringIdentity(
+            sessionBoundCandidates,
+            cartId,
+            body,
+          )
         : [];
     const candidates = [...staticNuveiCandidates, ...verifiedSessionBoundCandidates];
 
@@ -676,6 +750,35 @@ export class NuveiDmnReconciler {
       });
       return false;
     }
+  }
+
+  /**
+   * Verifies session-bound candidates through Nuvei, trying first the ones that
+   * already hold the DMN's transaction identity (e.g. a settle/refund DMN for a
+   * Payment that already recorded its Auth). Abandoned sibling sessions never
+   * hold that identity, so they no longer count toward the candidate cap when
+   * the real Payment can be told apart locally.
+   *
+   * Identity alone never decides: every narrowed candidate is still verified, and
+   * if none verifies the remaining candidates are verified as before.
+   */
+  private async verifySessionBoundCandidatesPreferringIdentity(
+    candidates: Payment[],
+    cartId: string,
+    body: Record<string, unknown>,
+  ): Promise<Payment[]> {
+    const holdingDmnTransaction = this.getPaymentsMatchingDmnTransactionIdentity(candidates, body);
+    if (holdingDmnTransaction.length === 0 || holdingDmnTransaction.length === candidates.length) {
+      return this.getNuveiVerifiedSessionBoundPayments(candidates, cartId);
+    }
+
+    const verified = await this.getNuveiVerifiedSessionBoundPayments(holdingDmnTransaction, cartId);
+    if (verified.length > 0) {
+      return verified;
+    }
+
+    const remaining = candidates.filter((payment) => !holdingDmnTransaction.includes(payment));
+    return this.getNuveiVerifiedSessionBoundPayments(remaining, cartId);
   }
 
   private async getNuveiVerifiedSessionBoundPayments(
