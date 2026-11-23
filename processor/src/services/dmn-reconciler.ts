@@ -387,7 +387,15 @@ export class NuveiDmnReconciler {
     try {
       payment = (await this.ctPaymentClient.payments().withKey({ key }).get().execute()).body;
     } catch (error) {
-      if (this.isResourceNotFoundError(error)) return undefined;
+      if (this.isResourceNotFoundError(error)) {
+        // Visible in logs so a staging/production run shows whether Nuvei's
+        // PPP_TransactionID really correlates with the key set at session creation.
+        log.info("No Payment found for Nuvei order key; using legacy DMN resolution.", {
+          resolutionPath: "nuvei-order-key-miss",
+          pppTransactionId,
+        });
+        return undefined;
+      }
       throw error;
     }
 
